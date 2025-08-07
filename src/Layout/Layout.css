@@ -1,0 +1,35 @@
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  position: fixed;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.dashboard-tabs {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  height: calc(100vh - 64px);
+  z-index: 1000;
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+}
+
+.dashboard-tabs::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for WebKit browsers */
+}
+
+.content-container {
+  margin-top: 64px;
+  padding: 20px;
+  background-color: #f2f2f7;
+  flex: 1;
+  overflow-y: auto; /* Enable scrolling for content */
+}
