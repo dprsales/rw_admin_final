@@ -102,6 +102,20 @@ export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
 };
 
+// Career applications
+export const getApplications = async () => {
+  const response = await http.get('/applications');
+  return response.data;
+};
+
+export const getApplicationDetails = (applicationId: string) => {
+  return http.get(`/applications/${applicationId}`);
+};
+
+export const deleteApplication = (applicationId: string) => {
+  return http.delete(`/applications/${applicationId}`);
+};
+
 
 export const searchProjects = (searchItem: string) => {
   return http.get("/projects/search", { params: { searchItem } });
