@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { Close, DeleteOutline, Search, WorkOutline } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { deleteApplication, getApplications } from '../../api/services';
+import { deleteApplication, downloadApplicationResume, getApplications } from '../../api/services';
 
 export interface Application {
   _id: string;
@@ -40,10 +40,14 @@ export interface Application {
   noticePeriod?: string;
   relocation?: string;
   workMode?: string;
+  applicationSource?: string;
+  privacyConsent?: string;
   ref1Name?: string;
   ref1Number?: string;
+  ref1Relationship?: string;
   ref2Name?: string;
   ref2Number?: string;
+  ref2Relationship?: string;
   linkedinUrl?: string;
   portfolioUrl?: string;
   coverLetter: string;
@@ -63,6 +67,7 @@ const Applications: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [downloadingResume, setDownloadingResume] = useState(false);
   const queryClient = useQueryClient();
   const deleteMutation = useMutation((applicationId: string) => deleteApplication(applicationId), {
     onSuccess: () => {
@@ -94,6 +99,23 @@ const Applications: React.FC = () => {
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(event.target.value);
     setCurrentPage(1);
+  };
+
+  const handleResumeDownload = async (application: Application) => {
+    setDownloadingResume(true);
+    try {
+      const response = await downloadApplicationResume(application._id);
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = application.resumeFileName || 'resume';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingResume(false);
+    }
   };
 
   if (isLoading) {
@@ -175,6 +197,8 @@ const Applications: React.FC = () => {
             deleteMutation.mutate(applicationId);
           }
         }}
+        onDownload={() => selectedApplication && handleResumeDownload(selectedApplication)}
+        downloading={downloadingResume}
         deleting={deleteMutation.isLoading}
       />
     </Box>
@@ -185,8 +209,10 @@ const ApplicationDetails: React.FC<{
   application: Application | null;
   onClose: () => void;
   onDelete: (applicationId: string) => void;
+  onDownload: () => void;
+  downloading: boolean;
   deleting: boolean;
-}> = ({ application, onClose, onDelete, deleting }) => (
+}> = ({ application, onClose, onDelete, onDownload, downloading, deleting }) => (
   <Dialog open={Boolean(application)} onClose={onClose} fullWidth maxWidth="sm">
     {application && <>
       <DialogTitle sx={{ pr: 6, fontWeight: 700 }}>
@@ -205,6 +231,7 @@ const ApplicationDetails: React.FC<{
           <Detail label="Notice period" value={application.noticePeriod} />
           <Detail label="Relocation" value={application.relocation} />
           <Detail label="Work mode" value={application.workMode} />
+          <Detail label="Application source" value={application.applicationSource} />
           <Detail label="Applied" value={formatDate(application.createdAt)} />
           <Detail label="LinkedIn" value={application.linkedinUrl} link={application.linkedinUrl} />
           <Detail label="Portfolio" value={application.portfolioUrl} link={application.portfolioUrl} />
@@ -212,17 +239,17 @@ const ApplicationDetails: React.FC<{
         </Box>
         <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700 }}>Professional references</Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, p: 2, bgcolor: '#fafcfd', border: '1px solid #e4edf2', borderRadius: 1 }}>
-          <Detail label="Reference 1" value={[application.ref1Name, application.ref1Number].filter(Boolean).join(' · ')} />
-          <Detail label="Reference 2" value={[application.ref2Name, application.ref2Number].filter(Boolean).join(' · ')} />
+          <Detail label="Reference 1" value={[application.ref1Name, application.ref1Number, application.ref1Relationship].filter(Boolean).join(' · ')} />
+          <Detail label="Reference 2" value={[application.ref2Name, application.ref2Number, application.ref2Relationship].filter(Boolean).join(' · ')} />
         </Box>
         {application.resumeUrl && (
           <Box sx={{ display: 'flex', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
             <Box component="a" href={application.resumeUrl} target="_blank" rel="noreferrer" sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', px: 2, py: 1, borderRadius: 1.5, bgcolor: '#0f63a5', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 600, '&:hover': { bgcolor: '#0b4f84' } }}>
               View Resume
             </Box>
-            <Box component="a" href={application.resumeUrl} download={application.resumeFileName || 'resume'} sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', px: 2, py: 1, borderRadius: 1.5, border: '1px solid #0f63a5', color: '#0f63a5', textDecoration: 'none', fontSize: 14, fontWeight: 600, '&:hover': { bgcolor: '#e7f1f7' } }}>
-              Download Resume
-            </Box>
+            <Button onClick={onDownload} disabled={downloading} variant="outlined" sx={{ borderRadius: 1.5, borderColor: '#0f63a5', color: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#e7f1f7', borderColor: '#0f63a5' } }}>
+              {downloading ? 'Downloading...' : 'Download Resume'}
+            </Button>
           </Box>
         )}
         <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700 }}>Cover letter / message</Typography>

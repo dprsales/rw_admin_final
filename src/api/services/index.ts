@@ -116,6 +116,10 @@ export const deleteApplication = (applicationId: string) => {
   return http.delete(`/applications/${applicationId}`);
 };
 
+export const downloadApplicationResume = (applicationId: string) => {
+  return http.get(`/applications/${applicationId}/resume/download`, { responseType: 'blob' });
+};
+
 
 export const searchProjects = (searchItem: string) => {
   return http.get("/projects/search", { params: { searchItem } });
