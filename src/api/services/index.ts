@@ -129,6 +129,10 @@ export const updateProject = (projectId: string, data: any) => {
   return http.patch(`/projects/${projectId}`, data);
 };
 
+export const deleteProject = (projectId: string) => {
+  return http.delete(`/projects/${projectId}`);
+};
+
 
 
 

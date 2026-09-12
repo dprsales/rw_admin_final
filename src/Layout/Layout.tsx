@@ -8,7 +8,10 @@ import { Box } from '@mui/material';
 
 const Layout = () => {
   const location = useLocation();
-  const [selectedTab, setSelectedTab] = useState('');
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const path = location.pathname.split('/')[1];
+    return `/${path}`;
+  });
   const userType = Cookies.get('user_type'); 
 
   useEffect(() => {

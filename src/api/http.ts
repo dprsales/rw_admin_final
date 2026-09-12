@@ -2,8 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 export const http = axios.create({
-  // baseURL: "https://api.rajivwilliams.com",
-  baseURL: "http://localhost:8088",
+  baseURL: "https://api.rajivwilliams.com",
+  // baseURL: `http://${window.location.hostname}:8088`,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json, text/plain, */*",  
@@ -30,7 +30,7 @@ http.interceptors.response.use(
   function (err) {
     if (err.message === "Network Error") {
       alert("Network Error");
-    } else if (err.response.status === 401) {
+    } else if (err.response && err.response.status === 401) {
       Cookies.remove("access_token");
       localStorage.clear();
       window.location.href = "/login";

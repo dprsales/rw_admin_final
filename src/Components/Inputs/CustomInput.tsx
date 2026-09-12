@@ -33,12 +33,17 @@ const CustomInputWrapper = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-export default function CustomInput(props: CustomInputProps) {
-  const { endAdornment, ...other } = props;
-  return (
+const CustomInput = React.forwardRef<HTMLElement, CustomInputProps>(
+  ({ endAdornment, autoComplete = "off", ...other }, ref) => (
     <CustomInputWrapper
+      ref={ref}
       {...other}
-      endAdornment={endAdornment} 
+      autoComplete={autoComplete}
+      endAdornment={endAdornment}
     />
-  );
-}
+  )
+);
+
+CustomInput.displayName = "CustomInput";
+
+export default CustomInput;

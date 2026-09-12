@@ -45,6 +45,10 @@ const Login: React.FC = () => {
     formState: { errors },
   } = useForm({
     resolver: yupResolver(validationSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
   });
 
   // Mutation to handle login via API
@@ -152,20 +156,26 @@ const Login: React.FC = () => {
               style={{ width: "100%", display: "flex", flexDirection: "column" }}
             >
               <FormControl error={!!errors.email} sx={{ mb: 2 }}>
-                <InputLabel shrink htmlFor="bootstrap-input" sx={{ left: "-12px !important" }}>
+                <InputLabel shrink htmlFor="login-email" sx={{ left: "-12px !important" }}>
                   Email
                 </InputLabel>
                 <Controller
                   name="email"
                   control={control}
                   render={({ field }) => (
-                    <CustomInput {...field} placeholder="Login ID" sx={{ width: "100%" }} />
+                    <CustomInput
+                      id="login-email"
+                      autoComplete="email"
+                      {...field}
+                      placeholder="Login ID"
+                      sx={{ width: "100%" }}
+                    />
                   )}
                 />
                 {errors.email && <FormHelperText>{errors.email.message}</FormHelperText>}
               </FormControl>
               <FormControl error={!!errors.password} sx={{ mb: 2 }}>
-                <InputLabel shrink htmlFor="bootstrap-input" sx={{ left: "-12px !important" }}>
+                <InputLabel shrink htmlFor="login-password" sx={{ left: "-12px !important" }}>
                   Password
                 </InputLabel>
                 <Controller
@@ -173,6 +183,8 @@ const Login: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <CustomInput
+                      id="login-password"
+                      autoComplete="current-password"
                       {...field}
                       placeholder="Password"
                       type={showPassword ? "text" : "password"}

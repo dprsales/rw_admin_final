@@ -23,6 +23,12 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
   const [step, setStep] = useState(1);
   const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(validationSchema),
+    defaultValues: {
+      identifier: '',
+      otp: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
   });
 
   const onSubmitIdentifier = (data: any) => {
@@ -56,6 +62,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                     label="Email or Username"
                     variant="standard"
                     fullWidth
+                    autoComplete="username"
                     error={!!errors.identifier}
                     helperText={errors.identifier?.message}
                     sx={{ mb: 1 }}
@@ -159,6 +166,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                     variant="standard"
                     fullWidth
                     type="password"
+                    autoComplete="new-password"
                     error={!!errors.newPassword}
                     helperText={errors.newPassword?.message}
                     sx={{ mb: 4 }}
@@ -176,6 +184,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                     variant="standard"
                     fullWidth
                     type="password"
+                    autoComplete="new-password"
                     error={!!errors.confirmPassword}
                     helperText={errors.confirmPassword?.message}
                     sx={{ mb: 4 }}
