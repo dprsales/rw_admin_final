@@ -102,6 +102,24 @@ export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
 };
 
+// Career applications
+export const getApplications = async () => {
+  const response = await http.get('/applications');
+  return response.data;
+};
+
+export const getApplicationDetails = (applicationId: string) => {
+  return http.get(`/applications/${applicationId}`);
+};
+
+export const deleteApplication = (applicationId: string) => {
+  return http.delete(`/applications/${applicationId}`);
+};
+
+export const downloadApplicationResume = (applicationId: string) => {
+  return http.get(`/applications/${applicationId}/resume/download`, { responseType: 'blob' });
+};
+
 
 export const searchProjects = (searchItem: string) => {
   return http.get("/projects/search", { params: { searchItem } });
@@ -109,6 +127,10 @@ export const searchProjects = (searchItem: string) => {
 
 export const updateProject = (projectId: string, data: any) => {
   return http.patch(`/projects/${projectId}`, data);
+};
+
+export const deleteProject = (projectId: string) => {
+  return http.delete(`/projects/${projectId}`);
 };
 
 

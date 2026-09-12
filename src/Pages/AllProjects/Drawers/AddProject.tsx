@@ -68,6 +68,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
       parkingarea: 0,
       propertyType: '',
       bankOffers: [],
+      highlights: { items: [] },
     }
   });
   const {
@@ -211,7 +212,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
               name="bhk"
               control={control}
               render={({ field }) => (
-                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())))} />
+                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
               )}
             />
             <FormHelperText>{errors.bhk?.message}</FormHelperText>
@@ -222,7 +223,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
               name="sqft"
               control={control}
               render={({ field }) => (
-                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())))} />
+                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
               )}
             />
             <FormHelperText>{errors.sqft?.message}</FormHelperText>
@@ -298,11 +299,40 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
             <Controller
               name="zone"
               control={control}
+              rules={{ required: 'Zone is required' }}
               render={({ field }) => (
-                <CustomInput id="project-zone-input" placeholder="Enter zone" {...field} />
+                <Select
+                  id="project-zone-input"
+                  displayEmpty
+                  {...field}
+                  error={!!errors.zone}
+                  IconComponent={ArrowDropDown}
+                  renderValue={(selected) =>
+                    selected ? selected : 'Select Zone'
+                  }
+                  style={{
+                    width: "100%",
+                    height: "45px",
+                    border: "1px solid #1212121A",
+                    borderRadius: "10px",
+                    opacity: 0.6,
+                    boxShadow: "0px 6px 14px #36408D08",
+                    fontSize: "14px",
+                    color: "#1D1D1D",
+                    textAlign: 'left',
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    Select Zone...
+                  </MenuItem>
+                  <MenuItem value="east">East</MenuItem>
+                  <MenuItem value="west">West</MenuItem>
+                  <MenuItem value="north">North</MenuItem>
+                  <MenuItem value="south">South</MenuItem>
+                </Select>
               )}
             />
-            <FormHelperText>{errors.zone?.message}</FormHelperText>
+            <FormHelperText error>{errors.zone?.message}</FormHelperText>
           </FormControl>
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel shrink htmlFor="project-street-input">Street</InputLabel>

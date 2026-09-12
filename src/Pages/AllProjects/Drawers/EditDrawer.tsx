@@ -150,6 +150,8 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
                 control={control}
                 render={({ field }) => (
                   <CustomInput
+                    id="name"
+                    autoComplete="off"
                     placeholder="Name"
                     fullWidth
                     value={formData?.name || ''}
@@ -167,6 +169,8 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
                 control={control}
                 render={({ field }) => (
                   <CustomInput
+                    id="description"
+                    autoComplete="off"
                     placeholder="Description"
                     fullWidth
                     multiline
@@ -186,6 +190,8 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
                 control={control}
                 render={({ field }) => (
                   <CustomInput
+                    id="establishedYear"
+                    autoComplete="off"
                     placeholder="Established Year"
                     fullWidth
                     value={formData?.establishedYear || ''}
@@ -203,6 +209,8 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
                 control={control}
                 render={({ field }) => (
                   <CustomInput
+                    id="sftPrice"
+                    autoComplete="off"
                     placeholder="SFT Price"
                     fullWidth
                     type="number"
@@ -220,6 +228,8 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
                 control={control}
                 render={({ field }) => (
                   <CustomInput
+                    id="builderName"
+                    autoComplete="off"
                     placeholder="Builder Name"
                     fullWidth
                     value={formData?.builderName || ''}
