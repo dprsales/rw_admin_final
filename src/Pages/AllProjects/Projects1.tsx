@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import {
   Box, TextField, InputAdornment, Button, Paper, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Pagination, Typography,
-  Tooltip
+  Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText,
+  DialogActions
 } from '@mui/material';
-import { Search as SearchIcon, Add as Plus } from '@mui/icons-material';
+import { Search as SearchIcon, Add as Plus, Delete as DeleteIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from 'react-query';
 import { Project } from './ProjectInterface';
 import AddProject from './Drawers/AddProject';
-// import { deleteProject } from '../../api/services';
+import { deleteProject } from '../../api/services';
 import { toast } from 'react-toastify';
 import AddAllProjects from './Drawers/AddAllProjects';
 
@@ -27,6 +29,23 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [deleteProjectTitle, setDeleteProjectTitle] = useState('');
+
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation(deleteProject, {
+    onSuccess: () => {
+      toast.success('Project deleted successfully');
+      queryClient.invalidateQueries('getProjects');
+      onDelete();
+      setDeleteProjectId(null);
+      setDeleteProjectTitle('');
+    },
+    onError: () => {
+      toast.error('Error deleting project');
+    }
+  });
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
@@ -36,15 +55,22 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
     navigate(`/projects/${slug}`);
   };
 
-  // const handleDeleteProject = async (projectId: string) => {
-  //   try {
-  //     await deleteProject(projectId);
-  //     toast.success('Project deleted successfully');
-  //     onDelete(); // refetch project list
-  //   } catch {
-  //     toast.error('Error deleting project');
-  //   }
-  // };
+  const handleDeleteConfirm = () => {
+    if (deleteProjectId) {
+      deleteMutation.mutate(deleteProjectId);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, projectId: string, title: string) => {
+    e.stopPropagation();
+    setDeleteProjectId(projectId);
+    setDeleteProjectTitle(title);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteProjectId(null);
+    setDeleteProjectTitle('');
+  };
 
   const safeToLower = (v: any) => (typeof v === 'string' ? v.toLowerCase() : '');
   const filtered = ProjectsData?.filter(p => safeToLower(p.name).includes(safeToLower(searchText))) || [];
@@ -110,6 +136,9 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
               <TableCell align="left" sx={{ padding: "8px" }}>
                 <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>Status</Typography>
               </TableCell>
+              <TableCell align="left" sx={{ padding: "8px" }}>
+                <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>Action</Typography>
+              </TableCell>
 
             </TableRow>
           </TableHead>
@@ -165,6 +194,17 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
                       </Box>
                     </Tooltip>
                   </TableCell>
+                  <TableCell sx={{ padding: '6px' }}>
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleDeleteClick(e, row.projectId, row.title)}
+                        sx={{ color: '#d32f2f' }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -189,9 +229,25 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
         open={isAddDrawerOpen}
         onClose={() => {
           setIsAddDrawerOpen(false);
-          onDelete(); // refresh after adding
+          onDelete();
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteProjectId} onClose={handleDeleteCancel}>
+        <DialogTitle>Delete Project</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "<strong>{deleteProjectTitle}</strong>"? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleteMutation.isLoading}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleteMutation.isLoading}>
+            {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -10,6 +10,7 @@ import Layout from "../Layout/Layout";
 import AllProjects from "../Pages/AllProjects";
 import ProjectDetails from "../Pages/AllProjects/ProjectDetails";
 import Leads from "../Pages/Leads";
+import Applications from "../Pages/Applications";
 
 // Check if user is authenticated
 const isAuthenticated = () => {
@@ -82,6 +83,10 @@ const router = createBrowserRouter([
       {
         path: "/leads",
         element: <ProtectedRoute componentType={"admin_notifications"} component={<Leads/>} />,
+      },
+      {
+        path: "/applications",
+        element: <ProtectedRoute componentType={"admin_applications"} component={<Applications />} />,
       },
 
       {
