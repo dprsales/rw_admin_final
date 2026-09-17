@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import { toast } from 'react-toastify';
@@ -82,9 +82,10 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
 
   const queryClient = useQueryClient();
 
-  const mutation = useMutation(addProject, {
+  const mutation = useMutation({
+    mutationFn: addProject,
     onSuccess: () => {
-      queryClient.invalidateQueries('getProjects');
+      queryClient.invalidateQueries({ queryKey: ['getProjects'] });
       toast.success('Project added successfully');
       onClose();
     },
@@ -516,7 +517,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
             Add Bank Offer
           </Button>
           <Box>
-            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isLoading}>
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isPending}>
               Add Project
             </Button>
           </Box>

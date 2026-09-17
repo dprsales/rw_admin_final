@@ -167,4 +167,8 @@ export interface Project {
   amenities?: any[];
   connectedliving: any[];
   projectBHK: (string | number)[];
+  highlights?: string[];
+  projectimage?: string;
+  rera?: string;
+  date?: number;
 }

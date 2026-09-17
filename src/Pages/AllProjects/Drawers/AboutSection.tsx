@@ -6,7 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { aboutSection ,updateProjectSection} from '../../../api/services';
 
@@ -52,20 +52,18 @@ const AboutSectionDrawer: FC<AboutSectionDrawerProps> = ({ open, onClose, slug, 
 
   const queryClient = useQueryClient();
 
-  const mutation = useMutation(
-    (formData: AboutSection) => updateProjectSection(slug, 'aboutsection', formData),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('project');
-        toast.success('About Section updated successfully');
-        onClose();
-        refetch();
-      },
-      onError: () => {
-        toast.error('Failed to update About Section');
-      }
+  const mutation = useMutation({
+    mutationFn: (formData: AboutSection) => updateProjectSection(slug, 'aboutsection', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('About Section updated successfully');
+      onClose();
+      refetch();
+    },
+    onError: () => {
+      toast.error('Failed to update About Section');
     }
-  );
+  });
 
    useEffect(() => {
       if (open && existingData) {

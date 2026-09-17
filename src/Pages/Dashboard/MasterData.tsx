@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Card, Typography, CircularProgress } from '@mui/material';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
 import { getProjects } from '../../api/services';
 import { TabsIcons } from '../../assets';
@@ -10,9 +10,9 @@ const MasterData: React.FC = () => {
 
   const {
     data: ProjectsData,
-    isLoading,
+    isPending,
     isError,
-  } = useQuery('getProjects', getProjects);
+  } = useQuery({ queryKey: ['getProjects'], queryFn: getProjects });
 
   // DEBUG: Log the actual response to inspect the shape
   console.log('ProjectsData:', ProjectsData);
@@ -32,7 +32,7 @@ const MasterData: React.FC = () => {
     },
   ];
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <Box sx={{ padding: 2 }}>
         <CircularProgress />

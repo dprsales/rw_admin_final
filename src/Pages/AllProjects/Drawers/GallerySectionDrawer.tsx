@@ -5,7 +5,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { gallerySection ,updateProjectSection} from '../../../api/services';
 
@@ -42,20 +42,18 @@ const GallerySectionDrawer: FC<GallerySectionDrawerProps> = ({ open, onClose, sl
 
   const queryClient = useQueryClient();
 
-  const mutation = useMutation(
-    (formData: GallerySection) => updateProjectSection(slug, 'gallerysection', formData),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('project');
-        toast.success('Gallery Section updated successfully');
-        onClose();
-        refetch();
-      },
-      onError: () => {
-        toast.error('Failed to update Gallery Section');
-      }
+  const mutation = useMutation({
+    mutationFn: (formData: GallerySection) => updateProjectSection(slug, 'gallerysection', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Gallery Section updated successfully');
+      onClose();
+      refetch();
+    },
+    onError: () => {
+      toast.error('Failed to update Gallery Section');
     }
-  );
+  });
 
   const onSubmit = (data: GallerySection) => {
     mutation.mutate(data);

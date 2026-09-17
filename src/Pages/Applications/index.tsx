@@ -23,7 +23,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Close, DeleteOutline, Search, WorkOutline } from '@mui/icons-material';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteApplication, downloadApplicationResume, getApplications } from '../../api/services';
 
 export interface Application {
@@ -69,13 +69,14 @@ const Applications: React.FC = () => {
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [downloadingResume, setDownloadingResume] = useState(false);
   const queryClient = useQueryClient();
-  const deleteMutation = useMutation((applicationId: string) => deleteApplication(applicationId), {
+  const deleteMutation = useMutation({
+    mutationFn: (applicationId: string) => deleteApplication(applicationId),
     onSuccess: () => {
-      queryClient.invalidateQueries('applications');
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
       setSelectedApplication(null);
     },
   });
-  const { data, isLoading, error } = useQuery<Application[], Error>({
+  const { data, isPending, error } = useQuery<Application[], Error>({
     queryKey: ['applications'],
     queryFn: getApplications,
   });
@@ -118,7 +119,7 @@ const Applications: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isPending) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
   }
 
@@ -199,7 +200,7 @@ const Applications: React.FC = () => {
         }}
         onDownload={() => selectedApplication && handleResumeDownload(selectedApplication)}
         downloading={downloadingResume}
-        deleting={deleteMutation.isLoading}
+        deleting={deleteMutation.isPending}
       />
     </Box>
   );

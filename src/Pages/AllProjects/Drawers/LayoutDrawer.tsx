@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
@@ -74,20 +74,18 @@ const LayoutDrawer: FC<LayoutDrawerProps> = ({ open, onClose, slug, refetch, exi
   //   mutation.mutate(data);
   // };
 
-const mutation = useMutation(
-  (formData: LayoutPayload) => updateProjectSection(slug, 'layout', formData),
-  {
-    onSuccess: () => {
-      queryClient.invalidateQueries('project');
-      toast.success('Layout Section updated successfully');
-      onClose();
-      refetch();
-    },
-    onError: () => {
-      toast.error('Failed to update Layout Section');
-    },
-  }
-);
+const mutation = useMutation({
+  mutationFn: (formData: LayoutPayload) => updateProjectSection(slug, 'layout', formData),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['project'] });
+    toast.success('Layout Section updated successfully');
+    onClose();
+    refetch();
+  },
+  onError: () => {
+    toast.error('Failed to update Layout Section');
+  },
+});
 
 // onSubmit
 const onSubmit = (data: Layout) => {

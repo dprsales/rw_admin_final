@@ -1,8 +1,9 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { getProjectDetails } from '../../../api/services';
-import { LinearProgress, Box, Typography } from '@mui/material';
+import { LinearProgress, Box, Typography, Button } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ProjectDetailsSection from './ProjectDetailsSection';
 import HeroSection from './HeroSection';
 import AboutSection from './AboutSection';
@@ -18,19 +19,22 @@ import AllProjectsDetails from './AllProjectsDetails';
 
 const ProjectDetailsPage = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
 
   // ✅ Call hook unconditionally, protect it with `enabled`
   const {
     data,
-    isLoading,
+    isPending,
     error,
     refetch,
-  } = useQuery(['getProjectDetails', slug], () => getProjectDetails(slug!), {
+  } = useQuery({
+    queryKey: ['getProjectDetails', slug],
+    queryFn: () => getProjectDetails(slug!),
     enabled: !!slug,
   });
 console.log("data from query:", data);
   // ✅ Render loading state
-  if (isLoading) return <LinearProgress />;
+  if (isPending) return <LinearProgress />;
 
   // ✅ Render error or missing data
   if (error || !data?.data) {
@@ -42,6 +46,14 @@ console.log("data from query:", data);
 
   return (
     <Box>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/projects')}
+        sx={{ mb: 2 }}
+      >
+        Back to Projects
+      </Button>
+
      {project.projectdetails && (
         <ProjectDetailsSection
           data={project.projectdetails}

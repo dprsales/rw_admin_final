@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon, ArrowDropDown as ArrowDropDownIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
 import { getLeads } from '../../api/services';
@@ -47,7 +47,7 @@ const AllLeads: React.FC = () => {
   const [showSourceSelect, setShowSourceSelect] = useState(false);
 
   // ✅ useQuery with proper typing
-  const { data, isLoading, error } = useQuery<LeadsApiResponse, Error>({
+  const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
     queryKey: ['leads'],
     queryFn: getLeads,
   });
@@ -103,7 +103,7 @@ const AllLeads: React.FC = () => {
   // ----------------------
   // Loading / Error States
   // ---------------------- 
-  if (isLoading) return <Typography>Loading...</Typography>;
+  if (isPending) return <Typography>Loading...</Typography>;
   if (error) return <Typography color="error">Error fetching leads.</Typography>;
 
   return (

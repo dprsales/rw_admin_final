@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect } from 'react';
 import {
     Drawer, Box, Typography, Button, IconButton, FormControl, InputLabel, FormHelperText,
     MenuItem,
@@ -6,11 +6,11 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import { toast } from 'react-toastify';
-import { addProject } from '../../../api/services';
+import { addProject, updateProject } from '../../../api/services';
 import { ArrowDropDown } from '@mui/icons-material';
 import { Projects } from '../ProjectInterface';
 
@@ -36,8 +36,8 @@ interface FormValues {
 }
 
 
-const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) => {
-    const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
+const AddAllProjects: FC<AddProjectProps> = ({ open, onClose, initialData }) => {
+    const { control, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
         defaultValues: {
             title: '',
             bhk: [],
@@ -47,10 +47,29 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
             projectimage: '',
             towers: 0,
             parkingarea: 0,
-           highlights: [{ value: '' }],
+            highlights: [{ value: '' }],
             rera: '',
+            date: 0,
         }
     });
+
+    useEffect(() => {
+        if (open) {
+            reset({
+                title: initialData?.title || '',
+                bhk: initialData?.bhk || [],
+                sqft: initialData?.sqft || [],
+                slug: initialData?.slug || '',
+                location: initialData?.location || '',
+                projectimage: initialData?.projectimage || '',
+                towers: initialData?.towers || 0,
+                parkingarea: initialData?.parkingarea || 0,
+                highlights: (initialData?.highlights?.map((h) => ({ value: h }))) || [{ value: '' }],
+                rera: initialData?.rera || '',
+                date: initialData?.date || 0,
+            });
+        }
+    }, [open, initialData, reset]);
     const { fields, append, remove } = useFieldArray({
         control,
         name: 'highlights'
@@ -58,14 +77,17 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
 
     const queryClient = useQueryClient();
 
-    const mutation = useMutation(addProject, {
+    const mutation = useMutation({
+        mutationFn: initialData
+            ? (data: any) => updateProject(initialData.slug, data)
+            : addProject,
         onSuccess: () => {
-            queryClient.invalidateQueries('getProjects');
-            toast.success('Project added successfully');
+            queryClient.invalidateQueries({ queryKey: ['getProjects'] });
+            toast.success(initialData ? 'Project updated successfully' : 'Project added successfully');
             onClose();
         },
         onError: () => {
-            toast.error('Error adding project');
+            toast.error(initialData ? 'Error updating project' : 'Error adding project');
         }
     });
 
@@ -141,7 +163,7 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
                 padding: '0 20px',
             }}>
                 <Typography variant="body1" sx={{ color: '#fff', fontWeight: '550' }}>
-                    Add Project
+                    {initialData ? 'Edit Project' : 'Add Project'}
                 </Typography>
                 <IconButton onClick={onClose} sx={{ color: 'white', mr: 2 }}>
                     <CloseIcon sx={{ color: "white" }} />
@@ -167,7 +189,7 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
                             name="bhk"
                             control={control}
                             render={({ field }) => (
-                                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())))} />
+                                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
                             )}
                         />
                         <FormHelperText>{errors.bhk?.message}</FormHelperText>
@@ -178,7 +200,7 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
                             name="sqft"
                             control={control}
                             render={({ field }) => (
-                                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())))} />
+                                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
                             )}
                         />
                         <FormHelperText>{errors.sqft?.message}</FormHelperText>
@@ -280,8 +302,8 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose ,initialData,  }) =
 
 
                     <Box>
-                        <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isLoading}>
-                            Add Project
+                        <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isPending}>
+                            {initialData ? 'Update Project' : 'Add Project'}
                         </Button>
                     </Box>
                 </form>

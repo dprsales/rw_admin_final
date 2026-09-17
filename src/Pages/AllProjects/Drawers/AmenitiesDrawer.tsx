@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
@@ -34,20 +34,18 @@ const AmenitiesDrawer: FC<Props> = ({ open, onClose, slug, refetch, existingData
 
     const queryClient = useQueryClient();
 
-    const mutation = useMutation(
-        (formData: Amenities) => updateProjectSection(slug, 'amenities', formData),
-        {
-            onSuccess: () => {
-                queryClient.invalidateQueries('project');
-                toast.success('Amenities updated');
-                onClose();
-                refetch();
-            },
-            onError: () => {
-                toast.error('Failed to update amenities');
-            }
+    const mutation = useMutation({
+        mutationFn: (formData: Amenities) => updateProjectSection(slug, 'amenities', formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['project'] });
+            toast.success('Amenities updated');
+            onClose();
+            refetch();
+        },
+        onError: () => {
+            toast.error('Failed to update amenities');
         }
-    );
+    });
 
     useEffect(() => {
         if (open && existingData) {

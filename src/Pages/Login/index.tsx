@@ -17,7 +17,7 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "react-query";
+import { useMutation } from "@tanstack/react-query";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { toast } from "react-toastify";
@@ -52,7 +52,8 @@ const Login: React.FC = () => {
   });
 
   // Mutation to handle login via API
-  const { mutate: loginUser, isLoading } = useMutation(authLogin, {
+  const { mutate: loginUser, isPending } = useMutation({
+    mutationFn: authLogin,
     onSuccess: (response) => {
       try {
         const { access_token, user_profile } = response.data;
@@ -214,8 +215,8 @@ const Login: React.FC = () => {
               >
                 Forgot password?
               </Typography>
-              <Button type="submit" variant="contained" color="primary" sx={{ mb: 2 }} disabled={isLoading}>
-                {isLoading ? <LinearProgress /> : "Login"}
+              <Button type="submit" variant="contained" color="primary" sx={{ mb: 2 }} disabled={isPending}>
+                {isPending ? <LinearProgress /> : "Login"}
               </Button>
             </form>
           </CardContent>

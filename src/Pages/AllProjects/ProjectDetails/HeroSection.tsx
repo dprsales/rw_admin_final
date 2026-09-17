@@ -85,19 +85,13 @@ const HeroSection: React.FC<Props> = ({ slug, refetch, data }) => {
           </Grid>
 
           <Grid container spacing={2} sx={{ mt: 2 }}>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="subtitle2" mb={1} textAlign='start'>Background Image :</Typography>
-              <Card sx={{ height: 150 }}>
-                <img src={resolveImageUrl(heroData.backgroundimage)} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="subtitle2" mb={1} textAlign='start'>Project Image :</Typography>
               <Card sx={{ height: 150 }}>
                 <img src={resolveImageUrl(heroData.projectimage)} alt="Project" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </Card>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="subtitle2" mb={1} textAlign='start'>Project Logo :</Typography>
               <Card sx={{ height: 150 }}>
                 <img src={resolveImageUrl(heroData.projectlogo)} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />

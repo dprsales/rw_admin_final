@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
@@ -41,20 +41,18 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
 
   const queryClient = useQueryClient();
 
-  const mutation = useMutation(
-    (formData: FloorPlans) => updateProjectSection(slug, 'floorplans', formData),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('project');
-        toast.success('Floor plans updated');
-        onClose();
-        refetch();
-      },
-      onError: () => {
-        toast.error('Failed to update floor plans');
-      }
+  const mutation = useMutation({
+    mutationFn: (formData: FloorPlans) => updateProjectSection(slug, 'floorplans', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      toast.success('Floor plans updated');
+      onClose();
+      refetch();
+    },
+    onError: () => {
+      toast.error('Failed to update floor plans');
     }
-  );
+  });
 
   // const onSubmit = (data: FloorPlans) => {
   //   mutation.mutate(data);

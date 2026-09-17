@@ -16,7 +16,7 @@
 // import * as yup from 'yup';
 // import { yupResolver } from '@hookform/resolvers/yup';
 // import CustomInput from '../../Components/Inputs/CustomInput';
-// import { useMutation, useQueryClient } from 'react-query';
+// import { useMutation, useQueryClient } from '@tanstack/react-query';
 // import { addLead, updateLead } from '../../api/services';
 // import { toast } from 'react-toastify';
 

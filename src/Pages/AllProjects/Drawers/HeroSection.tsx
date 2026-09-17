@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, Controller } from 'react-hook-form';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
@@ -44,21 +44,19 @@ const HeroSectionDrawer: FC<HeroSectionDrawerProps> = ({
 
   const queryClient = useQueryClient();
 
-const mutation = useMutation(
-  (formData: HeroSection) => updateProjectSection(slug, 'herosection', formData),
-  {
-    onSuccess: () => {
-      queryClient.invalidateQueries('project');
-      toast.success('Hero section updated successfully');
-      onClose();
-      refetch();
-    },
-    onError: (err: any) => {
-      toast.error('Failed to update hero section');
-      console.error("Update error:", err?.response?.data || err);
-    }
+const mutation = useMutation({
+  mutationFn: (formData: HeroSection) => updateProjectSection(slug, 'herosection', formData),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['project'] });
+    toast.success('Hero section updated successfully');
+    onClose();
+    refetch();
+  },
+  onError: (err: any) => {
+    toast.error('Failed to update hero section');
+    console.error("Update error:", err?.response?.data || err);
   }
-);
+});
 
   useEffect(() => {
     if (open && existingData) {
@@ -107,7 +105,7 @@ const mutation = useMutation(
 
           {/* Image Uploads */}
           {[
-            { name: 'backgroundimage', label: 'Background Image' },
+            // { name: 'backgroundimage', label: 'Background Image' },
             { name: 'projectimage', label: 'Project Image' },
             { name: 'projectlogo', label: 'Project Logo' }
           ].map(({ name, label }) => (

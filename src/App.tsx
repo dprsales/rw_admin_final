@@ -1,7 +1,7 @@
 import { ThemeProvider } from "@emotion/react";
 import { RouterProvider } from "react-router-dom";
 import "./App.css";
-import { QueryClient, QueryClientProvider } from "react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import router from "./Routes";
 import { theme } from "./Theme";
 import { Box } from "@mui/material";

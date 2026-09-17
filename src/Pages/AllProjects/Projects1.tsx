@@ -5,11 +5,11 @@ import {
   Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText,
   DialogActions
 } from '@mui/material';
-import { Search as SearchIcon, Add as Plus, Delete as DeleteIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Add as Plus, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from 'react-query';
-import { Project } from './ProjectInterface';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Project, Projects } from './ProjectInterface';
 import AddProject from './Drawers/AddProject';
 import { deleteProject } from '../../api/services';
 import { toast } from 'react-toastify';
@@ -27,6 +27,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
   const navigate = useNavigate();
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Projects | null>(null);
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
@@ -34,10 +35,11 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
 
   const queryClient = useQueryClient();
 
-  const deleteMutation = useMutation(deleteProject, {
+  const deleteMutation = useMutation({
+    mutationFn: deleteProject,
     onSuccess: () => {
       toast.success('Project deleted successfully');
-      queryClient.invalidateQueries('getProjects');
+      queryClient.invalidateQueries({ queryKey: ['getProjects'] });
       onDelete();
       setDeleteProjectId(null);
       setDeleteProjectTitle('');
@@ -65,6 +67,23 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
     e.stopPropagation();
     setDeleteProjectId(projectId);
     setDeleteProjectTitle(title);
+  };
+
+  const handleEditClick = (e: React.MouseEvent, row: Project) => {
+    e.stopPropagation();
+    setEditProject({
+      title: row.title,
+      bhk: row.bhk,
+      towers: row.towers,
+      parkingarea: row.parkingarea,
+      location: row.location,
+      sqft: row.sqft,
+      highlights: row.highlights || [],
+      slug: row.projectId,
+      projectimage: row.projectimage || '',
+      rera: row.rera || '',
+      date: row.date || 0,
+    });
   };
 
   const handleDeleteCancel = () => {
@@ -195,6 +214,15 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
                     </Tooltip>
                   </TableCell>
                   <TableCell sx={{ padding: '6px' }}>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleEditClick(e, row)}
+                        sx={{ color: 'primary.main' }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Delete">
                       <IconButton
                         size="small"
@@ -233,6 +261,16 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
         }}
       />
 
+      {/* Edit Drawer Integration */}
+      <AddAllProjects
+        open={!!editProject}
+        onClose={() => {
+          setEditProject(null);
+          onDelete();
+        }}
+        initialData={editProject || undefined}
+      />
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteProjectId} onClose={handleDeleteCancel}>
         <DialogTitle>Delete Project</DialogTitle>
@@ -242,9 +280,9 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel} disabled={deleteMutation.isLoading}>Cancel</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleteMutation.isLoading}>
-            {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
+          <Button onClick={handleDeleteCancel} disabled={deleteMutation.isPending}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained" disabled={deleteMutation.isPending}>
+            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

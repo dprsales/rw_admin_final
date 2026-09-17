@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getLeads } from '../../api/services';
 import Leads from './Leads';
 import NoLeads from './NoLeads';
@@ -7,9 +7,9 @@ import { LinearProgress, Typography, Box } from '@mui/material';
 import LeadsTable from './LeadsTable';
 
 const LeadsPage: React.FC = () => {
-  const { data, isLoading, isError } = useQuery('leads', getLeads);
+  const { data, isPending, isError } = useQuery({ queryKey: ['leads'], queryFn: getLeads });
 
-  if (isLoading) return <LinearProgress />;
+  if (isPending) return <LinearProgress />;
 
   if (isError) {
     return (
