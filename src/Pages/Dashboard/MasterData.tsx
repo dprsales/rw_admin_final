@@ -12,7 +12,7 @@ const MasterData: React.FC = () => {
     data: ProjectsData,
     isPending,
     isError,
-  } = useQuery({ queryKey: ['getProjects'], queryFn: getProjects });
+  } = useQuery({ queryKey: ['getProjects'], queryFn: () => getProjects() });
 
   // DEBUG: Log the actual response to inspect the shape
   console.log('ProjectsData:', ProjectsData);

@@ -13,8 +13,10 @@ export const authLogin = (data: any) => {
 
 // api/services.ts
 
-export const getProjects = async () => {
-  const response = await http.get("/projects");
+export const getProjects = async (page = 1, search = '', limit = 100) => {
+  const response = await http.get("/projects", {
+    params: { page, limit, search },
+  });
   return response.data; // ✅ Only return the actual data payload
 };
 

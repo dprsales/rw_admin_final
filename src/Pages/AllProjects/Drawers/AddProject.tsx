@@ -103,6 +103,8 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
     // Ensure all numeric fields are numbers and not empty strings or NaN
     const parsedData = {
       ...data,
+      bhk: Array.isArray(data.bhk) ? data.bhk.map((v: any) => String(v).trim()).filter(Boolean).map(Number) : [],
+      sqft: Array.isArray(data.sqft) ? data.sqft.map((v: any) => String(v).trim()).filter(Boolean).map(Number) : [],
       visits: Number(data.visits) || 0,
       leads: Number(data.leads) || 0,
       launchdate: Number(data.launchdate) || 0,
@@ -134,16 +136,12 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
       toast.error('SFT Price is required');
       hasError = true;
     }
-    if (!data.bhk || data.bhk.length === 0) {
+    if (!data.bhk || data.bhk.filter((v: any) => String(v).trim() !== '').length === 0) {
       toast.error('At least one BHK is required');
       hasError = true;
     }
-    if (!data.sqft || data.sqft.length === 0) {
+    if (!data.sqft || data.sqft.filter((v: any) => String(v).trim() !== '').length === 0) {
       toast.error('At least one Sqft is required');
-      hasError = true;
-    }
-    if (!data.bankOffers || data.bankOffers.length === 0) {
-      toast.error('At least one Bank Offer is required');
       hasError = true;
     }
     if (hasError) return;
@@ -213,7 +211,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
               name="bhk"
               control={control}
               render={({ field }) => (
-                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
+                <CustomInput id="project-bhk-input" placeholder="e.g. 3,4,5" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => v.trim()))} />
               )}
             />
             <FormHelperText>{errors.bhk?.message}</FormHelperText>
@@ -224,7 +222,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
               name="sqft"
               control={control}
               render={({ field }) => (
-                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => Number(v.trim())).filter(Boolean))} />
+                <CustomInput id="project-sqft-input" placeholder="e.g. 1000,1200" {...field} value={Array.isArray(field.value) ? field.value.join(',') : ''} onChange={e => field.onChange(e.target.value.split(',').map((v: string) => v.trim()))} />
               )}
             />
             <FormHelperText>{errors.sqft?.message}</FormHelperText>

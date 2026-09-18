@@ -92,7 +92,9 @@ const mutation = useMutation({
               <Controller
                 name={fieldName as keyof HeroSection}
                 control={control}
-                rules={{ required: `${fieldName.toUpperCase()} is required` }}
+                rules={fieldName === 'h3'
+                  ? { required: false }
+                  : { required: `${fieldName.toUpperCase()} is required` }}
                 render={({ field }) => (
                   <CustomInput placeholder={`Enter ${fieldName.toUpperCase()}...`} {...field} />
                 )}

@@ -3,7 +3,7 @@ import {
   Box, TextField, InputAdornment, Button, Paper, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Pagination, Typography,
   Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText,
-  DialogActions
+  DialogActions, CircularProgress
 } from '@mui/material';
 import { Search as SearchIcon, Add as Plus, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
@@ -20,16 +20,29 @@ const rowsPerPage = 100;
 interface ProjectsProps {
   ProjectsData: Project[];
   onDelete: () => void;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  isSearching?: boolean;
 }
 
-const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
+const Projects1: React.FC<ProjectsProps> = ({
+  ProjectsData,
+  onDelete,
+  page,
+  totalPages,
+  onPageChange,
+  search,
+  onSearchChange,
+  isSearching = false,
+}) => {
   const theme = useTheme();
   const navigate = useNavigate();
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
   const [editProject, setEditProject] = useState<Projects | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleteProjectTitle, setDeleteProjectTitle] = useState('');
 
@@ -50,7 +63,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
   });
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchText(e.target.value);
+    onSearchChange(e.target.value);
   };
 
   const handleRowClick = (slug: string) => {
@@ -91,11 +104,6 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
     setDeleteProjectTitle('');
   };
 
-  const safeToLower = (v: any) => (typeof v === 'string' ? v.toLowerCase() : '');
-  const filtered = ProjectsData?.filter(p => safeToLower(p.name).includes(safeToLower(searchText))) || [];
-  const paginated = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-  const totalPages = Math.ceil(filtered.length / rowsPerPage);
-
   return (
     <Box>
       {/* Header and Add Button */}
@@ -103,6 +111,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
         <TextField
           placeholder="Search Projects..."
           size="small"
+          value={search}
           onChange={handleSearch}
           sx={{
             width: 350,
@@ -113,7 +122,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <SearchIcon />
+                {isSearching ? <CircularProgress size={18} /> : <SearchIcon />}
               </InputAdornment>
             )
           }}
@@ -162,7 +171,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginated.map((row, idx) => {
+            {ProjectsData.map((row, idx) => {
               const isPending = !row.amenities?.length || !row.bankOffers?.length;
               const status = isPending
                 ? { text: 'Pending', color: 'red', bg: '#FF000020' }
@@ -178,7 +187,7 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
 
                   <TableCell sx={{ padding: '6px' }}>
                     <Typography variant="caption" sx={{ marginLeft: "25px" }}>
-                      {(currentPage - 1) * rowsPerPage + idx + 1}
+                      {(page - 1) * rowsPerPage + idx + 1}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ padding: '6px' }}>
@@ -246,8 +255,8 @@ const Projects1: React.FC<ProjectsProps> = ({ ProjectsData, onDelete }) => {
       <Box display="flex" justifyContent="center" mt={2}>
         <Pagination
           count={totalPages}
-          page={currentPage}
-          onChange={(e, val) => setCurrentPage(val)}
+          page={page}
+          onChange={(e, val) => onPageChange(val)}
           shape="rounded"
         />
       </Box>

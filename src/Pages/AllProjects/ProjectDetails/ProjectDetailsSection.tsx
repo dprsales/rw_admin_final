@@ -187,7 +187,7 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
                                 Bank Offers:
                             </Typography>
                             <Grid container spacing={2}>
-                                {details.bankOffers.map((bank, index) => (
+                                {(details.bankOffers || []).map((bank, index) => (
                                     <Grid item xs={12} md={3} key={index}>
                                         <Card sx={{ p: 1, height: '150px' }}>
 
@@ -198,6 +198,13 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
                                         </Card>
                                     </Grid>
                                 ))}
+                                {(details.bankOffers || []).length === 0 && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No bank offers available.
+                                        </Typography>
+                                    </Grid>
+                                )}
                             </Grid>
                         </Box>
                     </Grid>
