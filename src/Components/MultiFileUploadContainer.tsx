@@ -18,9 +18,21 @@ const MultiFileUploadContainer: React.FC<MultiFileUploadContainerProps> = ({
   foldername,
   existingImages = [],
 }) => {
-  const [previews, setPreviews] = useState<string[]>(existingImages); // Image previews
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>(existingImages); // Uploaded URLs
+  const [previews, setPreviews] = useState<string[]>([]); // Image previews
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]); // Uploaded URLs
   const [uploading, setUploading] = useState(false);
+
+  const resolveImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
+    return `https://dprstorage.b-cdn.net${path}`;
+  };
+
+  // Sync state whenever the parent form resets to existing images.
+  useEffect(() => {
+    setPreviews(existingImages.filter(Boolean).map(resolveImageUrl));
+    setUploadedUrls(existingImages.filter(Boolean));
+  }, [existingImages]);
 
   // Initialize dropzone
   const { getRootProps, getInputProps } = useDropzone({

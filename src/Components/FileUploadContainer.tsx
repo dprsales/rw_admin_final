@@ -22,12 +22,15 @@ const FileUploadContainer: React.FC<FileUploadContainerProps> = ({
   const [preview, setPreview] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle'); // Track upload status
 
+  const resolveImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
+    return `https://dprstorage.b-cdn.net${path}`;
+  };
+
   // Effect to set the preview if there is an existing image
   useEffect(() => {
-    if (existingImage) {
-      const imageUrl = `https://dprstorage.b-cdn.net${existingImage}`;
-      setPreview(imageUrl); 
-    }
+    setPreview(existingImage ? resolveImageUrl(existingImage) : null);
   }, [existingImage]);
 
   // Initialize dropzone

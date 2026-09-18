@@ -1,6 +1,6 @@
 import React, { FC, useEffect } from 'react';
 import {
-  Drawer, Box, Typography, IconButton, Button, FormControl, FormHelperText, Grid
+  Drawer, Box, Typography, IconButton, Button, FormControl, FormHelperText, Grid, MenuItem, InputLabel, Select
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
@@ -71,6 +71,7 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
       ...d,
       bhk: Number(d.bhk), // ✅ convert to number
       sft: Number(d.sft), // ✅ convert to number
+      facing: String(d.facing || '').toLowerCase(), // ✅ normalize to backend enum
     })),
   };
   mutation.mutate(cleaned);
@@ -196,7 +197,19 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
                     control={control}
                     rules={{ required: 'Facing is required' }}
                     render={({ field }) => (
-                      <CustomInput {...field} placeholder="Facing (e.g. East)" />
+                      <FormControl fullWidth size="small">
+                        <InputLabel id={`facing-${index}-label`}>Facing</InputLabel>
+                        <Select
+                          labelId={`facing-${index}-label`}
+                          label="Facing"
+                          {...field}
+                        >
+                          <MenuItem value="east">East</MenuItem>
+                          <MenuItem value="west">West</MenuItem>
+                          <MenuItem value="north">North</MenuItem>
+                          <MenuItem value="south">South</MenuItem>
+                        </Select>
+                      </FormControl>
                     )}
                   />
                    <FormHelperText error={!!errors?.data?.[index]?.facing}>
