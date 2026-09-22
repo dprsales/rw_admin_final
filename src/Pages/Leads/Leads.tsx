@@ -16,15 +16,45 @@ import { getLeads } from '../../api/services';
 // ----------------------
 export interface Lead {
   _id: string;
-  source: string;
+  source?: string;
   type: string;
   name: string;
   email: string;
   phoneNumber: string;
   projectName?: string;
   message?: string;
+  company?: string;
+  visitorType?: string;
+  challenge?: string;
+  goal?: string;
+  recommendedService?: string;
+  enquiries?: number;
   createdAt: string;
 }
+
+/** Labels for the guided-finder keys stored on a lead. */
+export const VISITOR_LABEL: Record<string, string> = {
+  developer: 'Developer / Builder',
+  sales_leader: 'Sales head / manager',
+  sales_pro: 'Sales professional',
+  investor: 'Investor / Buyer',
+  unsure: 'Not sure',
+};
+export const SERVICE_LABEL: Record<string, string> = {
+  coaching: 'Coaching',
+  consulting: 'Consulting',
+  realty: 'Mandate',
+  realty_portfolio: 'Portfolio',
+  strategy_call: 'Strategy call',
+};
+export const SOURCE_LABEL: Record<string, string> = {
+  guided_finder: 'Guided finder',
+  finder_skip: 'Finder (skipped)',
+  site_cta: 'Site CTA',
+  contact: 'Contact page',
+  project: 'Project page',
+  admin: 'Admin',
+};
 
 interface LeadsApiResponse {
   leads: Lead[];
@@ -44,7 +74,6 @@ const AllLeads: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [type, setType] = useState<string>('');
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [showSourceSelect, setShowSourceSelect] = useState(false);
 
   // ✅ useQuery with proper typing
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
@@ -54,7 +83,11 @@ const AllLeads: React.FC = () => {
 
   const LeadsData = data?.leads || [];
 
-  const sourceOptions = LeadsData.map((lead) => lead.source).filter(Boolean).filter(
+  const sourceOptions = LeadsData.map((lead) => lead.source || '').filter(Boolean).filter(
+    (value, index, self) => self.indexOf(value) === index
+  );
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const serviceOptions = LeadsData.map((lead) => lead.recommendedService || '').filter(Boolean).filter(
     (value, index, self) => self.indexOf(value) === index
   );
 
@@ -76,7 +109,6 @@ const AllLeads: React.FC = () => {
 
   const handleTypeChange = (event: any) => {
     setType(event.target.value);
-    setShowSourceSelect(event.target.value === 'project');
   };
 
   const handleSourceChange = (event: any) => {
@@ -92,9 +124,10 @@ const AllLeads: React.FC = () => {
       lead.phoneNumber.includes(searchText);
 
     const matchesType = !  type || lead.type.toLowerCase() === type.toLowerCase();
-    const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source);
+    const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source || '');
+    const matchesService = selectedServices.length === 0 || selectedServices.includes(lead.recommendedService || '');
 
-    return matchesSearch && matchesType && matchesSource;
+    return matchesSearch && matchesType && matchesSource && matchesService;
   });
 
   const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
@@ -192,7 +225,7 @@ const AllLeads: React.FC = () => {
             </Select>
           </FormControl> */}
 
-          {showSourceSelect && (
+          {sourceOptions.length > 0 && (
             <FormControl sx={{ minWidth: 120 }}>
               <Select
                 multiple
@@ -255,6 +288,31 @@ const AllLeads: React.FC = () => {
               </Select>
             </FormControl>
           )}
+
+          {serviceOptions.length > 0 && (
+            <FormControl sx={{ minWidth: 150 }}>
+              <Select
+                multiple
+                value={selectedServices}
+                onChange={(event: any) => { const v = event.target.value; setSelectedServices(typeof v === 'string' ? v.split(',') : v); }}
+                IconComponent={ArrowDropDownIcon}
+                displayEmpty
+                renderValue={(selected) => (
+                  <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: selected.length ? 1 : 0.6 }}>
+                    {selected.length ? `Recommended (${selected.length})` : 'Recommended service'}
+                  </Typography>
+                )}
+                sx={{ height: "40px", border: "1px solid #1212121A", borderRadius: "20px", boxShadow: "0px 6px 14px #36408D08", fontSize: "12px", color: "#1D1D1D" }}
+              >
+                {serviceOptions.map((key) => (
+                  <MenuItem key={key} value={key}>
+                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: '#1D1D1D' }} />
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>{SERVICE_LABEL[key] || key}</Typography>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
         </Box>
       </Box>
 
@@ -263,7 +321,7 @@ const AllLeads: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#30779d40' }}>
             <TableRow>
-              {['S.No', 'Project Name', 'Type', 'Name', 'Email', 'Phone Number', 'Date'].map((text) => (
+              {['S.No', 'Project Name', 'Type', 'Name', 'Email', 'Phone Number', 'Source', 'Recommended', 'Date'].map((text) => (
                 <TableCell key={text} align="left" sx={{ padding: "8px" }}>
                   <Typography variant="caption"  sx={{ marginLeft: "20px", fontWeight: '600' }} >{text}</Typography>
                 </TableCell>
@@ -297,6 +355,15 @@ const AllLeads: React.FC = () => {
                 </TableCell>
                 <TableCell sx={{ padding: '6px' }}>
                   <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.phoneNumber}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '6px' }}>
+                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.source ? (SOURCE_LABEL[lead.source] || lead.source) : '-'}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '6px' }}>
+                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>
+                    {lead.recommendedService ? (SERVICE_LABEL[lead.recommendedService] || lead.recommendedService) : '-'}
+                    {lead.enquiries && lead.enquiries > 1 ? ` ×${lead.enquiries}` : ''}
+                  </Typography>
                 </TableCell>
                 <TableCell sx={{ padding: '6px' }}>
                   <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{new Date(lead.createdAt).toLocaleDateString()}
