@@ -11,6 +11,7 @@ import AllProjects from "../Pages/AllProjects";
 import ProjectDetails from "../Pages/AllProjects/ProjectDetails";
 import Leads from "../Pages/Leads";
 import Applications from "../Pages/Applications";
+import ChannelPartners from "../Pages/ChannelPartners";
 
 // Check if user is authenticated
 const isAuthenticated = () => {
@@ -87,6 +88,10 @@ const router = createBrowserRouter([
       {
         path: "/applications",
         element: <ProtectedRoute componentType={"admin_applications"} component={<Applications />} />,
+      },
+      {
+        path: "/channel-partners",
+        element: <ProtectedRoute componentType={"admin_channel_partners"} component={<ChannelPartners />} />,
       },
 
       {

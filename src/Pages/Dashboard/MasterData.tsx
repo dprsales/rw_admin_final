@@ -2,8 +2,12 @@ import React from 'react';
 import { Box, Card, Typography, CircularProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
-import { getProjects } from '../../api/services';
+import { getProjects, getSiteVisitsSummary } from '../../api/services';
 import { TabsIcons } from '../../assets';
+
+const formatDay = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+  weekday: 'short', day: '2-digit', month: 'short',
+});
 
 const MasterData: React.FC = () => {
   const userType = Cookies.get('user_type');
@@ -24,11 +28,29 @@ const MasterData: React.FC = () => {
     ProjectsData?.projects?.length ??
     0;
 
+  const { data: visitSummary } = useQuery({
+    queryKey: ['site-visits-summary'],
+    queryFn: getSiteVisitsSummary,
+    // Visits trickle in all day — a stale count is more misleading here than on
+    // Projects, so this one refetches on its own instead of waiting for a manual reload.
+    refetchInterval: 60_000,
+  });
+
   const items = [
     {
       text: 'Number of Projects',
       number: projectCount,
       image: TabsIcons.ProjectsIcon,
+    },
+    {
+      text: "Today's Visitors",
+      number: visitSummary?.today ?? '—',
+      image: TabsIcons.UsersIcon,
+    },
+    {
+      text: 'Total Visitors',
+      number: visitSummary?.totalUniqueVisitors ?? '—',
+      image: TabsIcons.UsersIcon,
     },
   ];
 
@@ -117,6 +139,33 @@ const MasterData: React.FC = () => {
           </Card>
         ))}
       </Box>
+
+      {visitSummary?.last7Days && visitSummary.last7Days.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: '#888888', mb: 1 }}>
+            Visitors, last 7 days
+          </Typography>
+          <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {visitSummary.last7Days.map((day: { date: string; count: number }) => (
+              <Card
+                key={day.date}
+                sx={{
+                  minWidth: 96,
+                  px: 2, py: 1.2,
+                  background: '#FFFFFF',
+                  boxShadow: '0px 4px 10px #0A0A0A1A',
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#888888', display: 'block' }}>
+                  {formatDay(day.date)}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{day.count}</Typography>
+              </Card>
+            ))}
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };

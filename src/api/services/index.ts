@@ -122,6 +122,30 @@ export const downloadApplicationResume = (applicationId: string) => {
   return http.get(`/applications/${applicationId}/resume/download`, { responseType: 'blob' });
 };
 
+// Channel partner enrolments
+export const getChannelPartners = async () => {
+  const response = await http.get('/channel-partners');
+  return response.data;
+};
+
+export const updateChannelPartner = (partnerId: string, data: any) => {
+  return http.patch(`/channel-partners/${partnerId}`, data);
+};
+
+export const deleteChannelPartner = (partnerId: string) => {
+  return http.delete(`/channel-partners/${partnerId}`);
+};
+
+export const downloadChannelPartnersCsv = () => {
+  return http.get('/channel-partners/export/csv', { responseType: 'blob' });
+};
+
+// Site visits — daily unique-visitor tracker
+export const getSiteVisitsSummary = async () => {
+  const response = await http.get('/site-visits/summary');
+  return response.data;
+};
+
 
 export const searchProjects = (searchItem: string) => {
   return http.get("/projects/search", { params: { searchItem } });
