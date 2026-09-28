@@ -2,7 +2,7 @@
 
 Use this file as the handoff when continuing employee-onboarding work on another device or with another agent. Attach this file and `EMPLOYEE-ONBOARDING-REVIEW.md` from the repository root, then ask the agent to continue from the first unchecked item. Update the checkboxes and progress notes as work is completed.
 
-> **Status at handoff (27 September 2026):** A static queue prototype was created and then removed. The backend now has an employee schema, validated initial-create DTO, and internal service for allocating unique Employee IDs and creating a Draft/Prejoining record. No HTTP route exposes this service yet. Secure HR authorization, invitations/OTP, employee self-service, private documents, review workflow, and deployment remain unimplemented. Check the dated progress log before assuming any item is complete.
+> **Status at handoff (28 September 2026):** The backend has an employee schema, validated initial-create DTO, and internal service for allocating unique Employee IDs and creating a Draft/Prejoining record. Public signup can no longer assign a role, user self-updates cannot change roles, and user administration endpoints now require an authenticated admin role. The backend build passes. No HTTP route exposes employee creation yet. JWT secret management/rotation and the HR permission model, invitations/OTP, employee self-service, private documents, review workflow, and deployment remain outstanding. Check the dated progress log before assuming any item is complete.
 
 ## Source of truth and repository locations
 
@@ -60,7 +60,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-The former static demo page has been removed. Continue with real onboarding functionality only. The backend employee schema/service is a foundation and is not yet reachable through an authorized API. Before adding that route, fix privilege assignment in account provisioning, move JWT signing/verification to managed configuration with a rotation plan, and establish how the initial Super Admin/HR accounts are provisioned. Then add a role-guarded employee creation endpoint and connect the HR UI.
+The former static demo page has been removed. Continue with real onboarding functionality only. Public role escalation and user administration route guards are now implemented. Before exposing the employee creation service through an API, migrate JWT signing/verification to managed configuration with a rotation plan, validate current account status/role on requests, and establish how initial Super Admin/HR accounts are provisioned. Then add a role-guarded employee creation endpoint and connect the HR UI.
 
 ## Product and company decisions to collect
 
@@ -79,8 +79,9 @@ The former static demo page has been removed. Continue with real onboarding func
 ### Foundation and security
 
 - [ ] Design employee identity separately from shopping/customer accounts and recruitment applications.
+- [x] Public signup always assigns `customer`; profile updates cannot assign roles; user create/list/delete/delete-all endpoints require a JWT and the `admin` role.
 - [ ] Define server-enforced roles, permissions, employee ownership checks, and HR scope; do not trust role cookies or client-supplied employee IDs.
-- [ ] Review and address relevant legacy authentication/authorization findings in the review before exposing HR functionality.
+- [ ] Review and address relevant legacy authentication/authorization findings in the review before exposing HR functionality. Public role escalation and unguarded user create/list/delete routes are now addressed; hard-coded JWT signing/verification secrets and session/account-state handling remain outstanding.
 - [ ] Establish secure session, invitation, OTP/recovery, expiry, revocation, and account-state behavior.
 - [ ] Decide employee data model, indexes, employee-code generation, idempotency, audit event model, and migration/retention approach.
 
@@ -116,6 +117,15 @@ The former static demo page has been removed. Continue with real onboarding func
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-09-28 — Harden legacy user role assignment and administration
+
+- Completed: Public signup DTO no longer includes a role, and registration explicitly creates `customer` accounts. User profile updates use a role-free DTO, strict validation, and an explicit field allowlist. User create/list/delete/delete-all routes now require a valid JWT with the `admin` role; the account schema constrains new role values to `customer` or `admin`.
+- Files changed: `merchandising_backend/src/auth/auth.controller.ts`, `merchandising_backend/src/auth/auth.service.ts`, `merchandising_backend/src/users/dto/create-user.dto.ts`, new `register-user.dto.ts` and `update-user.dto.ts`, `merchandising_backend/src/users/schema/users.schema.ts`, `merchandising_backend/src/users/users.controller.ts`, and `merchandising_backend/src/users/users.service.ts`.
+- Verification: `npm run build` passed after correcting two TypeScript readonly assignment errors. Tests were not run.
+- Screenshots/artifacts: None.
+- Decisions or blockers: This is a targeted legacy-access repair, not the complete HR role system. The hard-coded JWT secret and role claims embedded in existing tokens still require a managed-secret migration/rotation and session/account-state plan. Do not expose the employee creation service until those issues and the initial HR provisioning policy are addressed.
+- Next item: Plan JWT secret configuration/rotation and current-account validation without unexpectedly invalidating existing sessions; then define and provision Super Admin and HR roles.
 
 ### 2026-09-27 — Project plan and handoff rule recorded
 
