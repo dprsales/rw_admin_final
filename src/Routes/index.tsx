@@ -12,6 +12,7 @@ import ProjectDetails from "../Pages/AllProjects/ProjectDetails";
 import Leads from "../Pages/Leads";
 import Applications from "../Pages/Applications";
 import ChannelPartners from "../Pages/ChannelPartners";
+import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo";
 
 // Check if user is authenticated
 const isAuthenticated = () => {
@@ -64,6 +65,11 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <ProtectedRoute componentType={"login"} component={<Login />} />,
+  },
+  {
+    // Public, API-free walkthrough for stakeholder review. Production pages remain protected below.
+    path: "/demo/onboarding",
+    element: <EmployeeOnboardingDemo />,
   },
   {
     element: <Layout />, // Common layout for all pages

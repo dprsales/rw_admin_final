@@ -2,7 +2,158 @@
 
 Use this file as the handoff when continuing employee-onboarding work on another device or with another agent. Attach this file and `EMPLOYEE-ONBOARDING-REVIEW.md` from the repository root, then ask the agent to continue from the first unchecked item. Update the checkboxes and progress notes as work is completed.
 
-> **Status at handoff (28 September 2026):** The backend has an employee schema, validated initial-create DTO, and internal service for allocating unique Employee IDs and creating a Draft/Prejoining record. Public signup can no longer assign a role, user self-updates cannot change roles, and user administration endpoints now require an authenticated admin role. The backend build passes. No HTTP route exposes employee creation yet. JWT secret management/rotation and the HR permission model, invitations/OTP, employee self-service, private documents, review workflow, and deployment remain outstanding. Check the dated progress log before assuming any item is complete.
+> **Current status (29 September 2026):** The backend has an employee schema, validated initial-create DTO, and internal service for allocating unique Employee IDs and creating a Draft/Prejoining record. Public signup can no longer assign a role, user self-updates cannot change roles, and user administration endpoints now require an authenticated admin role. Backend and frontend TypeScript checks pass. No HTTP route exposes employee creation yet. JWT secret management/rotation, current-account validation, the HR permission model, invitations/OTP, employee self-service, private documents, review workflow, PDFs, audit, reminders, deployment, and production testing remain outstanding. Use the status matrix below and the dated progress log as the source of truth; do not infer completion from a screen, schema, or checklist title alone.
+
+## How to use this checklist on any device
+
+This file is the implementation handoff and single source of truth for the employee-onboarding project. Before coding, read this file from the repository and then read `EMPLOYEE-ONBOARDING-REVIEW.md` and the attached specification PDF. Continue from the first unchecked, unblocked item in the order below. Do not recreate a prototype or restart completed work because another device is being used.
+
+At the end of every coding session, update this same file before switching devices:
+
+1. Mark only work that is implemented, verified, and present in the shared codebase as `[x]`.
+2. Add a newest dated progress-log entry with the files changed, commands/tests run, result, screenshots/artifacts, blockers, and the next concrete item.
+3. If a requirement is awaiting an HR/management decision, leave it unchecked and record the decision needed in the blockers section.
+4. Never mark an item complete because UI exists. The API, authorization, persistence, failure handling, and relevant test must also work.
+5. Keep secrets, production credentials, personal employee data, and real documents out of this file and out of source control.
+
+The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source folders are `rw_admin_final`, `merchandising_backend`, and `react`. The public website in `react` remains unchanged while onboarding is developed in `rw_admin_final` and `merchandising_backend`.
+
+## Current status matrix
+
+| Area | Status | Evidence/current truth | Completion rule |
+|---|---|---|---|
+| Employee schema | Complete foundation | `merchandising_backend/src/employees/schema/employee.schema.ts` | Keep only after schema review, indexes, migration/retention decisions, and tests are complete |
+| Yearly Employee ID counter | Complete foundation | `employees.service.ts` uses an atomic yearly counter and unique employee code | Must pass concurrent-create and duplicate/idempotency tests |
+| Initial employee DTO | Partial | First/last name, personal email, phone, designation, department, joining date | Add approved employment type, manager, location, offer status and restricted fields where required |
+| Internal create service | Complete foundation, not exposed | Creates Draft/Prejoining records; no controller | Expose only through an authorized HR endpoint with audit event and idempotency |
+| Public role escalation repair | Complete targeted repair | Public signup forces `customer`; role is excluded from registration DTO | Re-test signup with malicious role fields and unknown fields |
+| User administration guards | Complete targeted repair | Create/list/delete routes require JWT + `admin` | Replace legacy `admin/customer` model with approved HR permissions before onboarding use |
+| JWT secret/session security | Blocked/required next | Secrets remain hardcoded; validation returns token claims only | Managed secret, rotation/migration plan, account-status lookup, revocation/expiry behavior, tests |
+| Employee/HR roles | Not started | No employee, HR, or Super Admin role system exists | Backend permission matrix and server guards implemented and tested |
+| Employee creation API | Not started | No `EmployeesController` or HTTP route exists | HR can create and view a candidate through an authorized endpoint |
+| Admin frontend onboarding pages | Not started | Existing admin routes have no employee workflow | HR dashboard, create form, list, profile, review pages connected to API |
+| Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
+| Candidate invitation/OTP | Not started | No invitation or OTP module | Expiring, revocable, rate-limited, single-employee invitation flow |
+| Employee self-service | Not started | No employee onboarding route/form | Candidate can save, resume, validate, review and submit only their own record |
+| Private documents | Not started | Existing public upload/CDN paths are unsuitable | Private storage, authenticated delivery, versioning, verification and access logging |
+| Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
+| HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
+| Joining Form PDF | Not started | No PDF module | Server-generated, versioned HR/employee copies stored privately |
+| Audit log | Not started | No onboarding audit module | Append-only events for all sensitive actions and downloads |
+| Notifications/reminders | Not started | No onboarding delivery history/job flow | Durable, retryable invitation and reminder jobs without duplicates |
+| Deployment | Not started | `employee.rajivwilliams.com` is target architecture only | Staging and production deployment, SSL, SPA fallback, CORS, backup and restore verified |
+| Acceptance testing | Not started | No end-to-end onboarding test | Dummy employee flow and authorization/recovery tests pass before real data |
+
+## Required implementation order
+
+Do these in sequence. Do not expose employee creation before steps 1–3 are complete.
+
+### 1. Security and identity foundation
+
+- [ ] Move the JWT signing secret to managed environment configuration in both signing and verification paths.
+- [ ] Decide and document secret rotation without unexpectedly invalidating all existing users.
+- [ ] Make JWT validation load the current account and reject disabled, deleted, or role-changed accounts.
+- [ ] Define `super_admin`, `hr`, `employee`, and any additional staff permissions; do not use browser cookies as authorization.
+- [ ] Decide initial Super Admin/HR provisioning; remove or restrict open privileged-account creation.
+- [ ] Configure explicit trusted CORS origins for the public site, employee portal and approved local development origins.
+- [ ] Define session expiry, invitation expiry, OTP attempt limits, resend limits, logout/revocation and recovery behavior.
+- [ ] Add tests proving customer, employee, HR and Super Admin cannot cross permission boundaries.
+
+### 2. Employee master and HR API
+
+- [ ] Confirm MongoDB versus relational storage with management; record the decision here.
+- [ ] Finalize employee fields and conditional rules for employees, contractors, interns, freshers, rehires and no-shows.
+- [ ] Add approved fields: employment type, reporting manager, work location, offer status, source of hiring and restricted compensation as applicable.
+- [ ] Add `EmployeesController` with authenticated, role/permission-guarded create, list, detail and status endpoints.
+- [ ] Add request idempotency and server-side allowlists; never accept employee ID, role, status, reviewer or audit actor from the client.
+- [ ] Add audit event for employee creation and Employee ID generation.
+- [ ] Add API tests for duplicate email, concurrent Employee ID allocation, invalid fields, unauthorized access and repeated requests.
+
+### 3. HR frontend
+
+- [ ] Add role-aware route and navigation handling in `rw_admin_final`; backend permission remains authoritative.
+- [ ] Add HR dashboard with invitation, progress, review, corrections and joining-date queues.
+- [ ] Add Create Employee form connected to the API, including validation and success/error states.
+- [ ] Add employee list/search/filter and employee profile shell.
+- [ ] Do not show salary, bank, identity documents, exports or user management unless the current permission allows it.
+- [ ] Add loading, empty, API failure, session expiry and unsaved-change states.
+
+### 4. Invitation, candidate authentication and self-service
+
+- [ ] Create a cryptographically random, expiring, revocable invitation tied to one employee.
+- [ ] Invalidate or supersede prior invitations according to the approved resend policy.
+- [ ] Add candidate email verification/OTP with rate limiting and audit events.
+- [ ] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone.
+- [ ] Add saved drafts and section progress for personal/contact, family/emergency, education, previous employment and bank details.
+- [ ] Add server validation, review-before-submit, duplicate-submit protection and separate onboarding/employment states.
+
+### 5. Documents, policies and submission
+
+- [ ] Approve the document checklist, conditional requirements, accepted alternatives, file limits and missing-document exception process.
+- [ ] Implement private storage separate from public `/uploads` and public CDN assets.
+- [ ] Validate file content/type/size, generate server-side storage names, retain versions and prevent predictable public URLs.
+- [ ] Implement authenticated file delivery with employee ownership and HR permission checks.
+- [ ] Implement Pending, Approved, Re-upload Required and Locked document states with reviewer/reason metadata.
+- [ ] Add policy versions, applicability and acknowledgement timestamps.
+- [ ] Add final declaration, submission snapshot and correction/reopen flow.
+
+### 6. HR completion and operations
+
+- [ ] Add document/detail review actions and review ownership.
+- [ ] Generate private, versioned Joining Form PDFs from the submitted snapshot; separate HR and employee copies where required.
+- [ ] Add append-only audit events for sensitive reads/downloads, edits, approvals, rejection, reopening, export and policy acknowledgement.
+- [ ] Add allowlisted CSV export with sensitive-field restrictions.
+- [ ] Add durable email invitation, correction and reminder jobs with retry/delivery history and duplicate prevention.
+- [ ] Add backup/restore of database, private documents, PDFs and required key recovery material.
+
+### 7. Release and deployment
+
+- [ ] Confirm Hostinger subdomain/document root and deploy `rw_admin_final/dist` independently at `employee.rajivwilliams.com`.
+- [ ] Add and test SPA `.htaccess`, HTTPS/SSL, no-index behavior and production API environment configuration.
+- [ ] Confirm backend runtime, process manager, database, private storage, email sender, monitoring and backup ownership.
+- [ ] Run the dummy end-to-end flow with an HR user and at least two employee accounts.
+- [ ] Test direct URL access, refresh, expired invitation, failed OTP, interrupted save, re-upload, approval lock and recovery.
+- [ ] Complete HR pilot, user guide, operational handover and production approval before real employee data.
+
+## Definition of done for each code item
+
+An item is complete only when all applicable points are true:
+
+- The backend behavior exists and is reachable through the intended API route.
+- DTO validation, database persistence and error responses are implemented.
+- Authorization is enforced on the server for the role and employee/resource relationship.
+- The frontend handles loading, success, validation, unauthorized, expired-session and network-error states.
+- Sensitive fields are not returned to users without permission.
+- Audit/notification/state changes are recorded where required.
+- A meaningful automated test or documented manual test covers the acceptance behavior.
+- Typecheck/build passes and the progress log names the command and result.
+- No real employee data or secrets are used in development or screenshots.
+
+## Known blockers and decisions
+
+- [ ] Management approves the employee population and edge cases.
+- [ ] HR approves fields and conditional document checklist.
+- [ ] Management names initial Super Admin, HR reviewers and backup reviewer.
+- [ ] Management approves login/OTP, invitation expiry, correction and completion rules.
+- [ ] HR approves policies, declaration, retention and employee-visible PDF fields.
+- [ ] Management confirms MongoDB is acceptable or approves a relational database.
+- [ ] Technical owner confirms staging/production runtime, storage, email, backup and Hostinger access.
+
+## 2026-09-29 review entry
+
+- Reviewed the checklist against `merchandising_backend/src/employees`, authentication/user changes, `rw_admin_final` routes/layout/API client, and both applications' TypeScript compilation.
+- Confirmed the employee schema, counter and internal service are present; confirmed no employee controller/API or onboarding frontend is present.
+- Confirmed JWT secrets remain hardcoded, CORS remains wildcard, and the current role model is only `admin/customer`; these remain blockers before exposing HR functionality.
+- Verification: `tsc --noEmit --incremental false -p tsconfig.build.json` passed for the backend; `tsc --noEmit --incremental false` passed for `rw_admin_final`. A separate `npm run build` invocation did not produce a completion result in this environment and is not claimed as verified by this entry.
+- Next concrete item: complete Section 1 security and identity foundation, then expose the authorized employee creation API.
+
+## 2026-09-29 stakeholder demo entry
+
+- Added `rw_admin_final/src/Pages/EmployeeOnboardingDemo/index.tsx` with a deliberately limited, API-free onboarding walkthrough: HR creates candidate, candidate completes details, documents/declaration, and HR review.
+- Added public route `/demo/onboarding` in `rw_admin_final/src/Routes/index.tsx`. It does not bypass or change protection for production admin routes and uses only sample data.
+- The demo is for stakeholder understanding and workflow approval; it is not employee creation, authentication, document upload, or production onboarding.
+- Verification: `tsc --noEmit --incremental false` passed for `rw_admin_final`. `npm run build` was attempted but Vite failed in this sandbox while resolving the project config with an access-denied path; no TypeScript error was reported. Re-run the build on the normal development machine or CI before deploying the preview.
+- Next concrete item: deploy this branch/project as a temporary Vercel preview and share the generated link; then return to Section 1 security foundation.
 
 ## Source of truth and repository locations
 
