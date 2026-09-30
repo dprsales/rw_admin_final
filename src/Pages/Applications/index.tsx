@@ -11,8 +11,10 @@ import {
   Divider,
   IconButton,
   InputAdornment,
+  LinearProgress,
   Pagination,
   Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -54,7 +56,69 @@ export interface Application {
   resumeFileName?: string;
   resumeUrl?: string;
   createdAt: string;
+
+  // Character / mindset short answers (careers apply page).
+  qImpact?: string;
+  qDuties?: string;
+  qMotivation?: string;
+  qIntegrity?: string;
+  qSetback?: string;
+  qLoyalty?: string;
+  qFlexibility?: string;
+
+  // HEXACO-style trait scores, computed server-side from the raw Likert answers.
+  hexacoIntegrity?: string;
+  hexacoLoyalty?: string;
+  hexacoFlexibility?: string;
+  hexacoOverall?: string;
+  hexacoAnswers?: string;
 }
+
+/** The short-answer prompts, in the order the applicant saw them. */
+const CHARACTER_PROMPTS: { field: keyof Application; label: string }[] = [
+  { field: 'qImpact', label: 'Biggest impact in the previous role' },
+  { field: 'qDuties', label: 'Main duties and responsibilities' },
+  { field: 'qMotivation', label: 'Why Team RW, and why this role now' },
+  { field: 'qIntegrity', label: 'A time they chose not to bend the truth' },
+  { field: 'qSetback', label: 'A target or deal they missed' },
+  { field: 'qLoyalty', label: 'What keeps them long-term, and why moving on' },
+  { field: 'qFlexibility', label: 'Adapting when plans changed' },
+];
+
+/**
+ * Read-back for a trait score. Every band is written to be affirming — a lower
+ * score reads as a working style and a place to grow, never as a failing. Bands
+ * are 70+ / 45+ / below, matching how the backend computes the percentage.
+ */
+const TRAIT_BANDS: { min: number; tag: string; text: string }[][] = [
+  [
+    { min: 70, tag: 'A firm line', text: "Holds a clear line on honesty. Would flag an error against their own interest and will not cut corners to hit a number. This is the trust luxury clients pay for." },
+    { min: 45, tag: 'Principled and practical', text: 'Values doing the right thing and weighs it against real-world pressure. Chooses the honest path and can talk openly through the grey areas.' },
+    { min: 0, tag: 'Results-driven', text: "Pragmatic and outcome-focused. In a high-trust luxury environment, leaning a little more on transparency will pay back many times over." },
+  ],
+  [
+    { min: 70, tag: 'Sees it through', text: 'Commits and finishes what they start. Employers can count on them to stay the course when the work stops being exciting.' },
+    { min: 45, tag: 'Committed, with eyes open', text: 'Gives real commitment while staying honest about their own growth, a healthy and grounded balance.' },
+    { min: 0, tag: 'Opportunity-led', text: 'Goes where the opportunity is and keeps options open. Channelling that drive into a longer runway is where it compounds.' },
+  ],
+  [
+    { min: 70, tag: 'Adapts fast', text: 'Stays calm when plans change and steps outside their lane without hesitation. That adaptability is gold on a fast-moving sales floor.' },
+    { min: 45, tag: 'Steady and adaptable', text: 'Adapts well and still values some structure. Can flex when it matters without losing their footing.' },
+    { min: 0, tag: 'Structured', text: 'Does their sharpest work with clear structure and rhythm. Building comfort with sudden change will widen the rooms they can win in.' },
+  ],
+];
+
+const TRAIT_KEYS: { label: string; field: keyof Application }[] = [
+  { label: 'Integrity', field: 'hexacoIntegrity' },
+  { label: 'Loyalty', field: 'hexacoLoyalty' },
+  { label: 'Flexibility', field: 'hexacoFlexibility' },
+];
+
+/** Stored scores arrive as strings like "83%". */
+const pctToNumber = (value?: string): number => {
+  const parsed = parseInt(String(value ?? ''), 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
 
 const rowsPerPage = 12;
 const EMPTY_APPLICATIONS: Application[] = [];
