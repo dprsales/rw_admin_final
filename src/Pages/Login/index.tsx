@@ -26,6 +26,7 @@ import ForgotPassword from "./ForgotPassword"; // Modal for forgot password
 import { authLogin } from "../../api/services"; // API call function for login
 import { dprlogo, loginbackground, rwlogo } from "../../assets"; // Logo and background assets
 import CustomInput from "../../Components/Inputs/CustomInput"; // Custom input component
+import { isStaff } from "../../utils/roles";
 
 // Validation schema for login form
 const validationSchema = Yup.object().shape({
@@ -58,8 +59,8 @@ const Login: React.FC = () => {
       try {
         const { access_token, user_profile } = response.data;
 
-        // Only allow admin login
-        if (user_profile.usertype === "admin") {
+        // Only allow admin and above (super_admin inherits admin).
+        if (isStaff(user_profile.usertype)) {
           Cookies.set("access_token", access_token);
           Cookies.set("user_type", user_profile.usertype); 
           Cookies.set("user_name", user_profile.name); 

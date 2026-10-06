@@ -12,7 +12,9 @@ import ProjectDetails from "../Pages/AllProjects/ProjectDetails";
 import Leads from "../Pages/Leads";
 import Applications from "../Pages/Applications";
 import ChannelPartners from "../Pages/ChannelPartners";
+import Users from "../Pages/Users";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo";
+import { isStaff, roleSatisfies } from "../utils/roles";
 
 // Check if user is authenticated
 const isAuthenticated = () => {
@@ -20,9 +22,15 @@ const isAuthenticated = () => {
   return accessToken ? true : false;
 };
 
-// Check if the user is an admin
+// Check if the user has admin-or-above access (super_admin inherits admin).
 const isAdmin = () => {
-  return Cookies.get("user_type") === "admin";
+  return isStaff(Cookies.get("user_type"));
+};
+
+// User management is currently super-admin-only. This is a UI guard only — the
+// backend `@Roles('super_admin')` decorators are the authority.
+const isSuperAdmin = () => {
+  return roleSatisfies(Cookies.get("user_type"), "super_admin");
 };
 
 // Protected Route Component to manage authentication and role-based access
@@ -35,6 +43,9 @@ const ProtectedRoute = ({ component, componentType }: any) => {
       return <Navigate to="/dashboard" replace />;
     }
     if (userIsAdmin) {
+      if (componentType === "super_admin_only" && !isSuperAdmin()) {
+        return <Navigate to="/dashboard" replace />;
+      }
       return component;
     }
     // If not admin, force logout
@@ -98,6 +109,10 @@ const router = createBrowserRouter([
       {
         path: "/channel-partners",
         element: <ProtectedRoute componentType={"admin_channel_partners"} component={<ChannelPartners />} />,
+      },
+      {
+        path: "/users",
+        element: <ProtectedRoute componentType={"super_admin_only"} component={<Users />} />,
       },
 
       {

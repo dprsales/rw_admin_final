@@ -4,12 +4,15 @@ import { Box, Tab, Tabs as MuiTabs, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { TabsIcons } from '../../assets'; // Import icons from assets
 import Cookies from 'js-cookie'; // To get user type from cookies
+import { roleSatisfies } from '../../utils/roles';
 
 // Define tab properties for both user types
 interface TabPanelProps {
   icon: string;
   label: string;
   route: string;
+  /** When set, the tab only renders for a super admin. */
+  superAdminOnly?: boolean;
 }
 
 const adminTabs: TabPanelProps[] = [
@@ -18,7 +21,7 @@ const adminTabs: TabPanelProps[] = [
   { icon: TabsIcons.LeadsIcon, label: ' Leads', route: '/leads' },
   { icon: TabsIcons.LeadsIcon, label: 'Applications', route: '/applications' },
   { icon: TabsIcons.LeadsIcon, label: 'Channel Partners', route: '/channel-partners' },
-  // { icon: TabsIcons.UsersIcon, label: 'Users', route: '/users' },
+  { icon: TabsIcons.UsersIcon, label: 'Users', route: '/users', superAdminOnly: true },
 ];
 
 interface TabsProps {
@@ -28,8 +31,10 @@ interface TabsProps {
 
 const Tabs: React.FC<TabsProps> = ({ selectedTab, onTabChange }) => {
   const navigate = useNavigate();
-  // Only admin tabs
-  const tabs = adminTabs;
+  // Only admin tabs. User management is super-admin-only for now; the backend guards
+  // these routes independently, so this only controls what is shown.
+  const isSuperAdmin = roleSatisfies(Cookies.get('user_type'), 'super_admin');
+  const tabs = adminTabs.filter((tab) => !tab.superAdminOnly || isSuperAdmin);
 
   const handleChange = (event: React.SyntheticEvent, newValue: string) => {
     navigate(newValue);

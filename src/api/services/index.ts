@@ -140,6 +140,27 @@ export const downloadChannelPartnersCsv = () => {
   return http.get('/channel-partners/export/csv', { responseType: 'blob' });
 };
 
+// Users — staff listing and role changes
+export const getUsers = async () => {
+  const response = await http.get('/users');
+  return response.data;
+};
+
+export const changeUserRole = (userId: string, usertype: string) => {
+  return http.patch(`/users/${userId}/role`, { usertype });
+};
+
+export const createUser = (data: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  usertype: string;
+  userimage?: string;
+}) => {
+  return http.post('/users', data);
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');

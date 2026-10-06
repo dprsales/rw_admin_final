@@ -5,6 +5,7 @@ import Tabs from './Admin/Tabs';
 import './Layout.css';
 import Cookies from 'js-cookie';
 import { Box } from '@mui/material';
+import { isStaff } from '../utils/roles';
 
 const Layout = () => {
   const location = useLocation();
@@ -19,8 +20,8 @@ const Layout = () => {
     setSelectedTab(`/${path}`);
   }, [location]);
 
-  // Only allow admin
-  if (userType !== 'admin') {
+  // Only allow admin and above (super_admin inherits admin).
+  if (!isStaff(userType)) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>Access Denied. Only admin users are allowed.</div>;
   }
 
