@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -26,12 +27,12 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { GroupOutlined, PersonAddAlt1, Search } from '@mui/icons-material';
+import { GroupOutlined, LockReset, PersonAddAlt1, PersonOff, Search } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
-import { changeUserRole, createUser, getUsers } from '../../api/services';
-import { USER_ROLES, roleSatisfies, type UserRole } from '../../utils/roles';
+import { changeUserRole, createUser, deleteUser, getUsers, resetUserPassword, setUserAccess } from '../../api/services';
+import { ROLE_LABELS, USER_ROLES, roleSatisfies, type UserRole } from '../../utils/roles';
 
 export interface AdminUser {
   _id: string;
@@ -39,16 +40,20 @@ export interface AdminUser {
   email?: string;
   phone?: string;
   usertype: UserRole;
+  accessEnabled?: boolean;
   createdAt?: string;
 }
 
 const rowsPerPage = 12;
 const EMPTY_USERS: AdminUser[] = [];
 
-const ROLE_COLORS: Record<UserRole, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
+const ROLE_COLORS: Record<UserRole, 'default' | 'primary' | 'info' | 'warning' | 'success' | 'error' | 'secondary'> = {
   super_admin: 'error',
   admin: 'warning',
   hr: 'info',
+  account: 'primary',
+  finance: 'secondary',
+  sales: 'success',
   employee: 'success',
   customer: 'default',
 };
@@ -77,6 +82,21 @@ const EMPTY_FORM = {
 /** Mirrors the backend DTO so the form fails fast instead of posting invalid data. */
 const PHONE_PATTERN = /^[6-9][0-9]{9}$/;
 
+const signedInUserId = (): string | null => {
+  const token = Cookies.get('access_token');
+  if (!token) return null;
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.sub === 'string' ? json.sub : null;
+  } catch {
+    return null;
+  }
+};
+
+const hasAccess = (user: AdminUser) => user.accessEnabled !== false;
+
 const isValidForm = (form: typeof EMPTY_FORM) =>
   form.name.trim().length > 0 &&
   /^\S+@\S+\.\S+$/.test(form.email.trim()) &&
@@ -88,7 +108,12 @@ const Users: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [passwordFor, setPasswordFor] = useState<AdminUser | null>(null);
+  const [nextPassword, setNextPassword] = useState('');
+  const [confirm, setConfirm] = useState<null | { kind: 'delete' | 'remove' | 'restore'; ids: string[] }>(null);
   const queryClient = useQueryClient();
+  const selfId = signedInUserId();
 
   // Drives which roles this account may assign. The backend re-checks this on every
   // request, so a stale cookie only ever widens the menu, never the permissions.
@@ -106,6 +131,42 @@ const Users: React.FC = () => {
     onSuccess: (response: any) => {
       toast.success(response?.data?.message ?? 'Role updated');
       queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  const refreshUsers = () => {
+    setSelected([]);
+    setConfirm(null);
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
+
+  const accessMutation = useMutation({
+    mutationFn: ({ ids, enabled }: { ids: string[]; enabled: boolean }) =>
+      Promise.all(ids.map((id) => setUserAccess(id, enabled))),
+    onSuccess: (_result, variables) => {
+      toast.success(variables.enabled ? 'Access restored' : 'Access removed');
+      refreshUsers();
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => deleteUser(id))),
+    onSuccess: () => {
+      toast.success('Account deleted');
+      refreshUsers();
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
+      resetUserPassword(userId, password),
+    onSuccess: (response: any) => {
+      toast.success(response?.data?.message ?? 'Password updated');
+      setPasswordFor(null);
+      setNextPassword('');
     },
     onError: (error: any) => toast.error(errorMessage(error)),
   });
@@ -180,6 +241,32 @@ const Users: React.FC = () => {
     roleMutation.mutate({ userId: user._id, usertype });
   };
 
+  const selectableIds = visibleUsers.filter((user) => user._id !== selfId).map((user) => user._id);
+  const allVisibleSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.includes(id));
+
+  const toggleOne = (id: string) => {
+    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  };
+
+  const toggleVisible = () => {
+    setSelected((current) =>
+      allVisibleSelected
+        ? current.filter((id) => !selectableIds.includes(id))
+        : Array.from(new Set([...current, ...selectableIds])),
+    );
+  };
+
+  const runConfirm = () => {
+    if (!confirm) return;
+    if (confirm.kind === 'delete') {
+      deleteMutation.mutate(confirm.ids);
+      return;
+    }
+    accessMutation.mutate({ ids: confirm.ids, enabled: confirm.kind === 'restore' });
+  };
+
+  const busy = accessMutation.isPending || deleteMutation.isPending;
+
   if (isPending) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
@@ -210,10 +297,10 @@ const Users: React.FC = () => {
       >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Users
+            People and access
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Every account on the platform and the role it currently holds.
+            Give each person one seat, a username, and a password. Removing access keeps the account and stops sign-in. Deleting removes the account.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -248,69 +335,145 @@ const Users: React.FC = () => {
           </Typography>
         </Box>
         <Divider />
+        {selected.length > 0 && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 1.5, bgcolor: '#f4f8fb' }} flexWrap="wrap" useFlexGap>
+            <Typography variant="body2" sx={{ fontWeight: 600, mr: 1 }}>
+              {selected.length} selected
+            </Typography>
+            <Button size="small" disabled={busy} onClick={() => setConfirm({ kind: 'remove', ids: selected })}>
+              Remove access
+            </Button>
+            <Button size="small" disabled={busy} onClick={() => setConfirm({ kind: 'restore', ids: selected })}>
+              Restore access
+            </Button>
+            <Button size="small" color="error" disabled={busy} onClick={() => setConfirm({ kind: 'delete', ids: selected })}>
+              Delete
+            </Button>
+          </Stack>
+        )}
 
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    checked={allVisibleSelected}
+                    indeterminate={selected.length > 0 && !allVisibleSelected}
+                    onChange={toggleVisible}
+                    inputProps={{ 'aria-label': 'Select everyone on this page' }}
+                  />
+                </TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Username</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Change role</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Joined</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Access</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {visibleUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={7}>
                     <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
                       No users match that search.
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                visibleUsers.map((user) => (
-                  <TableRow key={user._id} hover>
-                    <TableCell>{user.name ?? '-'}</TableCell>
-                    <TableCell>{user.email ?? '-'}</TableCell>
-                    <TableCell>{user.phone ?? '-'}</TableCell>
-                    <TableCell>
-                      <Chip size="small" label={user.usertype} color={ROLE_COLORS[user.usertype] ?? 'default'} />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip
-                        title={
-                          allowedRoles.includes('super_admin')
-                            ? 'Applies on the user’s next request — no re-login needed'
-                            : 'Only a super admin can grant super admin'
-                        }
-                      >
-                        <span>
-                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                visibleUsers.map((user) => {
+                  const isSelf = user._id === selfId;
+                  const active = hasAccess(user);
+                  return (
+                    <TableRow key={user._id} hover selected={selected.includes(user._id)}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={selected.includes(user._id)}
+                          disabled={isSelf}
+                          onChange={() => toggleOne(user._id)}
+                          inputProps={{ 'aria-label': `Select ${user.name ?? user.email ?? 'user'}` }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {user.name ?? '-'}
+                        {isSelf && (
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            Signed in
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{user.email ?? '-'}</TableCell>
+                      <TableCell>{user.phone ?? '-'}</TableCell>
+                      <TableCell>
+                        <Stack spacing={0.5}>
+                          <Chip size="small" label={ROLE_LABELS[user.usertype] ?? user.usertype} color={ROLE_COLORS[user.usertype] ?? 'default'} />
+                          <FormControl size="small" sx={{ minWidth: 180 }}>
                             <InputLabel id={`role-label-${user._id}`}>Role</InputLabel>
                             <Select
                               labelId={`role-label-${user._id}`}
                               label="Role"
                               value={user.usertype}
-                              disabled={roleMutation.isPending}
+                              disabled={roleMutation.isPending || isSelf}
                               onChange={(event) => handleRoleChange(user, event.target.value as UserRole)}
+                              renderValue={(value) => ROLE_LABELS[value as UserRole] ?? value}
                               sx={{ borderRadius: 2 }}
                             >
                               {allowedRoles.map((role) => (
                                 <MenuItem key={role} value={role}>
-                                  {role}
+                                  {ROLE_LABELS[role]}
                                 </MenuItem>
                               ))}
                             </Select>
                           </FormControl>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell>{formatDate(user.createdAt)}</TableCell>
-                  </TableRow>
-                ))
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={active ? 'Can sign in' : 'Access removed'} color={active ? 'success' : 'default'} />
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                          Joined {formatDate(user.createdAt)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                          <Tooltip title="Set a new password">
+                            <span>
+                              <Button
+                                size="small"
+                                startIcon={<LockReset />}
+                                disabled={isSelf}
+                                onClick={() => {
+                                  setPasswordFor(user);
+                                  setNextPassword('');
+                                }}
+                              >
+                                Password
+                              </Button>
+                            </span>
+                          </Tooltip>
+                          <Button
+                            size="small"
+                            startIcon={<PersonOff />}
+                            disabled={isSelf || busy}
+                            onClick={() => setConfirm({ kind: active ? 'remove' : 'restore', ids: [user._id] })}
+                          >
+                            {active ? 'Remove access' : 'Restore'}
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            disabled={isSelf || busy}
+                            onClick={() => setConfirm({ kind: 'delete', ids: [user._id] })}
+                          >
+                            Delete
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -379,17 +542,19 @@ const Users: React.FC = () => {
                 label="Role"
                 value={form.usertype}
                 onChange={(e) => updateField('usertype', e.target.value)}
+                renderValue={(value) => ROLE_LABELS[value as UserRole] ?? value}
                 sx={{ borderRadius: 2 }}
               >
                 {allowedRoles.map((role) => (
                   <MenuItem key={role} value={role}>
-                    {role}
+                    {ROLE_LABELS[role]}
                   </MenuItem>
                 ))}
               </Select>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                Super admin can only be granted later by an existing super admin.
-              </Typography>            </FormControl>
+                HR sees Applications and Employees. Accounts and Finance see Payments. Sales sees Leads.
+              </Typography>
+            </FormControl>
             <TextField
               label="Profile image URL (optional)"
               value={form.userimage}
@@ -411,6 +576,62 @@ const Users: React.FC = () => {
             sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0b4f83' } }}
           >
             {createMutation.isPending ? 'Creating...' : 'Create user'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(passwordFor)} onClose={() => setPasswordFor(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Set password</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This becomes the password for {passwordFor?.email}. Share it with them directly.
+          </Typography>
+          <TextField
+            label="New password"
+            type="password"
+            value={nextPassword}
+            onChange={(event) => setNextPassword(event.target.value)}
+            fullWidth
+            size="small"
+            helperText="Minimum 6 characters"
+            error={nextPassword.length > 0 && nextPassword.length < 6}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setPasswordFor(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={nextPassword.length < 6 || passwordMutation.isPending || !passwordFor}
+            onClick={() => passwordFor && passwordMutation.mutate({ userId: passwordFor._id, password: nextPassword })}
+            sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+          >
+            {passwordMutation.isPending ? 'Saving...' : 'Save password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {confirm?.kind === 'delete' ? 'Delete accounts' : confirm?.kind === 'restore' ? 'Restore access' : 'Remove access'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {confirm?.kind === 'delete'
+              ? `${confirm.ids.length} account${confirm.ids.length === 1 ? '' : 's'} will be deleted. This cannot be undone.`
+              : confirm?.kind === 'restore'
+                ? `${confirm.ids.length} ${confirm.ids.length === 1 ? 'person' : 'people'} will be able to sign in with their username and password.`
+                : `${confirm?.ids.length ?? 0} ${confirm?.ids.length === 1 ? 'person' : 'people'} will stay on file, but their username and password will stop working.`}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirm(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color={confirm?.kind === 'delete' ? 'error' : 'primary'}
+            disabled={busy}
+            onClick={runConfirm}
+          >
+            {busy ? 'Working...' : 'Confirm'}
           </Button>
         </DialogActions>
       </Dialog>

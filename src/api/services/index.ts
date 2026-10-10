@@ -150,6 +150,18 @@ export const changeUserRole = (userId: string, usertype: string) => {
   return http.patch(`/users/${userId}/role`, { usertype });
 };
 
+export const setUserAccess = (userId: string, enabled: boolean) => {
+  return http.patch(`/users/${userId}/access`, { enabled });
+};
+
+export const resetUserPassword = (userId: string, password: string) => {
+  return http.patch(`/users/${userId}/password`, { password });
+};
+
+export const deleteUser = (userId: string) => {
+  return http.delete(`/users/${userId}`);
+};
+
 export interface CoachingPayment {
   _id: string;
   razorpayOrderId: string;

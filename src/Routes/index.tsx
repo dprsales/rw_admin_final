@@ -16,56 +16,42 @@ import Users from "../Pages/Users";
 import Employees from "../Pages/Employees";
 import Payments from "../Pages/Payments";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo";
-import { isStaff, roleSatisfies } from "../utils/roles";
+import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
-// Check if user is authenticated
-const isAuthenticated = () => {
-  const accessToken = Cookies.get("access_token");
-  return accessToken ? true : false;
+const isAuthenticated = () => Boolean(Cookies.get("access_token"));
+
+const clearSession = () => {
+  Cookies.remove("access_token");
+  Cookies.remove("user_type");
+  Cookies.remove("user_name");
+  localStorage.clear();
 };
 
-// Check if the user has admin-or-above access (super_admin inherits admin).
-const isAdmin = () => {
-  return isStaff(Cookies.get("user_type"));
-};
-
-// User management is currently super-admin-only. This is a UI guard only — the
-// backend `@Roles('super_admin')` decorators are the authority.
-const isSuperAdmin = () => {
-  return roleSatisfies(Cookies.get("user_type"), "super_admin");
-};
-
-// Protected Route Component to manage authentication and role-based access
-const ProtectedRoute = ({ component, componentType }: any) => {
+// Screen gate only. The API rejects a role that does not belong on that route.
+const ProtectedRoute = ({ component, componentType, allow }: any) => {
   const isAuth = isAuthenticated();
-  const userIsAdmin = isAdmin();
+  const role = Cookies.get("user_type");
+  const admitted = canEnterApp(role);
 
   if (isAuth) {
-    if (componentType === "login" && userIsAdmin) {
-      return <Navigate to="/dashboard" replace />;
+    if (componentType === "login" && admitted) {
+      return <Navigate to={homeRoute(role)} replace />;
     }
-    if (userIsAdmin) {
-      if (componentType === "super_admin_only" && !isSuperAdmin()) {
-        return <Navigate to="/dashboard" replace />;
+    if (admitted) {
+      if (allow && !canOpenRoute(role, allow)) {
+        return <Navigate to={homeRoute(role)} replace />;
       }
       return component;
     }
-    // If not admin, force logout
-    Cookies.remove("access_token");
-    Cookies.remove("user_type");
-    localStorage.clear();
+    clearSession();
     return <Navigate to="/login" replace />;
-  } else {
-    // User is not authenticated
-    Cookies.remove("access_token");
-    Cookies.remove("user_type");
-    localStorage.clear();
-    if (componentType === "login") {
-      return component;
-    } else {
-      return <Navigate to="/login" replace />;
-    }
   }
+
+  clearSession();
+  if (componentType === "login") {
+    return component;
+  }
+  return <Navigate to="/login" replace />;
 };
 
 // Define routes for the app
@@ -89,45 +75,45 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard",
-        element: <ProtectedRoute componentType={"admin_dashboard"} component={<Dashboard />} />,
+        element: <ProtectedRoute allow="/dashboard" component={<Dashboard />} />,
       },
 
       {
         path: "/projects",
-        element: <ProtectedRoute componentType={"projects"} component={<AllProjects />} />,
+        element: <ProtectedRoute allow="/projects" component={<AllProjects />} />,
       },
       {
         path: "/projects/:slug",
-        element: <ProtectedRoute componentType={"projects_details"} component={<ProjectDetails />} />,
+        element: <ProtectedRoute allow="/projects" component={<ProjectDetails />} />,
       },
       {
         path: "/leads",
-        element: <ProtectedRoute componentType={"admin_notifications"} component={<Leads/>} />,
+        element: <ProtectedRoute allow="/leads" component={<Leads />} />,
       },
       {
         path: "/applications",
-        element: <ProtectedRoute componentType={"admin_applications"} component={<Applications />} />,
+        element: <ProtectedRoute allow="/applications" component={<Applications />} />,
       },
       {
         path: "/channel-partners",
-        element: <ProtectedRoute componentType={"admin_channel_partners"} component={<ChannelPartners />} />,
+        element: <ProtectedRoute allow="/channel-partners" component={<ChannelPartners />} />,
       },
       {
         path: "/users",
-        element: <ProtectedRoute componentType={"super_admin_only"} component={<Users />} />,
+        element: <ProtectedRoute allow="/users" component={<Users />} />,
       },
       {
         path: "/employees",
-        element: <ProtectedRoute componentType={"admin_employees"} component={<Employees />} />,
+        element: <ProtectedRoute allow="/employees" component={<Employees />} />,
       },
       {
         path: "/payments",
-        element: <ProtectedRoute componentType={"admin_payments"} component={<Payments />} />,
+        element: <ProtectedRoute allow="/payments" component={<Payments />} />,
       },
 
       {
         path: "/integrations",
-        element: <ProtectedRoute componentType={"integration"} component={<Integration />} />,
+        element: <ProtectedRoute allow="/integrations" component={<Integration />} />,
       },
     ],
   },
