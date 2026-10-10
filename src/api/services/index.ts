@@ -150,6 +150,37 @@ export const changeUserRole = (userId: string, usertype: string) => {
   return http.patch(`/users/${userId}/role`, { usertype });
 };
 
+export interface CoachingPayment {
+  _id: string;
+  razorpayOrderId: string;
+  razorpayPaymentId?: string;
+  modules: { id: number; title: string; category?: string }[];
+  count: number;
+  baseAmount: number;
+  discountPercent: number;
+  discountAmount: number;
+  payableAmount: number;
+  currency: string;
+  customer: { name: string; email: string; phone: string };
+  status: 'pending' | 'completed' | 'failed';
+  failureReason?: string;
+  webhookVerifiedAt?: string;
+  invoiceNumber?: string;
+  invoiceIssuedAt?: string;
+  invoiceSentAt?: string;
+  invoiceSentTo?: string;
+  createdAt: string;
+}
+
+export const getCoachingPayments = async (): Promise<CoachingPayment[]> => {
+  const response = await http.get('/payments/admin');
+  return response.data;
+};
+
+export const sendCoachingInvoice = (paymentId: string) => {
+  return http.post(`/payments/admin/${paymentId}/invoice`);
+};
+
 export const createUser = (data: {
   name: string;
   email: string;
@@ -159,6 +190,40 @@ export const createUser = (data: {
   userimage?: string;
 }) => {
   return http.post('/users', data);
+};
+
+export interface EmployeeRecord {
+  _id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  personalEmail: string;
+  phone: string;
+  designation: string;
+  department: string;
+  joiningDate: string;
+  onboardingStatus: string;
+  employmentStatus: string;
+  createdAt?: string;
+}
+
+export interface CreateEmployeeInput {
+  firstName: string;
+  lastName: string;
+  personalEmail: string;
+  phone: string;
+  designation: string;
+  department: string;
+  joiningDate: string;
+}
+
+export const getEmployees = async (): Promise<EmployeeRecord[]> => {
+  const response = await http.get('/employees');
+  return response.data;
+};
+
+export const createEmployee = (data: CreateEmployeeInput) => {
+  return http.post('/employees', data);
 };
 
 // Site visits — daily unique-visitor tracker

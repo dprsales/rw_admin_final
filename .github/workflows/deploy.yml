@@ -1,0 +1,65 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+# Never run two deploys of this app at once.
+concurrency:
+  group: deploy-hostinger-admin
+  cancel-in-progress: false
+
+env:
+  SSH_HOST: 147.93.100.104
+  SSH_PORT: 65002
+  SSH_USER: u168180064
+  REMOTE_DIR: /home/u168180064/domains/rajivwilliams.com/public_html/admin
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the project
+        run: npm run build
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          # Strip Windows CRLFs and guarantee a trailing newline — OpenSSH rejects
+          # the key with "error in libcrypto" otherwise.
+          printf '%s\n' "$HOSTINGER_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy-key
+          chmod 600 ~/.ssh/deploy-key
+          ssh-keygen -y -f ~/.ssh/deploy-key > /dev/null && echo "Key format OK"
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+        env:
+          HOSTINGER_SSH_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+
+      - name: Verify SSH connection
+        run: |
+          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'echo "SSH connection works"'
+
+      - name: Upload build to Hostinger
+        run: |
+          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $REMOTE_DIR"
+          # dist/. includes .htaccess; dist/* would skip that hidden file.
+          scp -i ~/.ssh/deploy-key -P "$SSH_PORT" -r dist/. "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
+
+      - name: Fix file permissions
+        run: |
+          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "cd $REMOTE_DIR && find . -type d -exec chmod 755 {} \; && find . -type f -exec chmod 644 {} \;"

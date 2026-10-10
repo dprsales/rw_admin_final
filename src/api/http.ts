@@ -2,8 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 export const http = axios.create({
-  baseURL: "https://api.rajivwilliams.com",
-  // baseURL: `http://${window.location.hostname}:8088`,
+  // baseURL: "https://api.rajivwilliams.com",
+  baseURL: `http://${window.location.hostname}:8088`,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json, text/plain, */*",  

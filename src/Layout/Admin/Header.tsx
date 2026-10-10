@@ -22,6 +22,8 @@ const Header: React.FC<HeaderProps> = ({ selectedTab }) => {
     '/applications': 'Applications',
     '/channel-partners': 'Channel Partners',
     '/users': 'Users',
+    '/employees': 'Employees',
+    '/payments': 'Payments',
 
   };
 

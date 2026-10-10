@@ -13,6 +13,8 @@ import Leads from "../Pages/Leads";
 import Applications from "../Pages/Applications";
 import ChannelPartners from "../Pages/ChannelPartners";
 import Users from "../Pages/Users";
+import Employees from "../Pages/Employees";
+import Payments from "../Pages/Payments";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo";
 import { isStaff, roleSatisfies } from "../utils/roles";
 
@@ -113,6 +115,14 @@ const router = createBrowserRouter([
       {
         path: "/users",
         element: <ProtectedRoute componentType={"super_admin_only"} component={<Users />} />,
+      },
+      {
+        path: "/employees",
+        element: <ProtectedRoute componentType={"admin_employees"} component={<Employees />} />,
+      },
+      {
+        path: "/payments",
+        element: <ProtectedRoute componentType={"admin_payments"} component={<Payments />} />,
       },
 
       {

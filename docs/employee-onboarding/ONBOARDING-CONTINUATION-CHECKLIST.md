@@ -2,7 +2,7 @@
 
 Use this file as the handoff when continuing employee-onboarding work on another device or with another agent. Attach this file and `EMPLOYEE-ONBOARDING-REVIEW.md` from the repository root, then ask the agent to continue from the first unchecked item. Update the checkboxes and progress notes as work is completed.
 
-> **Current status (1 October 2026):** A role hierarchy (`super_admin` > `admin` > `hr` > `employee` > `customer`) is enforced by a hierarchy-aware `RolesGuard`, the JWT signing secret now comes from a managed `JWT_SECRET` whose value was regenerated (the previously hardcoded key no longer signs or verifies anything), and the previously empty `dist/` build was repaired. `scripts/promote-super-admin.ts` exists for Super Admin provisioning, but **no account holds `super_admin` yet and the intended `tech@rajivwilliams.com` account does not exist in the database**. Public signup can no longer assign a role, user self-updates cannot change roles, and user administration endpoints require an authenticated admin role. No HTTP route exposes employee creation yet. Super Admin provisioning, current-account validation, the HR permission matrix, invitations/OTP, employee self-service, private documents, review workflow, PDFs, audit, reminders, deployment, and production testing remain outstanding. Use the status matrix below and the dated progress log as the source of truth; do not infer completion from a screen, schema, or checklist title alone.
+> **Current status (1 October 2026):** A role hierarchy (`super_admin` > `admin` > `hr` > `employee` > `customer`) is enforced by a hierarchy-aware `RolesGuard`, the JWT signing secret now comes from a managed `JWT_SECRET` whose value was regenerated (the previously hardcoded key no longer signs or verifies anything), and the previously empty `dist/` build was repaired. `scripts/promote-super-admin.ts` exists for Super Admin provisioning, but **no account holds `super_admin` yet and the intended `tech@rajivwilliams.com` account does not exist in the database**. Public signup can no longer assign a role, user self-updates cannot change roles, and user administration endpoints require an authenticated admin role. `POST /employees`, `GET /employees`, and `GET /employees/:id` now require a JWT and a role of `hr` or above. Super Admin provisioning, current-account validation, the HR permission matrix, invitations/OTP, employee self-service, private documents, review workflow, PDFs, audit, reminders, deployment, and production testing remain outstanding. Use the status matrix below and the dated progress log as the source of truth; do not infer completion from a screen, schema, or checklist title alone.
 
 ## How to use this checklist on any device
 
@@ -30,8 +30,8 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | User administration guards | Complete targeted repair | Create/list/delete routes require JWT + `admin` | Replace legacy `admin/customer` model with approved HR permissions before onboarding use |
 | JWT secret/session security | Partial | Secret now read from `JWT_SECRET`, replaced with a freshly generated value; the previously hardcoded key no longer verifies anything. `JWT_SECRET_PREVIOUS` retained for future rotations. Validation still returns token claims only | Account-status lookup, revocation/expiry behaviour, tests |
 | Employee/HR roles | Partial foundation | `super_admin`/`admin`/`hr`/`employee`/`customer` hierarchy in `auth/roles.constants.ts`, enforced by a hierarchy-aware `RolesGuard`. **No account holds `super_admin` yet** and `hr` permissions are undefined | Provision the first Super Admin, define the per-role permission matrix and employee ownership checks, tests |
-| Employee creation API | Not started | No `EmployeesController` or HTTP route exists | HR can create and view a candidate through an authorized endpoint |
-| Admin frontend onboarding pages | Not started | Existing admin routes have no employee workflow | HR dashboard, create form, list, profile, review pages connected to API |
+| Employee creation API | Partial | `EmployeesController` exposes create, list, and detail behind `@Roles('hr')`. The server assigns the employee code and Draft/Prejoining status. No status-change route, idempotency key, or audit event yet | HR can create and view a candidate through an authorized endpoint |
+| Admin frontend onboarding pages | Partial | Staff route `/employees` in `rw_admin_final` creates and lists the seven HR-entered fields. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
 | Candidate invitation/OTP | Not started | No invitation or OTP module | Expiring, revocable, rate-limited, single-employee invitation flow |
 | Employee self-service | Not started | No employee onboarding route/form | Candidate can save, resume, validate, review and submit only their own record |
@@ -64,7 +64,7 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 - [ ] Confirm MongoDB versus relational storage with management; record the decision here.
 - [ ] Finalize employee fields and conditional rules for employees, contractors, interns, freshers, rehires and no-shows.
 - [ ] Add approved fields: employment type, reporting manager, work location, offer status, source of hiring and restricted compensation as applicable.
-- [ ] Add `EmployeesController` with authenticated, role/permission-guarded create, list, detail and status endpoints.
+- [ ] Add `EmployeesController` with authenticated, role/permission-guarded create, list, detail and status endpoints. Create, list, and detail are in place behind `@Roles('hr')`. A status-change endpoint is still outstanding.
 - [ ] Add request idempotency and server-side allowlists; never accept employee ID, role, status, reviewer or audit actor from the client.
 - [ ] Add audit event for employee creation and Employee ID generation.
 - [ ] Add API tests for duplicate email, concurrent Employee ID allocation, invalid fields, unauthorized access and repeated requests.
@@ -168,7 +168,7 @@ The review maps the requested workflow to the employee onboarding specification 
 
 - `rw_admin_final` is a React + TypeScript + MUI admin application. It has existing dashboard, project, lead, application, partner, and integration pages.
 - The admin route guard currently admits only the `admin` user type using browser-readable cookies. It is not a finished employee/HR permission model.
-- `merchandising_backend` is a NestJS + Mongoose/MongoDB application. It now has an employee data model and internal creation service only; it has no employee API route, invitation/OTP flow, private HR document, policy acknowledgement, or audit module.
+- `merchandising_backend` is a NestJS + Mongoose/MongoDB application. It has an employee data model, an internal creation service, and HR-guarded create, list, and detail routes. It has no invitation/OTP flow, private HR document, policy acknowledgement, or audit module.
 - Existing public uploads/static `/uploads` paths must not be used for confidential employee documents.
 - A frontend-only prototype may support design feedback, but it is not the current implementation priority or a functioning onboarding flow.
 - Full Phase 1 is estimated in the review at 30–45 working days for one experienced full-time developer, subject to decisions and assumptions listed there.
@@ -211,7 +211,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-The role-boundary unit tests are in place. Next, expose the internal employee creation service behind the hierarchy-aware `RolesGuard`. The invitation flow and HR UI remain after that. Note that any host still running a build from before 1 October 2026 must be restarted so it picks up the new `JWT_SECRET`.
+Create, list, and detail are exposed behind `RolesGuard` for `hr` and above, and staff can create and list records at `/employees`. Next, add the expiring invitation tied to that employee. HR accounts still cannot open the admin app; login remains admin and above, and the API already accepts `hr` for when that login is opened. Note that any host still running a build from before 1 October 2026 must be restarted so it picks up the new `JWT_SECRET`.
 
 ## Product and company decisions to collect
 
@@ -239,7 +239,7 @@ The role-boundary unit tests are in place. Next, expose the internal employee cr
 ### Employee onboarding
 
 - [x] Employee persistence model and internal create service with atomic, yearly Employee ID counter are implemented; no HTTP route is exposed until authorization is safe.
-- [ ] HR-authorized employee creation endpoint and unique, server-assigned permanent employee code.
+- [x] HR-authorized employee creation endpoint and unique, server-assigned permanent employee code. `POST /employees`, `GET /employees`, and `GET /employees/:id` require a JWT and a role of `hr` or above. The code and Draft/Prejoining status are assigned on the server.
 - [ ] Expiring/revocable invitation tied to the intended employee.
 - [ ] Employee self-service sections for personal/contact, family/emergency, education, prior employment, and bank details, with field-level access decisions.
 - [ ] Saved drafts, clear progress/next action, validation, and a review-before-submit step.
@@ -268,6 +268,15 @@ The role-boundary unit tests are in place. Next, expose the internal employee cr
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-10-07 — HR employee create, list, and detail
+
+- Completed: Exposed the existing employee creation service over HTTP. `POST /employees`, `GET /employees`, and `GET /employees/:id` require a JWT and `@Roles('hr')`, so `hr`, `admin`, and `super_admin` pass and `customer` and `employee` do not. The server assigns `employeeCode` and sets Draft / Prejoining. A client-sent code, status, or role is dropped by the whitelist pipe and is not read by the service. A duplicate personal email returns 409 before a code is allocated. The list and detail responses return only the HR-entered fields plus the code and the two statuses. Added `/employees` in the admin app for staff who can already log in: create form for the seven fields, list, and loading, empty, validation, and API error states. Salary, bank, and documents are not on the screen.
+- Files changed: `merchandising_backend/src/employees/employees.controller.ts`, `employees.service.ts`, `employees.module.ts`, `employees.access.spec.ts`; `rw_admin_final/src/Pages/Employees/index.tsx`, `src/api/services/index.ts`, `src/Routes/index.tsx`, `src/Layout/Admin/Tabs.tsx`, `src/Layout/Admin/Header.tsx`.
+- Verification performed: `npx jest src/employees/employees.access.spec.ts --no-coverage` — 1 suite, 4 tests, all passed. Backend `npx tsc --noEmit --incremental false -p tsconfig.build.json` passed. Admin `npx tsc --noEmit --incremental false` passed. The signed-in Employees screen was not exercised in a browser because login is required.
+- Screenshots/artifacts: None.
+- Decisions or blockers: The admin login and layout still admit only `admin` and above. An `hr` account can call the API but cannot open the page until login is widened and the other admin tabs are hidden from HR. No status-change route, idempotency key, or audit event.
+- Next item: Add the expiring, revocable invitation tied to one employee.
 
 ### 2026-10-06 — Permanent role-boundary tests
 
