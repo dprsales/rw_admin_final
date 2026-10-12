@@ -23,7 +23,7 @@ import {
 import { PersonAddAlt1 } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { createEmployee, getEmployees, type CreateEmployeeInput, type EmployeeRecord } from '../../api/services';
+import { createEmployee, getEmployees, sendEmployeeInvitation, type CreateEmployeeInput, type EmployeeRecord } from '../../api/services';
 
 const EMPTY_FORM: CreateEmployeeInput = {
   firstName: '',
@@ -83,6 +83,15 @@ const Employees: React.FC = () => {
   const { data, isPending, error, refetch } = useQuery<EmployeeRecord[], Error>({
     queryKey: ['employees'],
     queryFn: getEmployees,
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: sendEmployeeInvitation,
+    onSuccess: (response: any) => {
+      toast.success(response?.data?.message ?? 'Invitation sent');
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (requestError: any) => toast.error(errorMessage(requestError)),
   });
 
   const createMutation = useMutation({
@@ -190,12 +199,13 @@ const Employees: React.FC = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Joining date</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Onboarding</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} />
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={9}>
                     <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
                       No employees yet. Add the first record.
                     </Typography>
@@ -212,6 +222,17 @@ const Employees: React.FC = () => {
                     <TableCell>{employee.department}</TableCell>
                     <TableCell>{formatDate(employee.joiningDate)}</TableCell>
                     <TableCell>{employee.onboardingStatus}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        disabled={inviteMutation.isPending}
+                        onClick={() => inviteMutation.mutate(employee._id)}
+                      >
+                        {inviteMutation.isPending && inviteMutation.variables === employee._id
+                          ? 'Sending…'
+                          : 'Send invitation'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

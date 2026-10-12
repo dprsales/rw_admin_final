@@ -80,8 +80,8 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 
 ### 4. Invitation, candidate authentication and self-service
 
-- [ ] Create a cryptographically random, expiring, revocable invitation tied to one employee.
-- [ ] Invalidate or supersede prior invitations according to the approved resend policy.
+- [x] Create a cryptographically random, expiring, revocable invitation tied to one employee. `POST /employees/:id/invitation` stores a SHA-256 of a 32-byte token, a 7-day expiry, and `revoked: false`. The raw token is only in the email. Opening that link is not built yet.
+- [x] Invalidate or supersede prior invitations according to the approved resend policy. A successful send revokes other active invitations for that employee and sets `onboardingStatus` to `Invited`. If the email fails, the new invitation is deleted and the previous one stays active.
 - [ ] Add candidate email verification/OTP with rate limiting and audit events.
 - [ ] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone.
 - [ ] Add saved drafts and section progress for personal/contact, family/emergency, education, previous employment and bank details.
@@ -211,7 +211,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-Create, list, and detail are exposed behind `RolesGuard` for `hr` and above, and staff can create and list records at `/employees`. Next, add the expiring invitation tied to that employee. HR accounts still cannot open the admin app; login remains admin and above, and the API already accepts `hr` for when that login is opened. Note that any host still running a build from before 1 October 2026 must be restarted so it picks up the new `JWT_SECRET`.
+HR can send one invitation from an employee row. The email contains one link. The database stores the token hash, a 7-day expiry, and a revoked flag. A new successful send replaces the previous invitation for that employee. Next, refuse the link when it is expired, revoked, or replaced. The join page does not exist yet, so the link in the email has nowhere to land.
 
 ## Product and company decisions to collect
 
@@ -240,7 +240,7 @@ Create, list, and detail are exposed behind `RolesGuard` for `hr` and above, and
 
 - [x] Employee persistence model and internal create service with atomic, yearly Employee ID counter are implemented; no HTTP route is exposed until authorization is safe.
 - [x] HR-authorized employee creation endpoint and unique, server-assigned permanent employee code. `POST /employees`, `GET /employees`, and `GET /employees/:id` require a JWT and a role of `hr` or above. The code and Draft/Prejoining status are assigned on the server.
-- [ ] Expiring/revocable invitation tied to the intended employee.
+- [x] Expiring/revocable invitation tied to the intended employee. Send is implemented. The link is not opened or refused yet.
 - [ ] Employee self-service sections for personal/contact, family/emergency, education, prior employment, and bank details, with field-level access decisions.
 - [ ] Saved drafts, clear progress/next action, validation, and a review-before-submit step.
 - [ ] Versioned applicable document checklist, private uploads, replacement history, and employee-visible correction reasons.
@@ -268,6 +268,15 @@ Create, list, and detail are exposed behind `RolesGuard` for `hr` and above, and
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-10-12 — Send one employee invitation
+
+- Completed: HR can send one invitation from an existing employee. `POST /employees/:id/invitation` requires a JWT and `@Roles('hr')`. The service creates a random 32-byte token, stores only its SHA-256, sets expiry to 7 days, and sets `revoked` to false. The email contains one link, `INVITE_LINK_BASE` or `https://admin.rajivwilliams.com/join`, with that token. The API response is the message, the address, and the expiry. It does not include the raw token. After the mail server accepts the message, other active invitations for that employee are revoked and `onboardingStatus` becomes `Invited`. If sending fails, the new invitation is deleted and the previous one is left active. The Employees table has a Send invitation button on each row.
+- Files changed: `merchandising_backend/src/employees/schema/employee-invitation.schema.ts`, `employees.invitation.service.ts`, `employees.invitation.spec.ts`, `employees.controller.ts`, `employees.module.ts`; `rw_admin_final/src/api/services/index.ts`, `src/Pages/Employees/index.tsx`.
+- Verification performed: `npx jest src/employees/employees.invitation.spec.ts src/employees/employees.access.spec.ts --no-coverage` — 2 suites, 7 tests, all passed. Admin `npx tsc --noEmit --incremental false` passed. On the local Employees screen the row shows Send invitation; clicking it posts to `/employees/:id/invitation` and the button reads Sending…. The live API answered 404 because this route is only in the local backend and has not been deployed. No invitation email was sent.
+- Screenshots/artifacts: None.
+- Decisions or blockers: The join page is not built, so the link cannot be opened yet. OTP, the candidate form, and refusing an expired, revoked, or replaced link are later steps.
+- Next item: Refuse the invitation link when it is expired, revoked, or replaced.
 
 ### 2026-10-07 — HR employee create, list, and detail
 

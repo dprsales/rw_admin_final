@@ -238,6 +238,10 @@ export const createEmployee = (data: CreateEmployeeInput) => {
   return http.post('/employees', data);
 };
 
+export const sendEmployeeInvitation = (employeeId: string) => {
+  return http.post(`/employees/${employeeId}/invitation`);
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');
