@@ -2,8 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 export const http = axios.create({
-  baseURL: "https://api.rajivwilliams.com",
-  // baseURL: `http://${window.location.hostname}:8088`,
+  // baseURL: "https://api.rajivwilliams.com",
+  baseURL: `http://${window.location.hostname}:8088`,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json, text/plain, */*",  
@@ -17,7 +17,7 @@ http.interceptors.request.use((config) => {
   }
 
   if (config.data instanceof FormData) {
-    config.headers["Content-Type"] = "multipart/form-data";
+    config.headers.delete("Content-Type");
   }
 
   return config;

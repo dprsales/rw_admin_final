@@ -140,6 +140,28 @@ export const downloadChannelPartnersCsv = () => {
   return http.get('/channel-partners/export/csv', { responseType: 'blob' });
 };
 
+export const getVendors = async () => {
+  const response = await http.get('/vendors');
+  return response.data;
+};
+
+export const createVendor = (data: FormData | Record<string, unknown>) => {
+  return http.post('/vendors', data);
+};
+
+export const updateVendor = (vendorId: string, data: FormData | Record<string, unknown>) => {
+  return http.patch(`/vendors/${vendorId}`, data);
+};
+
+export const removeVendorDocument = async (vendorId: string, kind: 'cheque' | 'brochure') => {
+  const response = await http.delete(`/vendors/${vendorId}/documents/${kind}`);
+  return response.data;
+};
+
+export const deleteVendor = (vendorId: string) => {
+  return http.delete(`/vendors/${vendorId}`);
+};
+
 // Users — staff listing and role changes
 export const getUsers = async () => {
   const response = await http.get('/users');

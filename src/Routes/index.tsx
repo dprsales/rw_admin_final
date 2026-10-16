@@ -5,17 +5,18 @@ import {
   Login,
   NotFound,
   Integration,
-} from "../Pages/Exports";
+} from "../Pages/Exports/pageExports";
 import Layout from "../Layout/Layout";
-import AllProjects from "../Pages/AllProjects";
-import ProjectDetails from "../Pages/AllProjects/ProjectDetails";
-import Leads from "../Pages/Leads";
-import Applications from "../Pages/Applications";
-import ChannelPartners from "../Pages/ChannelPartners";
-import Users from "../Pages/Users";
-import Employees from "../Pages/Employees";
-import Payments from "../Pages/Payments";
-import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo";
+import AllProjects from "../Pages/AllProjects/ProjectsPage";
+import ProjectDetails from "../Pages/AllProjects/ProjectDetails/ProjectDetailsPage";
+import Leads from "../Pages/Leads/LeadsPage";
+import Applications from "../Pages/Applications/Applications";
+import ChannelPartners from "../Pages/ChannelPartners/ChannelPartners";
+import Vendors, { VendorFormPage } from "../Pages/Vendors/Vendors";
+import Users from "../Pages/Users/Users";
+import Employees from "../Pages/Employees/Employees";
+import Payments from "../Pages/Payments/Payments";
+import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnboardingDemo";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
 const isAuthenticated = () => Boolean(Cookies.get("access_token"));
@@ -97,6 +98,18 @@ const router = createBrowserRouter([
       {
         path: "/channel-partners",
         element: <ProtectedRoute allow="/channel-partners" component={<ChannelPartners />} />,
+      },
+      {
+        path: "/vendors",
+        element: <ProtectedRoute allow="/vendors" component={<Vendors />} />,
+      },
+      {
+        path: "/vendors/new",
+        element: <ProtectedRoute allow="/vendors" component={<VendorFormPage />} />,
+      },
+      {
+        path: "/vendors/:vendorId",
+        element: <ProtectedRoute allow="/vendors" component={<VendorFormPage />} />,
       },
       {
         path: "/users",
