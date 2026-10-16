@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -43,6 +44,8 @@ export interface Vendor {
   city?: string;
   industry: string;
   note?: string;
+  websiteUrl?: string;
+  feedback?: string;
   gstNumber?: string;
   panNumber?: string;
   cancelledChequeUrl?: string;
@@ -59,6 +62,8 @@ type VendorDraft = {
   city: string;
   industry: string;
   note: string;
+  websiteUrl: string;
+  feedback: string;
   gstNumber: string;
   panNumber: string;
   status: VendorStatus;
@@ -96,6 +101,8 @@ const blankDraft = (): VendorDraft => ({
   city: '',
   industry: '',
   note: '',
+  websiteUrl: '',
+  feedback: '',
   gstNumber: '',
   panNumber: '',
   status: 'active',
@@ -109,6 +116,8 @@ const draftFrom = (vendor: Vendor): VendorDraft => ({
   city: vendor.city || '',
   industry: vendor.industry,
   note: vendor.note || '',
+  websiteUrl: vendor.websiteUrl || '',
+  feedback: vendor.feedback || '',
   gstNumber: vendor.gstNumber || '',
   panNumber: vendor.panNumber || '',
   status: vendor.status,
@@ -123,6 +132,8 @@ const payloadFrom = (draft: VendorDraft) => ({
   ...(draft.email.trim() ? { email: draft.email.trim() } : {}),
   ...(draft.city.trim() ? { city: draft.city.trim() } : {}),
   ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
+  ...(draft.websiteUrl.trim() ? { websiteUrl: draft.websiteUrl.trim() } : {}),
+  ...(draft.feedback.trim() ? { feedback: draft.feedback.trim() } : {}),
   ...(draft.gstNumber.trim() ? { gstNumber: draft.gstNumber.trim().toUpperCase() } : {}),
   ...(draft.panNumber.trim() ? { panNumber: draft.panNumber.trim().toUpperCase() } : {}),
 });
@@ -192,8 +203,18 @@ const Vendors: React.FC = () => {
       if (industry !== 'All' && vendor.industry.toLowerCase() !== industry.toLowerCase()) return false;
       if (status !== 'all' && vendor.status !== status) return false;
       if (!query) return true;
-      return [vendor.companyName, vendor.contactName, vendor.phone, vendor.email, vendor.city, vendor.gstNumber, vendor.panNumber]
-        .some((value) => value?.toLowerCase().includes(query));
+      return [
+        vendor.companyName,
+        vendor.contactName,
+        vendor.phone,
+        vendor.email,
+        vendor.city,
+        vendor.gstNumber,
+        vendor.panNumber,
+        vendor.websiteUrl,
+        vendor.feedback,
+        vendor.note,
+      ].some((value) => value?.toLowerCase().includes(query));
     });
   }, [vendors, searchText, industry, status]);
 
@@ -236,12 +257,29 @@ const Vendors: React.FC = () => {
             <TextField
               value={searchText}
               onChange={(event) => { setSearchText(event.target.value); resetPage(); }}
-              placeholder="Search company, contact, phone, email, city, GST or PAN"
+              placeholder="Search company, contact, phone, email, city, website, feedback, GST or PAN"
               size="small"
-              sx={{ width: { xs: '100%', sm: 420 }, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ width: { xs: '100%', sm: 360, md: 420 }, flex: '1 1 280px', '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
             />
-            <Stack direction="row" spacing={1}>
+            <Autocomplete
+              size="small"
+              options={['All industries', ...industries]}
+              value={industry === 'All' ? 'All industries' : industry}
+              onChange={(_, value) => {
+                setIndustry(!value || value === 'All industries' ? 'All' : value);
+                resetPage();
+              }}
+              sx={{ width: { xs: '100%', sm: 260 }, flex: '0 1 260px' }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Industry"
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              )}
+            />
+            <Stack direction="row" spacing={1} sx={{ flex: '0 0 auto' }}>
               {(['all', 'active', 'paused'] as const).map((option) => (
                 <Chip
                   key={option}
@@ -254,25 +292,6 @@ const Vendors: React.FC = () => {
               ))}
             </Stack>
           </Box>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Chip
-              label="All industries"
-              clickable
-              variant={industry === 'All' ? 'filled' : 'outlined'}
-              color={industry === 'All' ? 'primary' : 'default'}
-              onClick={() => { setIndustry('All'); resetPage(); }}
-            />
-            {industries.map((name) => (
-              <Chip
-                key={name}
-                label={name}
-                clickable
-                variant={industry.toLowerCase() === name.toLowerCase() ? 'filled' : 'outlined'}
-                color={industry.toLowerCase() === name.toLowerCase() ? 'primary' : 'default'}
-                onClick={() => { setIndustry(name); resetPage(); }}
-              />
-            ))}
-          </Stack>
           <Typography variant="caption" color="text.secondary">{filtered.length} matching vendors</Typography>
         </Box>
         <Divider />
@@ -300,6 +319,18 @@ const Vendors: React.FC = () => {
                   <TableRow key={vendor._id} hover>
                     <TableCell>
                       <Typography sx={{ fontWeight: 600 }}>{vendor.companyName}</Typography>
+                      {vendor.websiteUrl && (
+                        <Typography
+                          component="a"
+                          href={vendor.websiteUrl.startsWith('http') ? vendor.websiteUrl : `https://${vendor.websiteUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="caption"
+                          sx={{ color: '#0f63a5', display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                          Website / portfolio
+                        </Typography>
+                      )}
                       {vendor.replacedNote && (
                         <Typography variant="caption" color="text.secondary">{vendor.replacedNote}</Typography>
                       )}
@@ -315,6 +346,11 @@ const Vendors: React.FC = () => {
                     <TableCell>
                       <Typography variant="body2">{vendor.industry}</Typography>
                       <Typography variant="caption" color="text.secondary">{vendor.city || '-'}</Typography>
+                      {vendor.feedback && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          {vendor.feedback.length > 80 ? `${vendor.feedback.slice(0, 80)}…` : vendor.feedback}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <DocumentLinks vendor={vendor} />
@@ -681,7 +717,9 @@ export const VendorFormPage: React.FC = () => {
           <TextField label="Email" value={draft.email} onChange={set('email')} type="email" fullWidth />
           <TextField label="City" value={draft.city} onChange={set('city')} fullWidth />
           <TextField label="Industry" value={draft.industry} onChange={set('industry')} required fullWidth helperText="Type the industry. It becomes a filter on the sheet." />
+          <TextField label="Website / portfolio" value={draft.websiteUrl} onChange={set('websiteUrl')} fullWidth sx={{ gridColumn: '1 / -1' }} helperText="Company site, Behance, Drive folder, or portfolio link." />
           <TextField label="What they supply" value={draft.note} onChange={set('note')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} />
+          <TextField label="Feedback / notes" value={draft.feedback} onChange={set('feedback')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} helperText="Call notes and outreach status from the vendor sheet." />
           <TextField label="GST number" value={draft.gstNumber} onChange={set('gstNumber')} fullWidth inputProps={{ maxLength: 15 }} helperText="15 characters. A GST certificate file is not required." />
           <TextField label="PAN number" value={draft.panNumber} onChange={set('panNumber')} fullWidth inputProps={{ maxLength: 10 }} helperText="10 characters. A PAN card file is not required." />
           <Box sx={{ minWidth: 0 }}>
