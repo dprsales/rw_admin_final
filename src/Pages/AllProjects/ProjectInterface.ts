@@ -11,6 +11,7 @@ export interface Projects {
   slug: string;
   projectimage: string;
   rera: string;
+  ocReceived?: boolean;
   date: number; 
 }
 
@@ -31,6 +32,7 @@ export interface ProjectDetails {
   locationiframe: string;
   parkingarea: number;
   propertyType: string; // Enum: 'Apartments' | 'Villas'
+  ocReceived?: boolean;
   bankOffers: {
     bankIcon: string;
     bankName: string;

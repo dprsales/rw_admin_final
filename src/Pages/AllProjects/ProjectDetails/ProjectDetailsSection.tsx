@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ProjectDetails } from '../ProjectInterface';
-import { Box, Typography, IconButton, Paper, Divider, Card, Grid } from '@mui/material';
+import { Box, Typography, IconButton, Paper, Divider, Card, Grid, FormControlLabel, Switch } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import { toast } from 'react-toastify';
+import { updateProject } from '../../../api/services';
 import ProjectDetailsDrawer from '../Drawers/ProjectDetailsDrawer';
 
 interface Props {
@@ -18,6 +20,24 @@ const resolveImageUrl = (path: string) => {
 const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [details, setDetails] = useState(data);
+    const [savingOc, setSavingOc] = useState(false);
+
+    const setOcReceived = async (ocReceived: boolean) => {
+        const previous = details.ocReceived === true;
+        setDetails({ ...details, ocReceived });
+        setSavingOc(true);
+        try {
+            await updateProject(details.slug, {
+                projectdetails: { ...details, ocReceived },
+            });
+            toast.success(ocReceived ? 'OC received is on for this project' : 'OC received is off for this project');
+        } catch {
+            setDetails({ ...details, ocReceived: previous });
+            toast.error('Could not update OC received');
+        } finally {
+            setSavingOc(false);
+        }
+    };
 
     return (
         <Paper sx={{ p: 2, mb: 2 }}>
@@ -134,6 +154,18 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
                                 </Typography>
                             </Box>
                         </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={details.ocReceived === true}
+                                        disabled={savingOc}
+                                        onChange={(_, checked) => setOcReceived(checked)}
+                                    />
+                                }
+                                label="OC received (Occupancy Certificate)"
+                            />
+                        </Grid>
 
                         <Grid item xs={12} md={6}>
                             <Box display="flex" flexDirection="row" alignItems="center">
@@ -217,7 +249,7 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
                 onClose={() => setDrawerOpen(false)}
                 initialData={details}
                 onSubmit={(newData: ProjectDetails) => {
-                    setDetails(newData);
+                    setDetails({ ...newData, ocReceived: details.ocReceived === true });
                     setDrawerOpen(false);
                 }}
             />
