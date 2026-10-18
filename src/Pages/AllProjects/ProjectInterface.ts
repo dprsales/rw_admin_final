@@ -172,5 +172,6 @@ export interface Project {
   highlights?: string[];
   projectimage?: string;
   rera?: string;
+  ocReceived?: boolean;
   date?: number;
 }

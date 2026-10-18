@@ -3,7 +3,7 @@ import { ProjectDetails } from '../ProjectInterface';
 import { Box, Typography, IconButton, Paper, Divider, Card, Grid, FormControlLabel, Switch } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-toastify';
-import { updateProject } from '../../../api/services';
+import { updateProjectOcReceived } from '../../../api/services';
 import ProjectDetailsDrawer from '../Drawers/ProjectDetailsDrawer';
 
 interface Props {
@@ -27,9 +27,7 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
         setDetails({ ...details, ocReceived });
         setSavingOc(true);
         try {
-            await updateProject(details.slug, {
-                projectdetails: { ...details, ocReceived },
-            });
+            await updateProjectOcReceived(details.slug, ocReceived);
             toast.success(ocReceived ? 'OC received is on for this project' : 'OC received is off for this project');
         } catch {
             setDetails({ ...details, ocReceived: previous });

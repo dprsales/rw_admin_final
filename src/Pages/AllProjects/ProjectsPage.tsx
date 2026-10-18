@@ -45,6 +45,7 @@ const ProjectsPage: React.FC = () => {
 
     projectimage: item.projectimage || '',
     rera: item.rera?.trim() || '',
+    ocReceived: item.ocReceived === true,
     date: item.date || 0,
      projectId: item.slug,
   })) || [];

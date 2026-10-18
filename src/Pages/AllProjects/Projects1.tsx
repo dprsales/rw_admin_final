@@ -162,6 +162,9 @@ const Projects1: React.FC<ProjectsProps> = ({
                 <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>Parking Area</Typography>
               </TableCell>
               <TableCell align="left" sx={{ padding: "8px" }}>
+                <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>OC</Typography>
+              </TableCell>
+              <TableCell align="left" sx={{ padding: "8px" }}>
                 <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>Status</Typography>
               </TableCell>
               <TableCell align="left" sx={{ padding: "8px" }}>
@@ -207,6 +210,11 @@ const Projects1: React.FC<ProjectsProps> = ({
                     </TableCell>
                   <TableCell sx={{ padding: '6px' }}>
                      <Typography variant="caption" sx={{ marginLeft: "25px" }}>{row.parkingarea}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ padding: '6px' }}>
+                    <Typography variant="caption" sx={{ marginLeft: "25px" }}>
+                      {row.ocReceived ? 'Received' : '—'}
+                    </Typography>
                   </TableCell>
                   <TableCell sx={{ padding: '6px' }}>
                     <Tooltip title={status.text}>

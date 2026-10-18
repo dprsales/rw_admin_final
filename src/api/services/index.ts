@@ -276,7 +276,11 @@ export const searchProjects = (searchItem: string) => {
 };
 
 export const updateProject = (projectId: string, data: any) => {
-  return http.patch(`/projects/${projectId}`, data);
+  return http.put(`/projects/${projectId}`, data);
+};
+
+export const updateProjectOcReceived = (slug: string, ocReceived: boolean) => {
+  return http.put(`/projects/${slug}/oc-received`, { ocReceived });
 };
 
 export const deleteProject = (projectId: string) => {
