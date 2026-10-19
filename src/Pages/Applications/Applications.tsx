@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -70,6 +71,14 @@ export interface Application {
   hexacoIntegrity?: string;
   hexacoLoyalty?: string;
   hexacoFlexibility?: string;
+  hexacoMindset?: string;
+  hexacoHonesty?: string;
+  hexacoEmotionality?: string;
+  hexacoExtraversion?: string;
+  hexacoAgreeableness?: string;
+  hexacoConscientiousness?: string;
+  hexacoOpenness?: string;
+  hexacoProblemSolving?: string;
   hexacoOverall?: string;
   hexacoAnswers?: string;
 }
@@ -112,6 +121,14 @@ const TRAIT_KEYS: { label: string; field: keyof Application }[] = [
   { label: 'Integrity', field: 'hexacoIntegrity' },
   { label: 'Loyalty', field: 'hexacoLoyalty' },
   { label: 'Flexibility', field: 'hexacoFlexibility' },
+  { label: 'Mindset', field: 'hexacoMindset' },
+  { label: 'Honesty-Humility', field: 'hexacoHonesty' },
+  { label: 'Emotionality', field: 'hexacoEmotionality' },
+  { label: 'Extraversion', field: 'hexacoExtraversion' },
+  { label: 'Agreeableness (versus Anger)', field: 'hexacoAgreeableness' },
+  { label: 'Conscientiousness', field: 'hexacoConscientiousness' },
+  { label: 'Openness to Experience', field: 'hexacoOpenness' },
+  { label: 'Problem solving', field: 'hexacoProblemSolving' },
 ];
 
 /** Stored scores arrive as strings like "83%". */
@@ -131,6 +148,8 @@ const Applications: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [downloadingResume, setDownloadingResume] = useState(false);
   const queryClient = useQueryClient();
   const deleteMutation = useMutation({
@@ -160,6 +179,47 @@ const Applications: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(filteredApplications.length / rowsPerPage));
   const visibleApplications = filteredApplications.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const filteredIds = filteredApplications.map((application) => application._id);
+  const selectedCount = selectedIds.length;
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
+  const someFilteredSelected = filteredIds.some((id) => selectedIds.includes(id));
+
+  const toggleOne = (applicationId: string) => {
+    setSelectedIds((current) => (
+      current.includes(applicationId)
+        ? current.filter((id) => id !== applicationId)
+        : [...current, applicationId]
+    ));
+  };
+
+  const toggleAllFiltered = () => {
+    setSelectedIds((current) => (
+      allFilteredSelected
+        ? current.filter((id) => !filteredIds.includes(id))
+        : [...new Set([...current, ...filteredIds])]
+    ));
+  };
+
+  const deleteSelected = async () => {
+    if (!selectedIds.length || bulkDeleting) return;
+    const count = selectedIds.length;
+    if (!window.confirm(`Delete ${count} application${count === 1 ? '' : 's'} and any stored resumes permanently?`)) return;
+
+    setBulkDeleting(true);
+    const failed: string[] = [];
+    for (const applicationId of selectedIds) {
+      try {
+        await deleteApplication(applicationId);
+      } catch {
+        failed.push(applicationId);
+      }
+    }
+    setSelectedIds(failed);
+    if (selectedApplication && !failed.includes(selectedApplication._id)) setSelectedApplication(null);
+    await queryClient.invalidateQueries({ queryKey: ['applications'] });
+    setBulkDeleting(false);
+    if (failed.length) window.alert(`${failed.length} application${failed.length === 1 ? '' : 's'} could not be deleted.`);
+  };
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(event.target.value);
@@ -211,7 +271,21 @@ const Applications: React.FC = () => {
             sx={{ width: { xs: '100%', sm: 380 }, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
           />
-          <Typography variant="caption" color="text.secondary">{filteredApplications.length} matching applications</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography variant="caption" color="text.secondary">{filteredApplications.length} matching applications</Typography>
+            {selectedCount > 0 && (
+              <Button
+                variant="contained"
+                color="error"
+                size="small"
+                startIcon={<DeleteOutline />}
+                disabled={bulkDeleting}
+                onClick={deleteSelected}
+              >
+                {bulkDeleting ? 'Deleting...' : `Delete selected (${selectedCount})`}
+              </Button>
+            )}
+          </Box>
         </Box>
         <Divider />
 
@@ -226,12 +300,29 @@ const Applications: React.FC = () => {
             <Table sx={{ minWidth: 760 }}>
               <TableHead sx={{ bgcolor: '#f3f8fb' }}>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      size="small"
+                      checked={allFilteredSelected}
+                      indeterminate={!allFilteredSelected && someFilteredSelected}
+                      onChange={toggleAllFiltered}
+                      inputProps={{ 'aria-label': 'Select all matching applications' }}
+                    />
+                  </TableCell>
                   {['Candidate', 'Role', 'Experience', 'Resume', 'Applied'].map((heading) => <TableCell key={heading} sx={{ fontWeight: 700, color: '#355466' }}>{heading}</TableCell>)}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {visibleApplications.map((application) => (
                   <TableRow key={application._id} hover onClick={() => setSelectedApplication(application)} sx={{ cursor: 'pointer' }}>
+                    <TableCell padding="checkbox" onClick={(event) => event.stopPropagation()}>
+                      <Checkbox
+                        size="small"
+                        checked={selectedIds.includes(application._id)}
+                        onChange={() => toggleOne(application._id)}
+                        inputProps={{ 'aria-label': `Select ${application.name || 'application'}` }}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Typography sx={{ fontWeight: 600 }}>{application.name || 'Unnamed candidate'}</Typography>
                       <Typography variant="caption" color="text.secondary">{application.email}</Typography>
