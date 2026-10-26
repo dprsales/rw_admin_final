@@ -53,6 +53,8 @@ export interface Application {
   ref2Relationship?: string;
   linkedinUrl?: string;
   portfolioUrl?: string;
+  socialMediaSavvy?: string;
+  aiTools?: string[];
   coverLetter: string;
   resumeFileName?: string;
   resumeUrl?: string;
@@ -174,6 +176,7 @@ const Applications: React.FC = () => {
       application.number,
       application.jobTitle,
       application.experience,
+      Array.isArray(application.aiTools) ? application.aiTools.join(' ') : '',
     ].some((value) => value?.toLowerCase().includes(query)));
   }, [applications, searchText]);
 
@@ -391,6 +394,8 @@ const ApplicationDetails: React.FC<{
           <Detail label="Applied" value={formatDate(application.createdAt)} />
           <Detail label="LinkedIn" value={application.linkedinUrl} link={application.linkedinUrl} />
           <Detail label="Portfolio" value={application.portfolioUrl} link={application.portfolioUrl} />
+          <Detail label="Social media & AI" value={application.socialMediaSavvy === 'true' ? 'Yes' : application.socialMediaSavvy === 'false' ? 'No' : application.socialMediaSavvy} />
+          <Detail label="AI tools they use" value={(Array.isArray(application.aiTools) ? application.aiTools : []).join(', ')} />
           <Detail label="Resume" value={application.resumeFileName || 'No resume attached'} />
         </Box>
         <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700 }}>Professional references</Typography>
