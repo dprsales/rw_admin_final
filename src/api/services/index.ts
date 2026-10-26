@@ -162,6 +162,19 @@ export const deleteVendor = (vendorId: string) => {
   return http.delete(`/vendors/${vendorId}`);
 };
 
+export const getVendorPartners = async () => {
+  const response = await http.get('/vendor-partners');
+  return response.data;
+};
+
+export const updateVendorPartner = (id: string, data: { status: 'approved' | 'rejected' | 'resubmit' }) => {
+  return http.patch(`/vendor-partners/${id}`, data);
+};
+
+export const deleteVendorPartner = (id: string) => {
+  return http.delete(`/vendor-partners/${id}`);
+};
+
 // Users — staff listing and role changes
 export const getUsers = async () => {
   const response = await http.get('/users');

@@ -228,15 +228,15 @@ const Vendors: React.FC = () => {
   }
 
   if (error) {
-    return <Paper sx={{ p: 4, borderRadius: 3 }}><Typography color="error">Unable to load vendors. Please try again.</Typography></Paper>;
+    return <Paper sx={{ p: 4, borderRadius: 3 }}><Typography color="error">Unable to load the vendor list. Please try again.</Typography></Paper>;
   }
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Vendors</Typography>
-          <Typography variant="body2" color="text.secondary">Companies Team RW buys from. The GST number, PAN number, and documents stay on the row.</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Vendor List</Typography>
+          <Typography variant="body2" color="text.secondary">Companies Team RW already works with. The GST number, PAN number, and documents stay on the row.</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
           <Chip icon={<StorefrontOutlined />} label={`${vendors.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
@@ -292,16 +292,16 @@ const Vendors: React.FC = () => {
               ))}
             </Stack>
           </Box>
-          <Typography variant="caption" color="text.secondary">{filtered.length} matching vendors</Typography>
+          <Typography variant="caption" color="text.secondary">{filtered.length} matching companies</Typography>
         </Box>
         <Divider />
 
         {visible.length === 0 ? (
           <Box sx={{ py: 10, px: 3, textAlign: 'center' }}>
             <StorefrontOutlined sx={{ fontSize: 42, color: '#9bb9ca', mb: 1 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>{vendors.length === 0 ? 'No vendors yet' : 'No vendors match'}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>{vendors.length === 0 ? 'No companies yet' : 'No companies match'}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {vendors.length === 0 ? 'Add the first company to start the sheet.' : 'Try another industry or clear the search.'}
+              {vendors.length === 0 ? 'Add the first company to start the vendor list.' : 'Try another industry or clear the search.'}
             </Typography>
           </Box>
         ) : (
@@ -667,8 +667,8 @@ export const VendorFormPage: React.FC = () => {
   if (vendorId && (error || !vendor)) {
     return (
       <Paper sx={{ p: 4, borderRadius: 3 }}>
-        <Typography color="error" sx={{ mb: 2 }}>This vendor is not on the sheet.</Typography>
-        <Button onClick={() => navigate('/vendors')} sx={quietButton}>Back to vendors</Button>
+        <Typography color="error" sx={{ mb: 2 }}>This vendor is not on the vendor list.</Typography>
+        <Button onClick={() => navigate('/vendors')} sx={quietButton}>Back to vendor list</Button>
       </Paper>
     );
   }
@@ -695,7 +695,7 @@ export const VendorFormPage: React.FC = () => {
             onClick={() => navigate('/vendors')}
             sx={{ bgcolor: 'transparent', color: '#0f63a5', px: 0, '&:hover': { bgcolor: 'transparent', color: '#0c5288', border: 'none' } }}
           >
-            Vendors
+            Vendor List
           </Button>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>{vendor ? 'Edit vendor' : 'Add vendor'}</Typography>
         </Box>
@@ -719,7 +719,7 @@ export const VendorFormPage: React.FC = () => {
           <TextField label="Industry" value={draft.industry} onChange={set('industry')} required fullWidth helperText="Type the industry. It becomes a filter on the sheet." />
           <TextField label="Website / portfolio" value={draft.websiteUrl} onChange={set('websiteUrl')} fullWidth sx={{ gridColumn: '1 / -1' }} helperText="Company site, Behance, Drive folder, or portfolio link." />
           <TextField label="What they supply" value={draft.note} onChange={set('note')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} />
-          <TextField label="Feedback / notes" value={draft.feedback} onChange={set('feedback')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} helperText="Call notes and outreach status from the vendor sheet." />
+          <TextField label="Feedback / notes" value={draft.feedback} onChange={set('feedback')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} helperText="Call notes and outreach status from the vendor list." />
           <TextField label="GST number" value={draft.gstNumber} onChange={set('gstNumber')} fullWidth inputProps={{ maxLength: 15 }} helperText="15 characters. A GST certificate file is not required." />
           <TextField label="PAN number" value={draft.panNumber} onChange={set('panNumber')} fullWidth inputProps={{ maxLength: 10 }} helperText="10 characters. A PAN card file is not required." />
           <Box sx={{ minWidth: 0 }}>
@@ -752,7 +752,7 @@ export const VendorFormPage: React.FC = () => {
           </TextField>
         </Box>
         {(localError || (error && !vendorId)) && (
-          <Typography color="error" variant="body2" sx={{ mt: 2 }}>{localError || 'Unable to load vendors. Please try again.'}</Typography>
+          <Typography color="error" variant="body2" sx={{ mt: 2 }}>{localError || 'Unable to load the vendor list. Please try again.'}</Typography>
         )}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 3 }}>
           <Button onClick={() => navigate('/vendors')} disabled={saveMutation.isPending} sx={quietButton}>Cancel</Button>

@@ -87,7 +87,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  * user management, which stays with super admin. One person, one seat.
  */
 const WORKSPACES: Partial<Record<UserRole, string[]>> = {
-  hr: ['/applications', '/employees', '/vendors'],
+  hr: ['/applications', '/employees', '/vendors', '/vendor-partners'],
   account: ['/payments'],
   finance: ['/payments'],
   sales: ['/leads'],

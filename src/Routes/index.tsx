@@ -13,6 +13,7 @@ import Leads from "../Pages/Leads/LeadsPage";
 import Applications from "../Pages/Applications/Applications";
 import ChannelPartners from "../Pages/ChannelPartners/ChannelPartners";
 import Vendors, { VendorFormPage } from "../Pages/Vendors/Vendors";
+import VendorPartners from "../Pages/VendorPartners/VendorPartners";
 import Users from "../Pages/Users/Users";
 import Employees from "../Pages/Employees/Employees";
 import Payments from "../Pages/Payments/Payments";
@@ -102,6 +103,10 @@ const router = createBrowserRouter([
       {
         path: "/vendors",
         element: <ProtectedRoute allow="/vendors" component={<Vendors />} />,
+      },
+      {
+        path: "/vendor-partners",
+        element: <ProtectedRoute allow="/vendor-partners" component={<VendorPartners />} />,
       },
       {
         path: "/vendors/new",
