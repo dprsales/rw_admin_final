@@ -47,6 +47,8 @@ export interface Vendor {
   websiteUrl?: string;
   feedback?: string;
   gstNumber?: string;
+  yearOfIncorporation?: string;
+  officeLocation?: string;
   panNumber?: string;
   cancelledChequeUrl?: string;
   brochureUrl?: string;
@@ -65,6 +67,8 @@ type VendorDraft = {
   websiteUrl: string;
   feedback: string;
   gstNumber: string;
+  yearOfIncorporation: string;
+  officeLocation: string;
   panNumber: string;
   status: VendorStatus;
 };
@@ -81,6 +85,8 @@ const EMPTY: Vendor[] = [];
 
 const GST_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i;
 const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
+const YEAR_PATTERN = /^(18|19|20)\d{2}$/;
+const THIS_YEAR = new Date().getFullYear();
 const DOCUMENT_ACCEPT = {
   'application/pdf': ['.pdf'],
   'image/jpeg': ['.jpg', '.jpeg'],
@@ -104,6 +110,8 @@ const blankDraft = (): VendorDraft => ({
   websiteUrl: '',
   feedback: '',
   gstNumber: '',
+  yearOfIncorporation: '',
+  officeLocation: '',
   panNumber: '',
   status: 'active',
 });
@@ -119,6 +127,8 @@ const draftFrom = (vendor: Vendor): VendorDraft => ({
   websiteUrl: vendor.websiteUrl || '',
   feedback: vendor.feedback || '',
   gstNumber: vendor.gstNumber || '',
+  yearOfIncorporation: vendor.yearOfIncorporation || '',
+  officeLocation: vendor.officeLocation || '',
   panNumber: vendor.panNumber || '',
   status: vendor.status,
 });
@@ -135,6 +145,8 @@ const payloadFrom = (draft: VendorDraft) => ({
   ...(draft.websiteUrl.trim() ? { websiteUrl: draft.websiteUrl.trim() } : {}),
   ...(draft.feedback.trim() ? { feedback: draft.feedback.trim() } : {}),
   ...(draft.gstNumber.trim() ? { gstNumber: draft.gstNumber.trim().toUpperCase() } : {}),
+  ...(draft.yearOfIncorporation.trim() ? { yearOfIncorporation: draft.yearOfIncorporation.trim() } : {}),
+  ...(draft.officeLocation.trim() ? { officeLocation: draft.officeLocation.trim() } : {}),
   ...(draft.panNumber.trim() ? { panNumber: draft.panNumber.trim().toUpperCase() } : {}),
 });
 
@@ -210,6 +222,8 @@ const Vendors: React.FC = () => {
         vendor.email,
         vendor.city,
         vendor.gstNumber,
+        vendor.yearOfIncorporation,
+        vendor.officeLocation,
         vendor.panNumber,
         vendor.websiteUrl,
         vendor.feedback,
@@ -257,7 +271,7 @@ const Vendors: React.FC = () => {
             <TextField
               value={searchText}
               onChange={(event) => { setSearchText(event.target.value); resetPage(); }}
-              placeholder="Search company, contact, phone, email, city, website, feedback, GST or PAN"
+              placeholder="Search company, contact, phone, email, city, office, website, feedback, GST, year or PAN"
               size="small"
               sx={{ width: { xs: '100%', sm: 360, md: 420 }, flex: '1 1 280px', '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
@@ -341,6 +355,9 @@ const Vendors: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">GST {vendor.gstNumber || '-'}</Typography>
+                      {vendor.yearOfIncorporation ? (
+                        <Typography variant="caption" color="text.secondary">Est. {vendor.yearOfIncorporation}</Typography>
+                      ) : null}
                       <Typography variant="caption" color="text.secondary">PAN {vendor.panNumber || '-'}</Typography>
                     </TableCell>
                     <TableCell>
@@ -652,6 +669,13 @@ export const VendorFormPage: React.FC = () => {
       setLocalError('Enter a valid 15-character GST number.');
       return;
     }
+    if (draft.yearOfIncorporation.trim()) {
+      const year = Number(draft.yearOfIncorporation.trim());
+      if (!YEAR_PATTERN.test(draft.yearOfIncorporation.trim()) || year > THIS_YEAR) {
+        setLocalError('Enter a 4-digit year of incorporation.');
+        return;
+      }
+    }
     if (draft.panNumber.trim() && !PAN_PATTERN.test(draft.panNumber.trim())) {
       setLocalError('Enter a valid 10-character PAN number.');
       return;
@@ -716,6 +740,8 @@ export const VendorFormPage: React.FC = () => {
           <TextField label="Phone" value={draft.phone} onChange={set('phone')} required fullWidth />
           <TextField label="Email" value={draft.email} onChange={set('email')} type="email" fullWidth />
           <TextField label="City" value={draft.city} onChange={set('city')} fullWidth />
+          <TextField label="Year of incorporation" value={draft.yearOfIncorporation} onChange={set('yearOfIncorporation')} fullWidth inputProps={{ maxLength: 4, inputMode: 'numeric' }} helperText="4-digit year, e.g. 2014." />
+          <TextField label="Their office location" value={draft.officeLocation} onChange={set('officeLocation')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} helperText="The vendor's street, area, and city — not Team RW." />
           <TextField label="Industry" value={draft.industry} onChange={set('industry')} required fullWidth helperText="Type the industry. It becomes a filter on the sheet." />
           <TextField label="Website / portfolio" value={draft.websiteUrl} onChange={set('websiteUrl')} fullWidth sx={{ gridColumn: '1 / -1' }} helperText="Company site, Behance, Drive folder, or portfolio link." />
           <TextField label="What they supply" value={draft.note} onChange={set('note')} fullWidth multiline minRows={2} sx={{ gridColumn: '1 / -1' }} />

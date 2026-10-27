@@ -48,6 +48,9 @@ interface VendorPartner {
   phone: string;
   email?: string;
   city?: string;
+  gstNumber?: string;
+  yearOfIncorporation?: string;
+  officeLocation?: string;
   industry: string;
   websiteUrl?: string;
   videoUrl?: string;
@@ -143,7 +146,7 @@ const VendorPartners: React.FC = () => {
     return rows.filter((row) => {
       if (statusFilter !== 'all' && row.status !== statusFilter) return false;
       if (!query) return true;
-      return [row.companyName, row.contactName, row.phone, row.email, row.city, row.industry, row.about]
+      return [row.companyName, row.contactName, row.phone, row.email, row.city, row.gstNumber, row.yearOfIncorporation, row.officeLocation, row.industry, row.about]
         .some((value) => value?.toLowerCase().includes(query));
     });
   }, [rows, searchText, statusFilter]);
@@ -228,6 +231,8 @@ const VendorPartners: React.FC = () => {
                       <Typography variant="body2">{row.contactName}</Typography>
                       <Typography variant="caption" color="text.secondary">
                         {row.phone}{row.email ? ` · ${row.email}` : ''}{row.city ? ` · ${row.city}` : ''}
+                        {row.gstNumber ? ` · GST ${row.gstNumber}` : ''}{row.yearOfIncorporation ? ` · Est. ${row.yearOfIncorporation}` : ''}
+                        {row.officeLocation ? ` · ${row.officeLocation}` : ''}
                       </Typography>
                     </TableCell>
                     <TableCell>{row.industry}</TableCell>
