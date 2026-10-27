@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Box, Typography, Button, Grid, Chip } from '@mui/material';
-import { Lead, SERVICE_LABEL, SOURCE_LABEL, VISITOR_LABEL } from './Leads';
+import { krisahStatusLabel, Lead, leadSourceLabel, SERVICE_LABEL, VISITOR_LABEL } from './Leads';
 
 interface LeadModalProps {
   open: boolean;
@@ -84,8 +84,15 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           )}
           <Grid item xs={6}>
             <Typography variant="body2">
-              <strong>Source:</strong> {lead.source ? (SOURCE_LABEL[lead.source] || lead.source) : '-'}
+              <strong>Source:</strong> {leadSourceLabel(lead)}
+              {lead.pageSource && lead.source !== 'assessment' ? ` · ${lead.pageSource}` : ''}
               {lead.enquiries && lead.enquiries > 1 ? ` · ${lead.enquiries} enquiries` : ''}
+            </Typography>
+          </Grid>
+          <Grid item xs={6}>
+            <Typography variant="body2">
+              <strong>Test:</strong> {krisahStatusLabel(lead)}
+              {lead.krisahCompletedAt ? ` · ${new Date(lead.krisahCompletedAt).toLocaleDateString()}` : ''}
             </Typography>
           </Grid>
         </Grid>
