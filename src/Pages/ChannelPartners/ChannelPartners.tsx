@@ -68,6 +68,8 @@ export interface ChannelPartner {
   utmContent?: string;
   clickId?: string;
   referrer?: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
   status: 'new' | 'reviewing' | 'approved' | 'rejected';
   uploads?: ChannelPartnerUpload[];
   createdAt: string;
@@ -357,6 +359,7 @@ const PartnerDetails: React.FC<{
           <Detail label="RERA registered" value={partner.hasRera} />
           <Detail label="RERA number" value={partner.reraNo} />
           <Detail label="Project categories" value={partner.projectCategories?.join(', ')} />
+          <Detail label="Terms accepted" value={partner.termsAccepted ? `Yes${partner.termsAcceptedAt ? ` · ${formatDate(partner.termsAcceptedAt)}` : ''}` : 'No'} />
         </Box>
 
         {(partner.uploads && partner.uploads.length > 0) && <>
