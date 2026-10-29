@@ -3,7 +3,7 @@ import {
   Box, TextField, InputAdornment, Paper, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
   Pagination, Typography, Select, MenuItem, ListSubheader, Checkbox, FormControl,
-  Button, Menu, Dialog, DialogTitle, DialogContent, DialogActions
+  Button, Menu, Dialog, DialogTitle, DialogContent, DialogActions, Chip
 } from '@mui/material';
 import { Search as SearchIcon, ArrowDropDown as ArrowDropDownIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
@@ -69,13 +69,47 @@ export function leadSourceLabel(lead: Pick<Lead, 'source' | 'pageSource'>): stri
   return lead.pageSource || '-';
 }
 
+export type KrisahStatus = 'completed' | 'invite_sent' | 'not_started' | 'none';
+
+export function krisahStatusKey(
+  lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahInviteSentAt'>,
+): KrisahStatus {
+  if (lead.krisahDone) return 'completed';
+  if (lead.krisahInviteSentAt) return 'invite_sent';
+  if (lead.source === 'assessment' || /assessment/i.test(lead.pageSource || '')) return 'not_started';
+  return 'none';
+}
+
 export function krisahStatusLabel(lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'>): string {
-  if (lead.krisahDone) {
+  const key = krisahStatusKey(lead);
+  if (key === 'completed') {
     return lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : 'Completed';
   }
-  if (lead.krisahInviteSentAt) return 'Invite sent';
-  if (lead.source === 'assessment' || /assessment/i.test(lead.pageSource || '')) return 'Not started';
+  if (key === 'invite_sent') return 'Invite sent';
+  if (key === 'not_started') return 'Not started';
   return '—';
+}
+
+const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: string; color: string }> = {
+  completed: { label: 'Completed', bg: '#e8f5e9', color: '#1b5e20' },
+  invite_sent: { label: 'Invite sent', bg: '#e3f2fd', color: '#0d47a1' },
+  not_started: { label: 'Not started', bg: '#fff3e0', color: '#e65100' },
+};
+
+export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
+  const key = krisahStatusKey(lead);
+  if (key === 'none') {
+    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>—</Typography>;
+  }
+  const chip = KRISAH_CHIP[key];
+  const label = key === 'completed' && lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : chip.label;
+  return (
+    <Chip
+      size="small"
+      label={label}
+      sx={{ height: 22, fontSize: '11px', fontWeight: 600, backgroundColor: chip.bg, color: chip.color }}
+    />
+  );
 }
 
 interface LeadsApiResponse {
@@ -148,6 +182,7 @@ const AllLeads: React.FC = () => {
     (value, index, self) => self.indexOf(value) === index
   );
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [krisahFilter, setKrisahFilter] = useState<KrisahStatus | ''>('');
   const serviceOptions = LeadsData.map((lead) => lead.recommendedService || '').filter(Boolean).filter(
     (value, index, self) => self.indexOf(value) === index
   );
@@ -191,8 +226,9 @@ const AllLeads: React.FC = () => {
     const matchesType = !  type || lead.type.toLowerCase() === type.toLowerCase();
     const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source || '');
     const matchesService = selectedServices.length === 0 || selectedServices.includes(lead.recommendedService || '');
+    const matchesKrisah = !krisahFilter || krisahStatusKey(lead) === krisahFilter;
 
-    return matchesSearch && matchesType && matchesSource && matchesService;
+    return matchesSearch && matchesType && matchesSource && matchesService && matchesKrisah;
   });
 
   const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
@@ -374,6 +410,38 @@ const AllLeads: React.FC = () => {
             </FormControl>
           )}
 
+          <FormControl sx={{ minWidth: 140 }}>
+            <Select
+              value={krisahFilter}
+              onChange={(event) => {
+                setKrisahFilter(event.target.value as KrisahStatus | '');
+                setCurrentPage(1);
+              }}
+              displayEmpty
+              sx={{
+                height: '40px',
+                border: '1px solid #1212121A',
+                borderRadius: '20px',
+                boxShadow: '0px 6px 14px #36408D08',
+                fontSize: '12px',
+                color: '#1D1D1D',
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="caption" sx={{ color: '#1D1D1D', opacity: 0.6 }}>KRISAH status</Typography>
+              </MenuItem>
+              <MenuItem value="not_started">
+                <Typography variant="caption">Not started</Typography>
+              </MenuItem>
+              <MenuItem value="invite_sent">
+                <Typography variant="caption">Invite sent</Typography>
+              </MenuItem>
+              <MenuItem value="completed">
+                <Typography variant="caption">Completed</Typography>
+              </MenuItem>
+            </Select>
+          </FormControl>
+
           {serviceOptions.length > 0 && (
             <FormControl sx={{ minWidth: 150 }}>
               <Select
@@ -455,7 +523,7 @@ const AllLeads: React.FC = () => {
                   inputProps={{ 'aria-label': 'Select leads on this page' }}
                 />
               </TableCell>
-              {['S.No', 'Project Name', 'Type', 'Name', 'Email', 'Phone Number', 'Source', 'Recommended', 'Test', 'Date'].map((text) => (
+              {['S.No', 'Project Name', 'Type', 'Name', 'Email', 'Phone Number', 'Source', 'Recommended', 'KRISAH', 'Date'].map((text) => (
                 <TableCell key={text} align="left" sx={{ padding: "8px" }}>
                   <Typography variant="caption"  sx={{ marginLeft: "20px", fontWeight: '600' }} >{text}</Typography>
                 </TableCell>
@@ -508,7 +576,9 @@ const AllLeads: React.FC = () => {
                   </Typography>
                 </TableCell>
                 <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{krisahStatusLabel(lead)}</Typography>
+                  <Box sx={{ marginLeft: '16px' }}>
+                    <KrisahStatusChip lead={lead} />
+                  </Box>
                 </TableCell>
                 <TableCell sx={{ padding: '6px' }}>
                   <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{new Date(lead.createdAt).toLocaleDateString()}
