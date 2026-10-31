@@ -13,6 +13,7 @@ export const USER_ROLES = [
   'account',
   'finance',
   'sales',
+  'marketing',
   'employee',
   'customer',
 ] as const;
@@ -26,7 +27,7 @@ const LADDER_RANK = {
   super_admin: 3,
 } as const;
 
-const DEPARTMENT_ROLES = ['hr', 'account', 'finance', 'sales'] as const;
+const DEPARTMENT_ROLES = ['hr', 'account', 'finance', 'sales', 'marketing'] as const;
 
 type LadderRole = keyof typeof LADDER_RANK;
 
@@ -78,6 +79,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   account: 'Account',
   finance: 'Finance',
   sales: 'Sales',
+  marketing: 'Performance marketer',
   employee: 'Employee',
   customer: 'Customer',
 };
@@ -91,6 +93,7 @@ const WORKSPACES: Partial<Record<UserRole, string[]>> = {
   account: ['/payments'],
   finance: ['/payments'],
   sales: ['/leads'],
+  marketing: ['/blogs'],
 };
 
 const ADMIN_ROUTES = [
@@ -103,6 +106,7 @@ const ADMIN_ROUTES = [
   '/employees',
   '/payments',
   '/integrations',
+  '/blogs',
 ];
 
 /** `null` means every route, including user management. */

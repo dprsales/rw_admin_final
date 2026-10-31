@@ -44,6 +44,8 @@ export interface Application {
   relocation?: string;
   workMode?: string;
   applicationSource?: string;
+  referredBy?: string;
+  applicationSourceOther?: string;
   privacyConsent?: string;
   ref1Name?: string;
   ref1Number?: string;
@@ -390,7 +392,13 @@ const ApplicationDetails: React.FC<{
           <Detail label="Notice period" value={application.noticePeriod} />
           <Detail label="Relocation" value={application.relocation} />
           <Detail label="Work mode" value={application.workMode} />
-          <Detail label="Application source" value={application.applicationSource} />
+          <Detail
+            label="Application source"
+            value={application.applicationSourceOther && application.applicationSource === 'Other'
+              ? `${application.applicationSource} · ${application.applicationSourceOther}`
+              : application.applicationSource}
+          />
+          {application.referredBy ? <Detail label="Referred by" value={application.referredBy} /> : null}
           <Detail label="Applied" value={formatDate(application.createdAt)} />
           <Detail label="LinkedIn" value={application.linkedinUrl} link={application.linkedinUrl} />
           <Detail label="Portfolio" value={application.portfolioUrl} link={application.portfolioUrl} />

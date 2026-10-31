@@ -116,7 +116,7 @@ const mutation = useMutation({
               <Controller
                 name={name as keyof HeroSection}
                 control={control}
-                rules={{ required: `${label} is required` }}
+                rules={{ required: false }}
                 render={({ field }) => (
                   <FileUploadContainer
                     foldername="hero"

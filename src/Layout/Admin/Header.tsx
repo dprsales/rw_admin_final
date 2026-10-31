@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ selectedTab }) => {
     '/users': 'Users',
     '/employees': 'Employees',
     '/payments': 'Payments',
-
+    '/blogs': 'Blogs',
   };
 
   // Get the current tab label, default to 'Dashboard' if route not found

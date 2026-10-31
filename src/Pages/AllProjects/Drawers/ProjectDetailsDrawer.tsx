@@ -193,7 +193,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="visits"
                   control={control}
-                  rules={{ required: 'Visits is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       type="number"
@@ -213,7 +213,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="leads"
                   control={control}
-                  rules={{ required: 'Leads is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       type="number"
@@ -233,7 +233,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="sftPrice"
                   control={control}
-                  rules={{ required: 'SFT Price is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       type="number"
@@ -253,7 +253,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="launchdate"
                   control={control}
-                  rules={{ required: 'Launch Date is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       type="number"
@@ -273,7 +273,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="zone"
                   control={control}
-                  rules={{ required: 'Zone is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <Select
                       {...field}
@@ -317,7 +317,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="parkingarea"
                   control={control}
-                  rules={{ required: 'Parking Area is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       type="number"
@@ -361,7 +361,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="street"
                   control={control}
-                  rules={{ required: 'Street is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       placeholder="Enter street..."
@@ -399,7 +399,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="locationiframe"
                   control={control}
-                  rules={{ required: 'Location iframe is required' }}
+                  rules={{}}
                   render={({ field }) => (
                     <CustomInput
                       placeholder="Enter location iframe..."

@@ -54,6 +54,7 @@ const ROLE_COLORS: Record<UserRole, 'default' | 'primary' | 'info' | 'warning' |
   account: 'primary',
   finance: 'secondary',
   sales: 'success',
+  marketing: 'info',
   employee: 'success',
   customer: 'default',
 };

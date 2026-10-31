@@ -58,14 +58,14 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
       visits: 0,
       leads: 0,
       slug: '',
-      launchdate: 0,
-      sftPrice: 0,
+      launchdate: undefined as unknown as number,
+      sftPrice: undefined as unknown as number,
       location: '',
       zone: '',
       street: '',
       towers: 0,
       locationiframe: '',
-      parkingarea: 0,
+      parkingarea: undefined as unknown as number,
       propertyType: '',
       bankOffers: [],
       highlights: { items: [] },
@@ -107,10 +107,13 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
       sqft: Array.isArray(data.sqft) ? data.sqft.map((v: any) => String(v).trim()).filter(Boolean).map(Number) : [],
       visits: Number(data.visits) || 0,
       leads: Number(data.leads) || 0,
-      launchdate: Number(data.launchdate) || 0,
-      sftPrice: Number(data.sftPrice) || 0,
+      launchdate: data.launchdate ? Number(data.launchdate) : undefined,
+      sftPrice: data.sftPrice ? Number(data.sftPrice) : undefined,
       towers: Number(data.towers) || 0,
-      parkingarea: Number(data.parkingarea) || 0,
+      parkingarea: data.parkingarea ? Number(data.parkingarea) : undefined,
+      street: data.street?.trim() || undefined,
+      locationiframe: data.locationiframe?.trim() || undefined,
+      zone: data.zone || undefined,
       propertyType: data.propertyType || '', // Ensure not undefined
       highlights: {
         items: data.highlights.items.map(h => h.value.trim()).filter(Boolean),
@@ -130,10 +133,6 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
     }
     if (!data.location) {
       toast.error('Location is required');
-      hasError = true;
-    }
-    if (!data.sftPrice) {
-      toast.error('SFT Price is required');
       hasError = true;
     }
     if (!data.bhk || data.bhk.filter((v: any) => String(v).trim() !== '').length === 0) {
@@ -298,7 +297,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
             <Controller
               name="zone"
               control={control}
-              rules={{ required: 'Zone is required' }}
+              rules={{}}
               render={({ field }) => (
                 <Select
                   id="project-zone-input"

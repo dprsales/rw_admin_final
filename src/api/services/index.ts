@@ -303,6 +303,63 @@ export const deleteProject = (projectId: string) => {
 
 
 
+export interface BlogSection {
+  title?: string;
+  description?: string;
+  type?: string;
+}
+
+export interface BlogRecord {
+  _id: string;
+  title: string;
+  slug: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  imageurl?: string;
+  posturl?: string;
+  embedposturl?: string;
+  Linkedinprofileurl?: string;
+  sections?: BlogSection[];
+  published?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BlogInput {
+  title: string;
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  imageurl?: string;
+  posturl?: string;
+  embedposturl?: string;
+  Linkedinprofileurl?: string;
+  sections?: BlogSection[];
+  published?: boolean;
+}
+
+export const getAdminBlogs = async (): Promise<BlogRecord[]> => {
+  const response = await http.get('/blogs/admin');
+  return response.data;
+};
+
+export const createBlog = (data: BlogInput) => {
+  return http.post('/blogs', data);
+};
+
+export const updateBlog = (blogId: string, data: BlogInput) => {
+  return http.patch(`/blogs/${blogId}`, data);
+};
+
+export const deleteBlog = (blogId: string) => {
+  return http.delete(`/blogs/${blogId}`);
+};
+
+export const importDprBlogs = async () => {
+  const response = await http.post('/blogs/import');
+  return response.data as { imported: number; skipped: number; total: number };
+};
+
 export const FileUpload = (folderName: string, file: File) => {
   const formData = new FormData();
   formData.append('file', file); // Append the file to FormData
