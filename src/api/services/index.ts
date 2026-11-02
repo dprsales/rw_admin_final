@@ -277,6 +277,16 @@ export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
 };
 
+export interface InvitationLookup {
+  valid: true;
+  firstName: string;
+}
+
+export const resolveInvitation = async (token: string): Promise<InvitationLookup> => {
+  const response = await http.get('/join', { params: { token } });
+  return response.data;
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');

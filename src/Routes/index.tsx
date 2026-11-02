@@ -18,6 +18,7 @@ import Users from "../Pages/Users/Users";
 import Employees from "../Pages/Employees/Employees";
 import Payments from "../Pages/Payments/Payments";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnboardingDemo";
+import Join from "../Pages/Join/Join";
 import Blogs from "../Pages/Blogs/Blogs";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
@@ -72,6 +73,11 @@ const router = createBrowserRouter([
     // Public, API-free walkthrough for stakeholder review. Production pages remain protected below.
     path: "/demo/onboarding",
     element: <EmployeeOnboardingDemo />,
+  },
+  {
+    // Public invitation landing. The candidate has no staff session.
+    path: "/join",
+    element: <Join />,
   },
   {
     element: <Layout />, // Common layout for all pages

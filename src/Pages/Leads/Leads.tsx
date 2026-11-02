@@ -27,6 +27,7 @@ export interface Lead {
   company?: string;
   visitorType?: string;
   challenge?: string;
+  challengeNote?: string;
   goal?: string;
   recommendedService?: string;
   pageSource?: string;

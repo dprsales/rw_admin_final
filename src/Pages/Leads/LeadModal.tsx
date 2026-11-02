@@ -9,7 +9,7 @@ interface LeadModalProps {
 }
 
 const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
-  const hasGuidance = Boolean(lead.visitorType || lead.challenge || lead.goal || lead.recommendedService);
+  const hasGuidance = Boolean(lead.visitorType || lead.challenge || lead.challengeNote || lead.goal || lead.recommendedService);
 
   return (
     <Modal
@@ -109,8 +109,13 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
               {lead.challenge && <Chip size="small" variant="outlined" label={lead.challenge.replace(/_/g, ' ')} />}
               {lead.goal && <Chip size="small" variant="outlined" label={lead.goal.replace(/_/g, ' ')} />}
             </Box>
+            {lead.challengeNote && (
+              <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
+                <strong>In their words:</strong> {lead.challengeNote}
+              </Typography>
+            )}
             {lead.recommendedService && (
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ mt: lead.challengeNote ? 1 : 0 }}>
                 <strong>Recommended:</strong> {SERVICE_LABEL[lead.recommendedService] || lead.recommendedService}
               </Typography>
             )}

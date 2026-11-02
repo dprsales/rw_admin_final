@@ -76,6 +76,7 @@ const ProjectsPage: React.FC = () => {
         ProjectsData={mappedProjects}
         onDelete={handleDataRefresh}
         page={page}
+        rowsPerPage={LIMIT}
         totalPages={pagination?.totalPages || 1}
         onPageChange={handlePageChange}
         search={search}

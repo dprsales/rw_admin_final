@@ -31,9 +31,9 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | JWT secret/session security | Partial | Secret now read from `JWT_SECRET`, replaced with a freshly generated value; the previously hardcoded key no longer verifies anything. `JWT_SECRET_PREVIOUS` retained for future rotations. Validation still returns token claims only | Account-status lookup, revocation/expiry behaviour, tests |
 | Employee/HR roles | Partial foundation | `super_admin`/`admin`/`hr`/`employee`/`customer` hierarchy in `auth/roles.constants.ts`, enforced by a hierarchy-aware `RolesGuard`. **No account holds `super_admin` yet** and `hr` permissions are undefined | Provision the first Super Admin, define the per-role permission matrix and employee ownership checks, tests |
 | Employee creation API | Partial | `EmployeesController` exposes create, list, and detail behind `@Roles('hr')`. The server assigns the employee code and Draft/Prejoining status. No status-change route, idempotency key, or audit event yet | HR can create and view a candidate through an authorized endpoint |
-| Admin frontend onboarding pages | Partial | Staff route `/employees` in `rw_admin_final` creates and lists the seven HR-entered fields. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
+| Admin frontend onboarding pages | Partial | Staff `/employees` creates and lists; public `/join` shows valid or refused. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
-| Candidate invitation/OTP | Not started | No invitation or OTP module | Expiring, revocable, rate-limited, single-employee invitation flow |
+| Candidate invitation/OTP | Partial | Invitation send + public `GET /join?token=` refusal are in place; OTP is not | Expiring, revocable, rate-limited, single-employee invitation flow with OTP |
 | Employee self-service | Not started | No employee onboarding route/form | Candidate can save, resume, validate, review and submit only their own record |
 | Private documents | Not started | Existing public upload/CDN paths are unsuitable | Private storage, authenticated delivery, versioning, verification and access logging |
 | Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
@@ -80,8 +80,9 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 
 ### 4. Invitation, candidate authentication and self-service
 
-- [x] Create a cryptographically random, expiring, revocable invitation tied to one employee. `POST /employees/:id/invitation` stores a SHA-256 of a 32-byte token, a 7-day expiry, and `revoked: false`. The raw token is only in the email. Opening that link is not built yet.
+- [x] Create a cryptographically random, expiring, revocable invitation tied to one employee. `POST /employees/:id/invitation` stores a SHA-256 of a 32-byte token, a 7-day expiry, and `revoked: false`. The raw token is only in the email. Public `GET /join?token=` opens and validates the link.
 - [x] Invalidate or supersede prior invitations according to the approved resend policy. A successful send revokes other active invitations for that employee and sets `onboardingStatus` to `Invited`. If the email fails, the new invitation is deleted and the previous one stays active.
+- [x] Refuse the invitation link when it is expired, revoked, or replaced. Public `GET /join?token=` and admin `/join` page.
 - [ ] Add candidate email verification/OTP with rate limiting and audit events.
 - [ ] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone.
 - [ ] Add saved drafts and section progress for personal/contact, family/emergency, education, previous employment and bank details.
@@ -211,7 +212,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-HR can send one invitation from an employee row. The email contains one link. The database stores the token hash, a 7-day expiry, and a revoked flag. A new successful send replaces the previous invitation for that employee. Next, refuse the link when it is expired, revoked, or replaced. The join page does not exist yet, so the link in the email has nowhere to land.
+The invitation link opens. `GET /join?token=` is public, hashes the token, and refuses missing, expired, and revoked invitations with one message. The admin `/join` page shows a valid greeting or a refusal. Next: candidate email verification/OTP with rate limiting and audit events.
 
 ## Product and company decisions to collect
 
@@ -240,7 +241,7 @@ HR can send one invitation from an employee row. The email contains one link. Th
 
 - [x] Employee persistence model and internal create service with atomic, yearly Employee ID counter are implemented; no HTTP route is exposed until authorization is safe.
 - [x] HR-authorized employee creation endpoint and unique, server-assigned permanent employee code. `POST /employees`, `GET /employees`, and `GET /employees/:id` require a JWT and a role of `hr` or above. The code and Draft/Prejoining status are assigned on the server.
-- [x] Expiring/revocable invitation tied to the intended employee. Send is implemented. The link is not opened or refused yet.
+- [x] Expiring/revocable invitation tied to the intended employee. Send is implemented. Opening the link is implemented: public lookup refuses expired, revoked, and missing tokens; `/join` shows valid or refused.
 - [ ] Employee self-service sections for personal/contact, family/emergency, education, prior employment, and bank details, with field-level access decisions.
 - [ ] Saved drafts, clear progress/next action, validation, and a review-before-submit step.
 - [ ] Versioned applicable document checklist, private uploads, replacement history, and employee-visible correction reasons.
@@ -268,6 +269,15 @@ HR can send one invitation from an employee row. The email contains one link. Th
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-02 — Open the invitation link
+
+- Completed: Public `GET /join?token=` hashes the raw token with SHA-256, loads that invitation, and accepts it only when it is not revoked and not expired. Missing, expired, and revoked tokens return the same 404. A valid response is `{ valid: true, firstName }` only. The route sits on `JoinController`, outside `JwtAuthGuard`. Admin `/join` reads the query token, calls the lookup, and shows a valid greeting or a refusal. No form, OTP, or login on this page.
+- Files changed: `merchandising_backend/src/employees/employees.invitation.service.ts`, `join.controller.ts`, `employees.module.ts`, `employees.invitation.spec.ts`; `rw_admin_final/src/Pages/Join/Join.tsx`, `src/Routes/index.tsx`, `src/api/services/index.ts`; docs `CHECKLIST-TASK-LOG.md`, `ONBOARDING-CONTINUATION-CHECKLIST.md`.
+- Verification performed: `npx jest src/employees/employees.invitation.spec.ts --no-coverage` — 1 suite, 7 tests, all passed. Backend `npx tsc --noEmit --incremental false -p tsconfig.build.json` passed. Admin `npx tsc --noEmit --incremental false` passed.
+- Screenshots/artifacts: None.
+- Decisions or blockers: Live `api.rajivwilliams.com` will 404 until this backend is deployed. Local admin must point `http.ts` at the local API to exercise a real token.
+- Next item: Candidate email verification/OTP with rate limiting and audit events.
 
 ### 2026-10-12 — Send one employee invitation
 

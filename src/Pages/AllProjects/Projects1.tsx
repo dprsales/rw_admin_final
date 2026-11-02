@@ -15,12 +15,11 @@ import { deleteProject } from '../../api/services';
 import { toast } from 'react-toastify';
 import AddAllProjects from './Drawers/AddAllProjects';
 
-const rowsPerPage = 100;
-
 interface ProjectsProps {
   ProjectsData: Project[];
   onDelete: () => void;
   page: number;
+  rowsPerPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   search: string;
@@ -32,6 +31,7 @@ const Projects1: React.FC<ProjectsProps> = ({
   ProjectsData,
   onDelete,
   page,
+  rowsPerPage,
   totalPages,
   onPageChange,
   search,
