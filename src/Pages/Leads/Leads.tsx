@@ -23,6 +23,7 @@ export interface Lead {
   email: string;
   phoneNumber: string;
   projectName?: string;
+  projectId?: string;
   message?: string;
   company?: string;
   visitorType?: string;
@@ -32,6 +33,20 @@ export interface Lead {
   recommendedService?: string;
   pageSource?: string;
   enquiries?: number;
+  ownerId?: string;
+  temperature?: string;
+  stage?: string;
+  status?: string;
+  crmSource?: string;
+  budget?: string;
+  configuration?: string;
+  nextAction?: string;
+  nextFollowUpAt?: string;
+  lostReason?: string;
+  loan?: string;
+  decisionMaker?: string;
+  channelPartnerId?: string;
+  firstCallAt?: string;
   krisahInviteSentAt?: string;
   krisahDone?: boolean;
   krisahScore?: number;
@@ -62,6 +77,72 @@ export const SOURCE_LABEL: Record<string, string> = {
   project: 'Project page',
   admin: 'Admin',
   assessment: 'Assessment',
+};
+
+/** Locked funnel — must match merchandising_backend LEAD_STAGES. */
+export const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'attempted_contact', label: 'Attempted Contact' },
+  { value: 'connected', label: 'Connected' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'site_visit_planned', label: 'Site Visit Planned' },
+  { value: 'site_visit_done', label: 'Site Visit Done' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'booking_token', label: 'Booking / Token' },
+  { value: 'won_booked', label: 'Won / Booked' },
+  { value: 'lost', label: 'Lost' },
+  { value: 'nurture', label: 'Nurture' },
+] as const;
+
+export const STAGE_LABEL: Record<string, string> = Object.fromEntries(
+  STAGE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+/** Locked temperatures — separate from stage. */
+export const TEMPERATURE_OPTIONS = [
+  { value: 'hot', label: 'Hot' },
+  { value: 'warm', label: 'Warm' },
+  { value: 'cold', label: 'Cold' },
+] as const;
+
+export const TEMPERATURE_LABEL: Record<string, string> = Object.fromEntries(
+  TEMPERATURE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+export const LOST_REASON_OPTIONS = [
+  { value: 'budget', label: 'Budget' },
+  { value: 'price', label: 'Price' },
+  { value: 'location', label: 'Location' },
+  { value: 'project_not_suitable', label: 'Project not suitable' },
+  { value: 'bought_elsewhere', label: 'Bought elsewhere' },
+  { value: 'no_response', label: 'No response' },
+  { value: 'not_interested', label: 'Not interested' },
+  { value: 'duplicate', label: 'Duplicate' },
+  { value: 'future_requirement', label: 'Future requirement' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export const CRM_SOURCE_LABEL: Record<string, string> = {
+  meta: 'Meta Ads',
+  google: 'Google Ads',
+  whatsapp: 'WhatsApp',
+  website: 'Website',
+  referral: 'Referral',
+  channel_partner: 'Channel partner',
+  walk_in: 'Walk-in',
+  housing: 'Housing / portal',
+  manual: 'Manual',
+  other: 'Other',
+};
+
+export const NEXT_ACTION_LABEL: Record<string, string> = {
+  call: 'Call',
+  whatsapp: 'WhatsApp',
+  site_visit: 'Site visit',
+  send_brochure: 'Send brochure',
+  send_cost_sheet: 'Send cost sheet',
+  meeting: 'Meeting',
+  follow_up: 'Follow-up',
 };
 
 export function leadSourceLabel(lead: Pick<Lead, 'source' | 'pageSource'>): string {

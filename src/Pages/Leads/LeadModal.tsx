@@ -1,6 +1,21 @@
-import React from 'react';
-import { Modal, Box, Typography, Button, Grid, Chip } from '@mui/material';
-import { KrisahStatusChip, Lead, leadSourceLabel, SERVICE_LABEL, VISITOR_LABEL } from './Leads';
+import React, { useEffect, useState } from 'react';
+import {
+  Modal, Box, Typography, Button, Grid, Chip, FormControl, InputLabel, Select, MenuItem, Alert,
+} from '@mui/material';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  CRM_SOURCE_LABEL,
+  KrisahStatusChip,
+  Lead,
+  leadSourceLabel,
+  LOST_REASON_OPTIONS,
+  NEXT_ACTION_LABEL,
+  SERVICE_LABEL,
+  STAGE_OPTIONS,
+  TEMPERATURE_OPTIONS,
+  VISITOR_LABEL,
+} from './Leads';
+import { updateLead } from '../../api/services';
 
 interface LeadModalProps {
   open: boolean;
@@ -9,7 +24,52 @@ interface LeadModalProps {
 }
 
 const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
+  const queryClient = useQueryClient();
   const hasGuidance = Boolean(lead.visitorType || lead.challenge || lead.challengeNote || lead.goal || lead.recommendedService);
+
+  const [stage, setStage] = useState(lead.stage || 'new_lead');
+  const [temperature, setTemperature] = useState(lead.temperature || 'cold');
+  const [lostReason, setLostReason] = useState(lead.lostReason || '');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setStage(lead.stage || 'new_lead');
+    setTemperature(lead.temperature || 'cold');
+    setLostReason(lead.lostReason || '');
+    setError('');
+  }, [open, lead]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      updateLead(lead._id, {
+        stage,
+        temperature,
+        ...(stage === 'lost' ? { lostReason, status: 'lost' } : {}),
+        ...(stage === 'won_booked' ? { status: 'won' } : {}),
+        ...(stage === 'nurture' ? { status: 'nurture' } : {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      handleClose();
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : null) ||
+        'Could not save stage / temperature.';
+      setError(typeof msg === 'string' ? msg : 'Could not save stage / temperature.');
+    },
+  });
+
+  const dirty =
+    stage !== (lead.stage || 'new_lead') ||
+    temperature !== (lead.temperature || 'cold') ||
+    (stage === 'lost' && lostReason !== (lead.lostReason || ''));
+
+  const canSave = dirty && (stage !== 'lost' || Boolean(lostReason));
 
   return (
     <Modal
@@ -34,41 +94,29 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           outline: 'none',
         }}
       >
-        {/* Conditional Title for Project Type */}
         <Typography
           id="lead-modal-title"
           variant="h6"
           component="h2"
-          sx={{
-            fontWeight: 'bold',
-            mb: 2,
-            color: '#1976d2',
-          }}
+          sx={{ fontWeight: 'bold', mb: 2, color: '#1976d2' }}
         >
           {lead.type === 'project' && lead.projectName
             ? `Project Lead Details (Source: ${lead.projectName})`
             : 'Lead Details'}
         </Typography>
 
-        {/* Personal Information */}
         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
           Personal Information:
         </Typography>
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item xs={6}>
-            <Typography variant="body2">
-              <strong>Name:</strong> {lead.name}
-            </Typography>
+            <Typography variant="body2"><strong>Name:</strong> {lead.name}</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="body2">
-              <strong>Email:</strong> {lead.email}
-            </Typography>
+            <Typography variant="body2"><strong>Email:</strong> {lead.email}</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography variant="body2">
-              <strong>Phone Number:</strong> {lead.phoneNumber}
-            </Typography>
+            <Typography variant="body2"><strong>Phone Number:</strong> {lead.phoneNumber}</Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography variant="body2">
@@ -77,9 +125,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           </Grid>
           {lead.company && (
             <Grid item xs={6}>
-              <Typography variant="body2">
-                <strong>Company:</strong> {lead.company}
-              </Typography>
+              <Typography variant="body2"><strong>Company:</strong> {lead.company}</Typography>
             </Grid>
           )}
           <Grid item xs={6}>
@@ -98,7 +144,93 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           </Grid>
         </Grid>
 
-        {/* Guided journey — only present for leads that came through the finder */}
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+          CRM (locked stage list):
+        </Typography>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="lead-stage-label">Stage</InputLabel>
+              <Select
+                labelId="lead-stage-label"
+                label="Stage"
+                value={stage}
+                onChange={(e) => setStage(e.target.value)}
+              >
+                {STAGE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="lead-temp-label">Temperature</InputLabel>
+              <Select
+                labelId="lead-temp-label"
+                label="Temperature"
+                value={temperature}
+                onChange={(e) => setTemperature(e.target.value)}
+              >
+                {TEMPERATURE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          {stage === 'lost' && (
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel id="lead-lost-label">Lost reason</InputLabel>
+                <Select
+                  labelId="lead-lost-label"
+                  label="Lost reason"
+                  value={lostReason}
+                  onChange={(e) => setLostReason(e.target.value)}
+                >
+                  {LOST_REASON_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          )}
+          <Grid item xs={6}>
+            <Typography variant="body2"><strong>Status:</strong> {lead.status || 'open'}</Typography>
+          </Grid>
+          <Grid item xs={6}>
+            <Typography variant="body2">
+              <strong>CRM source:</strong>{' '}
+              {CRM_SOURCE_LABEL[lead.crmSource || ''] || lead.crmSource || '-'}
+            </Typography>
+          </Grid>
+          {lead.budget && (
+            <Grid item xs={6}>
+              <Typography variant="body2"><strong>Budget:</strong> {lead.budget}</Typography>
+            </Grid>
+          )}
+          {lead.configuration && (
+            <Grid item xs={6}>
+              <Typography variant="body2"><strong>Configuration:</strong> {lead.configuration}</Typography>
+            </Grid>
+          )}
+          {lead.nextAction && (
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                <strong>Next action:</strong> {NEXT_ACTION_LABEL[lead.nextAction] || lead.nextAction}
+              </Typography>
+            </Grid>
+          )}
+          {lead.nextFollowUpAt && (
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                <strong>Next follow-up:</strong> {new Date(lead.nextFollowUpAt).toLocaleString()}
+              </Typography>
+            </Grid>
+          )}
+        </Grid>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
         {hasGuidance && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
@@ -122,7 +254,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           </Box>
         )}
 
-        {/* Project Info for "Project" Type */}
         {lead.type === 'project' && lead.projectName && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
@@ -134,7 +265,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           </Box>
         )}
 
-        {/* Message */}
         <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
           Additional Information:
         </Typography>
@@ -142,10 +272,17 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           <strong>Message:</strong> {lead.message || '-'}
         </Typography>
 
-        {/* Close Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-          <Button onClick={handleClose} variant="contained" color="primary">
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+          <Button onClick={handleClose} variant="outlined">
             Close
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            variant="contained"
+            color="primary"
+            disabled={!canSave || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save CRM'}
           </Button>
         </Box>
       </Box>
