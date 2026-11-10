@@ -93,7 +93,7 @@ const WORKSPACES: Partial<Record<UserRole, string[]>> = {
   account: ['/payments'],
   finance: ['/payments'],
   sales: ['/leads'],
-  marketing: ['/blogs'],
+  marketing: ['/blogs', '/leads'],
 };
 
 const ADMIN_ROUTES = [
@@ -103,6 +103,7 @@ const ADMIN_ROUTES = [
   '/applications',
   '/channel-partners',
   '/vendors',
+  '/listings',
   '/employees',
   '/payments',
   '/integrations',

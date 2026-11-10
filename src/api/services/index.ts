@@ -197,6 +197,91 @@ export const deleteUser = (userId: string) => {
   return http.delete(`/users/${userId}`);
 };
 
+/** Owner / builder listings on the public site (`properties` + `listing_users`). */
+export const getAdminListings = async (status?: string) => {
+  const response = await http.get('/properties/admin/all', { params: status ? { status } : undefined });
+  return response.data;
+};
+
+export const getAdminListing = async (id: string) => {
+  const response = await http.get(`/properties/admin/${id}`);
+  return response.data;
+};
+
+export const approveAdminListing = async (id: string) => {
+  const response = await http.patch(`/properties/admin/${id}/approve`);
+  return response.data;
+};
+
+export const rejectAdminListing = async (id: string, reason?: string) => {
+  const response = await http.patch(`/properties/admin/${id}/reject`, { reason });
+  return response.data;
+};
+
+export const deleteAdminListing = async (id: string) => {
+  const response = await http.delete(`/properties/admin/${id}`);
+  return response.data;
+};
+
+export const bulkApproveAdminListings = async (ids: string[]) => {
+  const response = await http.post('/properties/admin/bulk-approve', { ids });
+  return response.data;
+};
+
+export const bulkRejectAdminListings = async (ids: string[], reason?: string) => {
+  const response = await http.post('/properties/admin/bulk-reject', { ids, reason });
+  return response.data;
+};
+
+export const bulkDeleteAdminListings = async (ids: string[]) => {
+  const response = await http.post('/properties/admin/bulk-delete', { ids });
+  return response.data;
+};
+
+export const getAdminListingUsers = async () => {
+  const response = await http.get('/properties/admin/users');
+  return response.data;
+};
+
+export const getAdminListingUser = async (userId: string) => {
+  const response = await http.get(`/properties/admin/users/${userId}`);
+  return response.data;
+};
+
+export const createAdminListingUser = async (data: {
+  email: string;
+  password: string;
+  name?: string;
+  mobile?: string;
+  city?: string;
+}) => {
+  const response = await http.post('/properties/admin/users', data);
+  return response.data;
+};
+
+export const updateAdminListingUser = async (
+  userId: string,
+  data: { email?: string; name?: string; mobile?: string; city?: string },
+) => {
+  const response = await http.patch(`/properties/admin/users/${userId}`, data);
+  return response.data;
+};
+
+export const resetAdminListingUserPassword = async (userId: string, password: string) => {
+  const response = await http.patch(`/properties/admin/users/${userId}/password`, { password });
+  return response.data;
+};
+
+export const deleteAdminListingUser = async (userId: string) => {
+  const response = await http.delete(`/properties/admin/users/${userId}`);
+  return response.data;
+};
+
+export const bulkDeleteAdminListingUsers = async (ids: string[]) => {
+  const response = await http.post('/properties/admin/users/bulk-delete', { ids });
+  return response.data;
+};
+
 export interface CoachingPayment {
   _id: string;
   razorpayOrderId: string;

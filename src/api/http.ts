@@ -1,13 +1,16 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 
+const apiBase =
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  "https://api.rajivwilliams.com";
+
 export const http = axios.create({
-  baseURL: "https://api.rajivwilliams.com",
-  // baseURL: `http://${window.location.hostname}:8088`,
+  baseURL: String(apiBase).replace(/\/$/, ""),
   headers: {
     "Content-Type": "application/json",
-    Accept: "application/json, text/plain, */*",  
-  }, 
+    Accept: "application/json, text/plain, */*",
+  },
 }); 
 
 http.interceptors.request.use((config) => {
