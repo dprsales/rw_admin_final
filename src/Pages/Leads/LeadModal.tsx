@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   Modal, Box, Typography, Button, Grid, Chip, FormControl, InputLabel, Select, MenuItem, Alert,
+  TextField, Divider,
 } from '@mui/material';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CRM_SOURCE_LABEL,
   KrisahStatusChip,
@@ -11,17 +12,27 @@ import {
   LOST_REASON_OPTIONS,
   NEXT_ACTION_LABEL,
   SERVICE_LABEL,
+  STAGE_LABEL,
   STAGE_OPTIONS,
   TEMPERATURE_OPTIONS,
   VISITOR_LABEL,
 } from './Leads';
-import { updateLead } from '../../api/services';
+import { getLeadActivities, updateLead } from '../../api/services';
 
 interface LeadModalProps {
   open: boolean;
   handleClose: () => void;
   lead: Lead;
 }
+
+type LeadActivityRow = {
+  _id: string;
+  type: 'note' | 'stage_change';
+  note?: string;
+  fromStage?: string;
+  toStage?: string;
+  createdAt?: string;
+};
 
 const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
   const queryClient = useQueryClient();
@@ -30,6 +41,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
   const [stage, setStage] = useState(lead.stage || 'new_lead');
   const [temperature, setTemperature] = useState(lead.temperature || 'cold');
   const [lostReason, setLostReason] = useState(lead.lostReason || '');
+  const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -37,8 +49,17 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     setStage(lead.stage || 'new_lead');
     setTemperature(lead.temperature || 'cold');
     setLostReason(lead.lostReason || '');
+    setNote('');
     setError('');
   }, [open, lead]);
+
+  const activitiesQuery = useQuery({
+    queryKey: ['lead-activities', lead._id],
+    queryFn: () => getLeadActivities(lead._id),
+    enabled: open && Boolean(lead._id),
+  });
+
+  const activities: LeadActivityRow[] = activitiesQuery.data?.activities || [];
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -48,9 +69,12 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
         ...(stage === 'lost' ? { lostReason, status: 'lost' } : {}),
         ...(stage === 'won_booked' ? { status: 'won' } : {}),
         ...(stage === 'nurture' ? { status: 'nurture' } : {}),
+        ...(note.trim() ? { note: note.trim() } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
+      setNote('');
       handleClose();
     },
     onError: (err: any) => {
@@ -64,12 +88,35 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     },
   });
 
+  const noteOnlyMutation = useMutation({
+    mutationFn: () => updateLead(lead._id, { note: note.trim() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
+      setNote('');
+      setError('');
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Could not save note.';
+      setError(typeof msg === 'string' ? msg : 'Could not save note.');
+    },
+  });
+
   const dirty =
     stage !== (lead.stage || 'new_lead') ||
     temperature !== (lead.temperature || 'cold') ||
     (stage === 'lost' && lostReason !== (lead.lostReason || ''));
 
   const canSave = dirty && (stage !== 'lost' || Boolean(lostReason));
+  const canSaveNote = Boolean(note.trim()) && !dirty;
+
+  const activityLabel = (row: LeadActivityRow) => {
+    if (row.type === 'stage_change') {
+      const from = STAGE_LABEL[row.fromStage || ''] || row.fromStage || '—';
+      const to = STAGE_LABEL[row.toStage || ''] || row.toStage || '—';
+      return `Stage: ${from} → ${to}`;
+    }
+    return 'Note';
+  };
 
   return (
     <Modal
@@ -229,6 +276,56 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
             </Grid>
           )}
         </Grid>
+
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+          Activity
+        </Typography>
+        <TextField
+          fullWidth
+          size="small"
+          multiline
+          minRows={2}
+          label="Add a note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          sx={{ mb: 1.5 }}
+        />
+        {canSaveNote && (
+          <Button
+            size="small"
+            variant="outlined"
+            sx={{ mb: 2 }}
+            disabled={noteOnlyMutation.isPending}
+            onClick={() => noteOnlyMutation.mutate()}
+          >
+            {noteOnlyMutation.isPending ? 'Saving note…' : 'Save note'}
+          </Button>
+        )}
+        <Box sx={{ mb: 2, maxHeight: 180, overflowY: 'auto' }}>
+          {activitiesQuery.isLoading && (
+            <Typography variant="body2" color="text.secondary">Loading activity…</Typography>
+          )}
+          {!activitiesQuery.isLoading && activities.length === 0 && (
+            <Typography variant="body2" color="text.secondary">No activity yet.</Typography>
+          )}
+          {activities.map((row) => (
+            <Box key={row._id} sx={{ mb: 1.25 }}>
+              <Typography variant="caption" color="text.secondary">
+                {row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {activityLabel(row)}
+              </Typography>
+              {row.note && (
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {row.note}
+                </Typography>
+              )}
+              <Divider sx={{ mt: 1 }} />
+            </Box>
+          ))}
+        </Box>
+
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {hasGuidance && (

@@ -100,6 +100,11 @@ export const updateLead = (leadId: string, data: any) => {
   return http.patch(`/leads/${leadId}`, data);
 };
 
+export const getLeadActivities = async (leadId: string) => {
+  const response = await http.get(`/leads/${leadId}/activities`);
+  return response.data; // { activities: [...] }
+};
+
 export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
 };
