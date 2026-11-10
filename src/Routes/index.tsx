@@ -20,6 +20,7 @@ import Payments from "../Pages/Payments/Payments";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnboardingDemo";
 import Join from "../Pages/Join/Join";
 import Blogs from "../Pages/Blogs/Blogs";
+import Listings from "../Pages/Listings/Listings";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
 const isAuthenticated = () => Boolean(Cookies.get("access_token"));
@@ -143,6 +144,10 @@ const router = createBrowserRouter([
       {
         path: "/blogs",
         element: <ProtectedRoute allow="/blogs" component={<Blogs />} />,
+      },
+      {
+        path: "/listings",
+        element: <ProtectedRoute allow="/listings" component={<Listings />} />,
       },
     ],
   },

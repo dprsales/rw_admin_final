@@ -103,6 +103,7 @@ const ADMIN_ROUTES = [
   '/applications',
   '/channel-partners',
   '/vendors',
+  '/listings',
   '/employees',
   '/payments',
   '/integrations',
