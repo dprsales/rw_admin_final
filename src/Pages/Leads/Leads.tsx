@@ -575,9 +575,18 @@ const AllLeads: React.FC = () => {
         </Menu>
       </Box>
 
-      {/* Leads Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: '10px' }}>
-        <Table>
+      {/* Leads Table — horizontal scroll when the panel is narrow */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: '10px',
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        <Table sx={{ minWidth: 920 }} stickyHeader={false}>
           <TableHead sx={{ backgroundColor: '#30779d40' }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
