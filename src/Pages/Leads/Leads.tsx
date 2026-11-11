@@ -18,6 +18,7 @@ import { deleteLead, getLeads } from '../../api/services';
 export interface Lead {
   _id: string;
   source?: string;
+  intent?: string;
   type: string;
   name: string;
   email: string;
@@ -32,6 +33,7 @@ export interface Lead {
   goal?: string;
   recommendedService?: string;
   pageSource?: string;
+  lastTouchSource?: string;
   enquiries?: number;
   ownerId?: string;
   temperature?: string;
@@ -47,10 +49,23 @@ export interface Lead {
   decisionMaker?: string;
   channelPartnerId?: string;
   firstCallAt?: string;
+  contentDownloadCount?: number;
+  contentDownloads?: Array<{
+    title?: string;
+    fileId?: string;
+    fileName?: string;
+    date?: string;
+    at?: string;
+  }>;
   krisahInviteSentAt?: string;
   krisahDone?: boolean;
   krisahScore?: number;
   krisahCompletedAt?: string;
+  /** Long website form track + answers (merged from saleleads). */
+  formTrack?: 'coaching' | 'consulting' | 'realty' | string;
+  formAnswers?: Record<string, unknown>;
+  saleLeadId?: string;
+  formSubmittedAt?: string;
   createdAt: string;
 }
 
@@ -77,6 +92,56 @@ export const SOURCE_LABEL: Record<string, string> = {
   project: 'Project page',
   admin: 'Admin',
   assessment: 'Assessment',
+  content_library: 'Content Library',
+  sale_form: 'Service form',
+};
+
+export const INTENT_LABEL: Record<string, string> = {
+  enquiry: 'Enquiry',
+  nurture: 'Nurture',
+  assessment: 'Assessment',
+};
+
+export const FORM_TRACK_LABEL: Record<string, string> = {
+  coaching: 'Coaching form',
+  consulting: 'Consulting form',
+  realty: 'Realty form',
+};
+
+/** Human labels for /form question ids (admin detail view). */
+export const FORM_ANSWER_LABELS: Record<string, string> = {
+  name: 'Full name',
+  phone: 'Phone',
+  email: 'Email',
+  role: 'Role',
+  experience: 'Experience',
+  projectType: 'Project type',
+  challenges: 'Challenges',
+  goal: 'Goal',
+  timeline: 'Timeline',
+  notes: 'Notes',
+  orgName: 'Organisation',
+  businessStage: 'Business stage',
+  servicesNeeded: 'Services needed',
+  biggestChallenge: 'Biggest challenge',
+  challengeSeverity: 'Challenge severity',
+  primaryGoal: 'Primary goal',
+  hasSalesTeam: 'In-house sales team',
+  triedSolutions: 'Tried solutions',
+  decisionMaker: 'Decision maker',
+  reachOutReason: 'Why they reached out',
+  investmentPlan: 'Investment timeline',
+  successLooksLike: 'What success looks like',
+  projectName: 'Project name',
+  location: 'Project location',
+  website: 'Website',
+  socialLinks: 'Social links',
+  unitsAvailable: 'Units available',
+  objective: 'Primary objective',
+  projectStage: 'Project stage',
+  enquirySource: 'Enquiry sources',
+  finalizeTimeline: 'Partner timeline',
+  reasonNow: 'Why partner now',
 };
 
 /** Locked funnel — must match merchandising_backend LEAD_STAGES. */
@@ -135,15 +200,19 @@ export const CRM_SOURCE_LABEL: Record<string, string> = {
   other: 'Other',
 };
 
-export const NEXT_ACTION_LABEL: Record<string, string> = {
-  call: 'Call',
-  whatsapp: 'WhatsApp',
-  site_visit: 'Site visit',
-  send_brochure: 'Send brochure',
-  send_cost_sheet: 'Send cost sheet',
-  meeting: 'Meeting',
-  follow_up: 'Follow-up',
-};
+export const NEXT_ACTION_OPTIONS = [
+  { value: 'call', label: 'Call' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'site_visit', label: 'Site visit' },
+  { value: 'send_brochure', label: 'Send brochure' },
+  { value: 'send_cost_sheet', label: 'Send cost sheet' },
+  { value: 'meeting', label: 'Meeting' },
+  { value: 'follow_up', label: 'Follow-up' },
+] as const;
+
+export const NEXT_ACTION_LABEL: Record<string, string> = Object.fromEntries(
+  NEXT_ACTION_OPTIONS.map((o) => [o.value, o.label]),
+);
 
 export function leadSourceLabel(lead: Pick<Lead, 'source' | 'pageSource'>): string {
   if (lead.source === 'assessment' || /assessment/i.test(lead.pageSource || '')) return 'Assessment';
@@ -169,7 +238,7 @@ export function krisahStatusLabel(lead: Pick<Lead, 'source' | 'pageSource' | 'kr
   }
   if (key === 'invite_sent') return 'Invite sent';
   if (key === 'not_started') return 'Not started';
-  return '—';
+  return '-';
 }
 
 const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: string; color: string }> = {
@@ -591,9 +660,18 @@ const AllLeads: React.FC = () => {
         </Menu>
       </Box>
 
-      {/* Leads Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: '10px' }}>
-        <Table>
+      {/* Leads Table — horizontal scroll when the panel is narrow */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: '10px',
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        <Table sx={{ minWidth: 920 }} stickyHeader={false}>
           <TableHead sx={{ backgroundColor: '#30779d40' }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
@@ -605,9 +683,9 @@ const AllLeads: React.FC = () => {
                   inputProps={{ 'aria-label': 'Select leads on this page' }}
                 />
               </TableCell>
-              {['S.No', 'Project Name', 'Type', 'Name', 'Email', 'Phone Number', 'Source', 'Recommended', 'KRISAH', 'Date'].map((text) => (
-                <TableCell key={text} align="left" sx={{ padding: "8px" }}>
-                  <Typography variant="caption"  sx={{ marginLeft: "20px", fontWeight: '600' }} >{text}</Typography>
+              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Date'].map((text) => (
+                <TableCell key={text} align="left" sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{text}</Typography>
                 </TableCell>
               ))}
             </TableRow>
@@ -628,42 +706,65 @@ const AllLeads: React.FC = () => {
                     inputProps={{ 'aria-label': `Select ${lead.name || 'lead'}` }}
                   />
                 </TableCell>
-                <TableCell align="left" sx={{ padding: "6px" }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{(currentPage - 1) * rowsPerPage + index + 1}</Typography>
-                  </TableCell>
-                <TableCell align="left" sx={{ padding: "6px" }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>
-                    {lead.projectName ? (lead.projectName.length > 12 ? `${lead.projectName.slice(0, 12)}...` : lead.projectName) : '-'}
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption">
+                    {(currentPage - 1) * rowsPerPage + index + 1}
                   </Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.type}</Typography>
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                    {lead.name}
+                  </Typography>
+                  {lead.company && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {lead.company}
+                    </Typography>
+                  )}
+                  {lead.projectName && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {lead.projectName}
+                    </Typography>
+                  )}
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.name}</Typography>
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption" display="block">{lead.email}</Typography>
+                  <Typography variant="caption" color="text.secondary">{lead.phoneNumber}</Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.email}</Typography>
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Chip
+                    size="small"
+                    label={lead.formTrack
+                      ? (FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack)
+                      : lead.type}
+                    sx={{ height: 22, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}
+                  />
+                  {lead.intent && lead.intent !== 'enquiry' && (
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                      {INTENT_LABEL[lead.intent] || lead.intent}
+                    </Typography>
+                  )}
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{lead.phoneNumber}</Typography>
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption">{leadSourceLabel(lead)}</Typography>
+                  {lead.enquiries && lead.enquiries > 1 && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {lead.enquiries} touches
+                    </Typography>
+                  )}
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{leadSourceLabel(lead)}</Typography>
-                </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>
-                    {lead.recommendedService ? (SERVICE_LABEL[lead.recommendedService] || lead.recommendedService) : '-'}
-                    {lead.enquiries && lead.enquiries > 1 ? ` ×${lead.enquiries}` : ''}
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption">
+                    {lead.recommendedService
+                      ? (SERVICE_LABEL[lead.recommendedService] || lead.recommendedService)
+                      : '-'}
                   </Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Box sx={{ marginLeft: '16px' }}>
-                    <KrisahStatusChip lead={lead} />
-                  </Box>
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <KrisahStatusChip lead={lead} />
                 </TableCell>
-                <TableCell sx={{ padding: '6px' }}>
-                  <Typography variant="caption" sx={{ marginLeft: "25px", fontWeight: 400 }}>{new Date(lead.createdAt).toLocaleDateString()}
+                <TableCell sx={{ padding: '8px 12px' }}>
+                  <Typography variant="caption">
+                    {new Date(lead.createdAt).toLocaleDateString()}
                   </Typography>
                 </TableCell>
               </TableRow>
