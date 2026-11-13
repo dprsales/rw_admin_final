@@ -100,6 +100,35 @@ export const updateLead = (leadId: string, data: any) => {
   return http.patch(`/leads/${leadId}`, data);
 };
 
+export const addLeadNote = async (leadId: string, note: string) => {
+  const response = await http.post(`/leads/${leadId}/notes`, { note });
+  return response.data; // { activity }
+};
+
+export const updateLeadNote = async (leadId: string, noteId: string, note: string) => {
+  const response = await http.patch(
+    `/leads/${encodeURIComponent(String(leadId))}/notes/${encodeURIComponent(String(noteId))}`,
+    { note: String(note) },
+  );
+  return response.data; // { activity }
+};
+
+export const deleteLeadNote = async (leadId: string, noteId: string) => {
+  const response = await http.delete(
+    `/leads/${encodeURIComponent(String(leadId))}/notes/${encodeURIComponent(String(noteId))}`,
+  );
+  return response.data; // { ok, id }
+};
+
+export const getLeadActivities = async (leadId: string) => {
+  // Cache-bust with query only. Do not send Cache-Control request headers
+  // (they trigger CORS preflight and our API allowlist blocks them).
+  const response = await http.get(`/leads/${leadId}/activities`, {
+    params: { _ts: Date.now() },
+  });
+  return response.data; // { activities: [...] }
+};
+
 export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
 };
