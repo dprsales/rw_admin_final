@@ -34,7 +34,7 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Admin frontend onboarding pages | Partial | Staff `/employees` creates and lists; public `/join` shows valid or refused. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
 | Candidate invitation/OTP | Complete foundation | Invite send, `/join` lookup, OTP send/verify, rate limits, and audit events are in place | Candidate session for the form is still outstanding |
-| Employee self-service | Not started | No employee onboarding route/form | Candidate can save, resume, validate, review and submit only their own record |
+| Employee self-service | Partial | Join session + full draft form (personal, education, employment, bank) on `/join` | Documents, policies, review/submit |
 | Private documents | Not started | Existing public upload/CDN paths are unsuitable | Private storage, authenticated delivery, versioning, verification and access logging |
 | Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
 | HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
@@ -84,8 +84,9 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 - [x] Invalidate or supersede prior invitations according to the approved resend policy. A successful send revokes other active invitations for that employee and sets `onboardingStatus` to `Invited`. If the email fails, the new invitation is deleted and the previous one stays active.
 - [x] Refuse the invitation link when it is expired, revoked, or replaced. Public `GET /join?token=` and admin `/join` page.
 - [x] Add candidate email verification/OTP with rate limiting and audit events. `POST /join/otp`, `POST /join/verify`, Team RW email shell, onboarding audit rows.
-- [ ] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone.
-- [ ] Add saved drafts and section progress for personal/contact, family/emergency, education, previous employment and bank details.
+- [x] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone. Join access token + `JoinAuthGuard` on form routes.
+- [x] Add saved drafts for personal/contact (including emergency contact), education, previous employment and bank details on `GET/PUT /join/form`.
+- [ ] Add review-before-submit and duplicate-submit protection for the full form.
 - [ ] Add server validation, review-before-submit, duplicate-submit protection and separate onboarding/employment states.
 
 ### 5. Documents, policies and submission
@@ -212,7 +213,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-Email verification is in place. `POST /join/otp` and `POST /join/verify` send and check a hashed 6-digit code, with resend cooldown, send and attempt limits, and onboarding audit events. Invitation and OTP mail use the Team RW email shell. Next: candidate self-service form sections with saved drafts.
+Full joining draft fields are in place on `GET/PUT /join/form` (personal extras, education, previous employment / fresher, bank). Next: private document uploads for the joining checklist.
 
 ## Product and company decisions to collect
 
@@ -269,6 +270,22 @@ Email verification is in place. `POST /join/otp` and `POST /join/verify` send an
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-13 — Full joining draft fields
+
+- Completed: Expanded the candidate draft to personal extras (alternate phone, parents, marital status, blood group, nationality), multiple education rows, previous employment rows with fresher flag, and bank details. `GET/PUT /join/form` saves the full draft under the join session. Admin `/join` shows all sections with Save all details.
+- Files changed: employee schema, `dto/join-form.dto.ts`, onboarding service/spec, join controller; admin `Join.tsx` and join API helpers; checklist + daily update.
+- Verification performed: invitation + onboarding Jest passed. Backend and admin `tsc` passed.
+- Next item: Private document uploads.
+
+### 2026-11-13 — Candidate personal draft after OTP
+
+- Completed: After OTP, `verify` and `POST /join/session` issue a join access token (`purpose: employee_join`). `GET/PUT /join/form/personal` load and save personal/contact draft fields under `JoinAuthGuard`. Audit records `session_issued` and `form_personal_saved`. Admin `/join` shows the personal form after verify and resumes from the invite link.
+- Files changed: `merchandising_backend/src/employees/join-session.ts`, `join-auth.guard.ts`, `employees.onboarding.service.ts`, `employees.onboarding.spec.ts`, `dto/join-personal.dto.ts`, `join.controller.ts`, `employees.invitation.service.ts`, `employees.module.ts`, `schema/employee.schema.ts`, `schema/employee-onboarding-audit.schema.ts`; `rw_admin_final/src/Pages/Join/Join.tsx`, `src/api/services/index.ts`; checklist docs.
+- Verification performed: invitation + onboarding Jest suites passed. Backend `tsc --noEmit -p tsconfig.build.json` passed. Admin `tsc --noEmit` passed.
+- Screenshots/artifacts: None.
+- Decisions or blockers: Education, prior employment, and bank sections not started. No document upload yet.
+- Next item: Education / previous employment / bank draft sections.
 
 ### 2026-11-11 — Verify the invited email with OTP
 
