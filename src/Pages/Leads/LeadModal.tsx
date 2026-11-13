@@ -24,7 +24,6 @@ import {
   addLeadNote,
   deleteLeadNote,
   getLeadActivities,
-  updateLead,
   updateLeadNote,
 } from '../../api/services';
 
@@ -159,26 +158,29 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     ? (FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack)
     : null;
 
+  const normalizeNote = (a: LeadNoteActivity): LeadNoteActivity => ({
+    ...a,
+    _id: String(a._id),
+    type: 'note',
+    note: String(a.note || ''),
+    authorName: a.authorName ? String(a.authorName) : a.authorName,
+    authorEmail: a.authorEmail ? String(a.authorEmail) : a.authorEmail,
+  });
+
   const loadNotes = useCallback(async (opts?: { quiet?: boolean }) => {
     if (!lead?._id) return;
     if (!opts?.quiet) setNotesLoading(true);
     setNotesError('');
     try {
       const data = await getLeadActivities(String(lead._id));
-      const rows = (data?.activities || []) as LeadNoteActivity[];
-      setNotes(
-        rows
-          .filter((a) => a.type === 'note' && a.note?.trim())
-          .map((a) => ({
-            ...a,
-            _id: String(a._id),
-            note: String(a.note || ''),
-            authorName: a.authorName ? String(a.authorName) : a.authorName,
-            authorEmail: a.authorEmail ? String(a.authorEmail) : a.authorEmail,
-          })),
-      );
-    } catch {
-      setNotesError('Could not load notes. Try again.');
+      const rows = (data?.activities || data || []) as LeadNoteActivity[];
+      const list = (Array.isArray(rows) ? rows : [])
+        .filter((a) => a && String(a.note || '').trim() && (a.type === 'note' || !a.type))
+        .map(normalizeNote);
+      setNotes(list);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Could not load notes. Try again.';
+      setNotesError(Array.isArray(msg) ? msg.join(', ') : String(msg));
       if (!opts?.quiet) setNotes([]);
     } finally {
       if (!opts?.quiet) setNotesLoading(false);
@@ -217,25 +219,18 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     setDraft('');
 
     try {
-      let saved: LeadNoteActivity | undefined;
-      try {
-        const data = await addLeadNote(lead._id, text);
-        saved = data?.activity as LeadNoteActivity | undefined;
-      } catch (err: any) {
-        // Older API without POST /notes — fall back to PATCH { note }.
-        const status = err?.response?.status;
-        if (status !== 404 && status !== 405) throw err;
-        await updateLead(lead._id, { note: text });
+      const data = await addLeadNote(String(lead._id), text);
+      const saved = data?.activity as LeadNoteActivity | undefined;
+      if (!saved?._id || !String(saved.note || text).trim()) {
+        throw new Error('Note save did not return a saved note');
       }
-      if (saved?._id && saved.note?.trim()) {
-        setNotes((prev) => [saved!, ...prev.filter((n) => n._id !== tempId && n._id !== saved!._id)]);
-      } else {
-        await loadNotes({ quiet: true });
-      }
-    } catch {
+      const normalized = normalizeNote({ ...saved, note: saved.note || text, authorName: saved.authorName || me });
+      setNotes((prev) => [normalized, ...prev.filter((n) => n._id !== tempId && n._id !== normalized._id)]);
+    } catch (err: any) {
       setNotes((prev) => prev.filter((n) => n._id !== tempId));
       setDraft(text);
-      setSaveError('Could not save the note. Try again.');
+      const msg = err?.response?.data?.message || err?.message || 'Could not save the note. Try again.';
+      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
     } finally {
       setSaving(false);
     }
