@@ -365,11 +365,23 @@ export const sendEmployeeInvitation = (employeeId: string) => {
 export interface InvitationLookup {
   valid: true;
   firstName: string;
+  emailVerified: boolean;
+  maskedEmail: string;
 }
 
 export const resolveInvitation = async (token: string): Promise<InvitationLookup> => {
   const response = await http.get('/join', { params: { token } });
   return response.data;
+};
+
+export const requestJoinOtp = async (token: string) => {
+  const response = await http.post('/join/otp', { token });
+  return response.data as { message: string; maskedEmail: string; expiresAt: string };
+};
+
+export const verifyJoinOtp = async (token: string, code: string) => {
+  const response = await http.post('/join/verify', { token, code });
+  return response.data as { verified: true; firstName: string };
 };
 
 // Site visits — daily unique-visitor tracker

@@ -1,12 +1,31 @@
-import React from 'react';
-import { Alert, Box, CircularProgress, Paper, Stack, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { resolveInvitation } from '../../api/services';
+import { requestJoinOtp, resolveInvitation, verifyJoinOtp } from '../../api/services';
+
+const errorMessage = (error: any): string => {
+  const message = error?.response?.data?.message;
+  if (Array.isArray(message)) return message.join(' ');
+  return message || 'Something went wrong. Please try again.';
+};
 
 const Join: React.FC = () => {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
+  const [code, setCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const queryClient = useQueryClient();
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['join', token],
@@ -15,7 +34,25 @@ const Join: React.FC = () => {
     retry: false,
   });
 
+  const sendOtp = useMutation({
+    mutationFn: () => requestJoinOtp(token),
+    onSuccess: (response) => {
+      setOtpSent(true);
+      setStatusMessage(response.message);
+    },
+  });
+
+  const verifyOtp = useMutation({
+    mutationFn: () => verifyJoinOtp(token, code.trim()),
+    onSuccess: async () => {
+      setStatusMessage('Email verified. You can continue onboarding.');
+      await queryClient.invalidateQueries({ queryKey: ['join', token] });
+    },
+  });
+
   const refused = !token || isError || (!isPending && !data?.valid);
+  const verified = Boolean(data?.emailVerified);
+  const actionError = sendOtp.error || verifyOtp.error;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f4f7fb', px: { xs: 2, md: 5 }, py: { xs: 4, md: 8 } }}>
@@ -40,13 +77,63 @@ const Join: React.FC = () => {
           )}
 
           {token && !isPending && data?.valid && (
-            <Stack spacing={1.5}>
+            <Stack spacing={2}>
               <Typography variant="h5" fontWeight={700}>
                 Hello, {data.firstName}
               </Typography>
-              <Typography color="text.secondary">
-                Your invitation is valid. The next step is email verification.
-              </Typography>
+
+              {verified ? (
+                <Alert severity="success">
+                  Your email is verified. The next step is your joining form.
+                </Alert>
+              ) : (
+                <>
+                  <Typography color="text.secondary">
+                    We will send a one-time code to {data.maskedEmail}. Enter that code to confirm
+                    this invitation is yours.
+                  </Typography>
+
+                  <Button
+                    variant="contained"
+                    onClick={() => sendOtp.mutate()}
+                    disabled={sendOtp.isPending}
+                  >
+                    {sendOtp.isPending
+                      ? 'Sending…'
+                      : otpSent
+                        ? 'Resend code'
+                        : 'Send verification code'}
+                  </Button>
+
+                  {(otpSent || statusMessage) && (
+                    <TextField
+                      label="6-digit code"
+                      value={code}
+                      onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      inputProps={{ inputMode: 'numeric', maxLength: 6 }}
+                      fullWidth
+                    />
+                  )}
+
+                  {(otpSent || statusMessage) && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => verifyOtp.mutate()}
+                      disabled={verifyOtp.isPending || code.trim().length !== 6}
+                    >
+                      {verifyOtp.isPending ? 'Checking…' : 'Verify email'}
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {statusMessage && !verified && (
+                <Alert severity="info">{statusMessage}</Alert>
+              )}
+
+              {actionError && (
+                <Alert severity="error">{errorMessage(actionError)}</Alert>
+              )}
             </Stack>
           )}
 
