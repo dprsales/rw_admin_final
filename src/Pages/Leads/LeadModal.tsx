@@ -57,6 +57,23 @@ function looksLikeId(value: string): boolean {
   return false;
 }
 
+function looksLikeHumanName(value: string): boolean {
+  const s = String(value || '').trim();
+  if (!s || s.length > 120) return false;
+  const letters = (s.match(/[A-Za-z\u00C0-\u024F]/g) || []).length;
+  if (letters < 2) return false;
+  const significant = s.replace(/[\s.'-]/g, '');
+  return letters >= Math.ceil(significant.length * 0.6);
+}
+
+function nameFromEmail(email?: string): string {
+  const mail = String(email || '').trim();
+  if (!mail.includes('@')) return '';
+  const local = mail.split('@')[0].trim();
+  if (!local) return '';
+  return local.replace(/[._]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function formatAnswerValue(raw: unknown): string {
   if (raw == null || raw === '') return '';
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean).join(', ');
@@ -81,13 +98,18 @@ function formatNoteWhen(iso?: string): { date: string; time: string; full: strin
 }
 
 function authorLabel(item: LeadNoteActivity): string {
-  const fromSnapshot = item.authorName?.trim() || item.authorEmail?.trim();
-  if (fromSnapshot && !looksLikeId(fromSnapshot)) return fromSnapshot;
+  const rawName = item.authorName?.trim() || '';
+  if (rawName && !looksLikeId(rawName) && looksLikeHumanName(rawName)) return rawName;
+
+  const fromEmail = nameFromEmail(item.authorEmail);
+  if (fromEmail) return fromEmail;
 
   const createdBy = item.createdBy;
   if (createdBy && typeof createdBy === 'object') {
-    const fromUser = createdBy.name?.trim() || createdBy.email?.trim();
-    if (fromUser && !looksLikeId(fromUser)) return fromUser;
+    const fromUser = createdBy.name?.trim() || '';
+    if (fromUser && !looksLikeId(fromUser) && looksLikeHumanName(fromUser)) return fromUser;
+    const fromUserEmail = nameFromEmail(createdBy.email);
+    if (fromUserEmail) return fromUserEmail;
   }
 
   return 'Team';
