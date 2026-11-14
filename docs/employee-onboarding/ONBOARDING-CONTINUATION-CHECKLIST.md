@@ -94,7 +94,7 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 - [x] Approve a first fixed document checklist with PDF/JPG/PNG and 5 MB limit (HR can later replace with config).
 - [x] Implement private storage separate from public `/uploads` and public CDN assets (`private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR`).
 - [x] Validate file type/size, generate server-side storage names, store version number, and never return storage keys to the browser.
-- [ ] Implement authenticated file delivery with employee ownership and HR permission checks.
+- [x] Implement authenticated candidate file preview/delivery via `GET /join/documents/:type/file` (HR staff download still outstanding).
 - [ ] Implement Pending, Approved, Re-upload Required and Locked document states with reviewer/reason metadata (Uploaded/Missing/Locked checks exist for replace).
 - [ ] Add policy versions, applicability and acknowledgement timestamps.
 - [ ] Add final declaration, submission snapshot and correction/reopen flow.
@@ -273,11 +273,11 @@ Add newest entries at the top. Keep this log factual and include the date, summa
 
 ### 2026-11-14 — Joining documents checklist (start)
 
-- Completed: Fixed required document list (photo, Aadhaar, PAN, address proof, bank proof, education certificate, resume). Private disk storage under `private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR` (not public `/uploads` or CDN URLs). Session-gated `GET /join/documents` and `POST /join/documents/:documentType` with PDF/JPG/PNG and 5 MB limits. Admin `/join` Documents step shows status and upload/replace. Audit `document_uploaded`.
+- Completed: Fixed required document list (photo, Aadhaar, PAN, address proof, bank proof, education certificate, resume). Private disk storage under `private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR` (not public `/uploads` or CDN URLs). Session-gated `GET /join/documents`, `POST /join/documents/:documentType`, and `GET /join/documents/:type/file` preview. Admin `/join` Documents step shows empty state, image/PDF thumbnail, Preview dialog, upload/replace, and upload count status. Audits `document_uploaded` / `document_viewed`.
 - Files changed: `join-documents.ts`, `employees.documents.service.ts`, `employees.documents.spec.ts`, employee schema, onboarding audit schema, `join.controller.ts`, `employees.module.ts`, `.gitignore`; admin `Join.tsx`, `api/services/index.ts`; checklist docs.
-- Verification performed: documents Jest suite passed (3 tests). Admin `tsc --noEmit` passed.
-- Decisions or blockers: No authenticated download yet. HR approve/reject not started. Version number increments; prior file bytes remain on disk but only the current row is in Mongo.
-- Next item: Authenticated download and HR document review states.
+- Verification performed: documents Jest suite passed. Admin `tsc --noEmit` passed.
+- Decisions or blockers: HR staff download and approve/reject not started. Version number increments; prior file bytes remain on disk but only the current row is in Mongo.
+- Next item: HR document review states (approve / reject / re-upload).
 
 ### 2026-11-13 — Full joining draft fields
 

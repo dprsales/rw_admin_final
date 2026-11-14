@@ -4,7 +4,12 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   Grid,
@@ -19,9 +24,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
+  fetchJoinDocumentBlob,
   getJoinDocuments,
   getJoinForm,
   requestJoinOtp,
@@ -30,6 +39,7 @@ import {
   saveJoinForm,
   uploadJoinDocument,
   verifyJoinOtp,
+  type JoinDocumentItem,
   type JoinEducationRow,
   type JoinEmploymentRow,
   type JoinFormDraft,
@@ -189,6 +199,203 @@ const OptionSelect = ({
 const Field = (props: React.ComponentProps<typeof TextField>) => (
   <TextField size="small" fullWidth {...props} />
 );
+
+const isImageMime = (mime: string) => mime.startsWith('image/');
+const isPdfMime = (mime: string) => mime === 'application/pdf' || mime.includes('pdf');
+
+const DocumentPreviewCard = ({
+  doc,
+  accessToken,
+  busy,
+  onUpload,
+}: {
+  doc: JoinDocumentItem;
+  accessToken: string;
+  busy: boolean;
+  onUpload: (file: File) => void;
+}) => {
+  const inputId = `join-doc-${doc.documentType}`;
+  const uploaded = doc.status !== 'Missing';
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewMime, setPreviewMime] = useState(doc.mimeType || '');
+  const [previewError, setPreviewError] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = '';
+
+    if (!uploaded || !accessToken) {
+      setPreviewUrl('');
+      setPreviewMime('');
+      setPreviewError('');
+      return undefined;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError('');
+    fetchJoinDocumentBlob(accessToken, doc.documentType)
+      .then(({ blob, mimeType }) => {
+        const url = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setPreviewUrl(url);
+        setPreviewMime(mimeType || doc.mimeType || blob.type || '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPreviewError('Preview unavailable. Try upload again.');
+        setPreviewUrl('');
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [accessToken, doc.documentType, doc.version, doc.status, doc.mimeType, uploaded]);
+
+  const locked = doc.status === 'Locked' || doc.status === 'Approved';
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'stretch' }}>
+        <Box
+          sx={{
+            width: { xs: '100%', sm: 132 },
+            minHeight: 104,
+            borderRadius: 1.5,
+            border: '1px dashed',
+            borderColor: uploaded ? 'success.light' : 'divider',
+            bgcolor: uploaded ? 'rgba(46, 125, 50, 0.04)' : 'grey.50',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}
+          aria-busy={previewLoading}
+        >
+          {!uploaded && (
+            <Stack alignItems="center" spacing={0.5} px={1} textAlign="center">
+              <UploadFileOutlinedIcon color="disabled" aria-hidden="true" />
+              <Typography variant="caption" color="text.secondary">
+                No file yet
+              </Typography>
+            </Stack>
+          )}
+          {uploaded && previewLoading && <CircularProgress size={22} />}
+          {uploaded && !previewLoading && previewError && (
+            <Typography variant="caption" color="error" px={1} textAlign="center">
+              {previewError}
+            </Typography>
+          )}
+          {uploaded && !previewLoading && previewUrl && isImageMime(previewMime) && (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt={`${doc.label} preview`}
+              sx={{ width: '100%', height: 104, objectFit: 'cover', display: 'block' }}
+            />
+          )}
+          {uploaded && !previewLoading && previewUrl && isPdfMime(previewMime) && (
+            <Stack alignItems="center" spacing={0.5}>
+              <PictureAsPdfOutlinedIcon color="error" aria-hidden="true" />
+              <Typography variant="caption" color="text.secondary">
+                PDF ready
+              </Typography>
+            </Stack>
+          )}
+          {uploaded &&
+            !previewLoading &&
+            previewUrl &&
+            !isImageMime(previewMime) &&
+            !isPdfMime(previewMime) && (
+              <Stack alignItems="center" spacing={0.5}>
+                <ImageOutlinedIcon color="action" aria-hidden="true" />
+                <Typography variant="caption" color="text.secondary">
+                  File ready
+                </Typography>
+              </Stack>
+            )}
+        </Box>
+
+        <Stack spacing={1.25} flex={1} justifyContent="space-between">
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography fontWeight={700}>{doc.label}</Typography>
+              <Chip
+                size="small"
+                color={uploaded ? 'success' : 'default'}
+                label={uploaded ? doc.status : 'Missing'}
+                role="status"
+              />
+            </Stack>
+            <Typography variant="body2" color="text.secondary" mt={0.5}>
+              {uploaded
+                ? `${doc.originalFileName || 'Uploaded file'}${doc.version ? ` · v${doc.version}` : ''}`
+                : 'PDF, JPG, or PNG up to 5 MB'}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {uploaded && previewUrl && (
+              <Button variant="outlined" onClick={() => setDialogOpen(true)} disabled={previewLoading}>
+                Preview
+              </Button>
+            )}
+            <Button variant="contained" component="label" disabled={busy || locked}>
+              {busy ? 'Uploading…' : uploaded ? 'Replace' : 'Upload'}
+              <input
+                id={inputId}
+                hidden
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (!file) return;
+                  onUpload(file);
+                }}
+              />
+            </Button>
+          </Stack>
+        </Stack>
+      </Stack>
+
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{doc.label}</DialogTitle>
+        <DialogContent dividers>
+          {previewUrl && isImageMime(previewMime) && (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt={`${doc.label} full preview`}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', display: 'block', mx: 'auto' }}
+            />
+          )}
+          {previewUrl && isPdfMime(previewMime) && (
+            <Box
+              component="iframe"
+              title={`${doc.label} PDF preview`}
+              src={previewUrl}
+              sx={{ width: '100%', height: '70vh', border: 0 }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Paper>
+  );
+};
 
 const Join: React.FC = () => {
   const [params] = useSearchParams();
@@ -548,58 +755,27 @@ const Join: React.FC = () => {
     return (
       <Stack spacing={2}>
         <Typography variant="body2" color="text.secondary">
-          Upload PDF, JPG, or PNG files up to 5 MB. Files are stored privately and are not public links.
+          Upload PDF, JPG, or PNG files up to 5 MB. Each uploaded file shows a preview so you can
+          confirm the right document before moving on.
         </Typography>
         {checklist && (
-          <Typography variant="body2" fontWeight={600}>
+          <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
             {checklist.uploadedCount} of {checklist.requiredCount} required files uploaded
           </Typography>
         )}
         {(checklist?.documents || []).map((doc) => {
-          const inputId = `join-doc-${doc.documentType}`;
           const busy = uploadingType === doc.documentType && uploadDocument.isPending;
           return (
-            <Paper key={doc.documentType} variant="outlined" sx={{ p: 2 }}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                alignItems={{ sm: 'center' }}
-                justifyContent="space-between"
-              >
-                <Box>
-                  <Typography fontWeight={700}>{doc.label}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {doc.status === 'Missing'
-                      ? 'Not uploaded yet'
-                      : `${doc.status}${doc.originalFileName ? ` · ${doc.originalFileName}` : ''}${
-                          doc.version ? ` · v${doc.version}` : ''
-                        }`}
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    variant="outlined"
-                    component="label"
-                    disabled={busy || doc.status === 'Locked' || doc.status === 'Approved'}
-                  >
-                    {busy ? 'Uploading…' : doc.status === 'Missing' ? 'Upload' : 'Replace'}
-                    <input
-                      id={inputId}
-                      hidden
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = '';
-                        if (!file) return;
-                        setUploadingType(doc.documentType);
-                        uploadDocument.mutate({ documentType: doc.documentType, file });
-                      }}
-                    />
-                  </Button>
-                </Stack>
-              </Stack>
-            </Paper>
+            <DocumentPreviewCard
+              key={`${doc.documentType}-${doc.version}-${doc.status}`}
+              doc={doc}
+              accessToken={accessToken}
+              busy={busy}
+              onUpload={(file) => {
+                setUploadingType(doc.documentType);
+                uploadDocument.mutate({ documentType: doc.documentType, file });
+              }}
+            />
           );
         })}
       </Stack>

@@ -588,6 +588,22 @@ export const uploadJoinDocument = async (
   return response.data;
 };
 
+/** Private preview blob. Caller must revokeObjectURL when done. */
+export const fetchJoinDocumentBlob = async (
+  accessToken: string,
+  documentType: string,
+): Promise<{ blob: Blob; mimeType: string }> => {
+  const response = await joinHttp.get(`/join/documents/${documentType}/file`, {
+    ...joinAuth(accessToken),
+    responseType: 'blob',
+  });
+  const mimeType =
+    (response.headers['content-type'] as string) ||
+    response.data.type ||
+    'application/octet-stream';
+  return { blob: response.data as Blob, mimeType };
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');
