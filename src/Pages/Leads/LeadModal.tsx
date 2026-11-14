@@ -1,9 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Drawer, Box, Typography, Button, Chip, Divider, Stack, Link, IconButton,
-  FormControl, InputLabel, Select, MenuItem, TextField, Alert, Grid,
+  FormControl, InputLabel, Select, MenuItem, TextField, Alert, Grid, CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CheckIcon from '@mui/icons-material/Check';
+import Cookies from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CRM_SOURCE_LABEL,
@@ -21,7 +27,13 @@ import {
   TEMPERATURE_OPTIONS,
   VISITOR_LABEL,
 } from './Leads';
-import { getLeadActivities, updateLead } from '../../api/services';
+import {
+  addLeadNote,
+  deleteLeadNote,
+  getLeadActivities,
+  updateLead,
+  updateLeadNote,
+} from '../../api/services';
 
 interface LeadModalProps {
   open: boolean;
@@ -29,14 +41,46 @@ interface LeadModalProps {
   lead: Lead;
 }
 
-type LeadActivityRow = {
+type LeadNoteActivity = {
   _id: string;
-  type: 'note' | 'stage_change';
+  type: string;
   note?: string;
-  fromStage?: string;
-  toStage?: string;
   createdAt?: string;
+  authorName?: string;
+  authorEmail?: string;
+  createdBy?: { name?: string; email?: string } | string | null;
 };
+
+function currentUserLabel(): string {
+  return (Cookies.get('user_name') || Cookies.get('user_type') || 'Team').trim();
+}
+
+function looksLikeId(value: string): boolean {
+  if (!value) return true;
+  if (/^[a-f0-9]{24}$/i.test(value)) return true;
+  // Binary ObjectId mis-decoded as text (e.g. "NVJXDhInXEMR")
+  if (value.length <= 16 && !/\s/.test(value) && /[A-Z]/.test(value) && /[a-z]/.test(value)) {
+    return !/[aeiou]{2}/i.test(value) && value.length >= 8;
+  }
+  return false;
+}
+
+function looksLikeHumanName(value: string): boolean {
+  const s = String(value || '').trim();
+  if (!s || s.length > 120) return false;
+  const letters = (s.match(/[A-Za-z\u00C0-\u024F]/g) || []).length;
+  if (letters < 2) return false;
+  const significant = s.replace(/[\s.'-]/g, '');
+  return letters >= Math.ceil(significant.length * 0.6);
+}
+
+function nameFromEmail(email?: string): string {
+  const mail = String(email || '').trim();
+  if (!mail.includes('@')) return '';
+  const local = mail.split('@')[0].trim();
+  if (!local) return '';
+  return local.replace(/[._]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function formatAnswerValue(raw: unknown): string {
   if (raw == null || raw === '') return '';
@@ -49,6 +93,48 @@ function answerLabel(key: string): string {
   if (FORM_ANSWER_LABELS[key]) return FORM_ANSWER_LABELS[key];
   return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()).trim();
 }
+
+function formatNoteWhen(iso?: string): { date: string; time: string; full: string } {
+  if (!iso) return { date: '-', time: '', full: '-' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: '-', time: '', full: '-' };
+  return {
+    date: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
+    time: d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+    full: d.toLocaleString(),
+  };
+}
+
+function authorLabel(item: LeadNoteActivity): string {
+  const rawName = item.authorName?.trim() || '';
+  if (rawName && !looksLikeId(rawName) && looksLikeHumanName(rawName)) return rawName;
+
+  const fromEmail = nameFromEmail(item.authorEmail);
+  if (fromEmail) return fromEmail;
+
+  const createdBy = item.createdBy;
+  if (createdBy && typeof createdBy === 'object') {
+    const fromUser = createdBy.name?.trim() || '';
+    if (fromUser && !looksLikeId(fromUser) && looksLikeHumanName(fromUser)) return fromUser;
+    const fromUserEmail = nameFromEmail(createdBy.email);
+    if (fromUserEmail) return fromUserEmail;
+  }
+
+  return 'Team';
+}
+
+
+type LeadActivityRow = {
+  _id: string;
+  type: 'note' | 'stage_change' | string;
+  note?: string;
+  fromStage?: string;
+  toStage?: string;
+  createdAt?: string;
+  authorName?: string;
+  authorEmail?: string;
+  createdBy?: { name?: string; email?: string } | string | null;
+};
 
 /** Convert ISO / Date string to datetime-local value (local wall clock). */
 function toLocalInput(iso?: string): string {
@@ -116,7 +202,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
   const [lostReason, setLostReason] = useState(lead.lostReason || '');
   const [nextAction, setNextAction] = useState(lead.nextAction || '');
   const [nextFollowUpAt, setNextFollowUpAt] = useState(toLocalInput(lead.nextFollowUpAt));
-  const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -126,7 +211,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     setLostReason(lead.lostReason || '');
     setNextAction(lead.nextAction || '');
     setNextFollowUpAt(toLocalInput(lead.nextFollowUpAt));
-    setNote('');
     setError('');
   }, [open, lead]);
 
@@ -137,6 +221,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
   });
 
   const activities: LeadActivityRow[] = activitiesQuery.data?.activities || [];
+  const stageChanges = activities.filter((row) => row.type === 'stage_change');
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -151,13 +236,11 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
         ...(stage === 'nurture' ? { status: 'nurture' } : {}),
         ...(nextAction ? { nextAction } : {}),
         ...(followUpIso ? { nextFollowUpAt: followUpIso } : {}),
-        ...(note.trim() ? { note: note.trim() } : {}),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
-      setNote('');
       handleClose();
     },
     onError: (err: any) => {
@@ -171,19 +254,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     },
   });
 
-  const noteOnlyMutation = useMutation({
-    mutationFn: () => updateLead(lead._id, { note: note.trim() }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
-      setNote('');
-      setError('');
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || 'Could not save note.';
-      setError(typeof msg === 'string' ? msg : 'Could not save note.');
-    },
-  });
-
   const dirty =
     stage !== (lead.stage || 'new_lead') ||
     temperature !== (lead.temperature || 'cold') ||
@@ -192,7 +262,178 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
     nextFollowUpAt !== toLocalInput(lead.nextFollowUpAt);
 
   const canSave = dirty && (stage !== 'lost' || Boolean(lostReason));
-  const canSaveNote = Boolean(note.trim()) && !dirty;
+
+  const [notes, setNotes] = useState<LeadNoteActivity[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+
+  const normalizeNote = (a: LeadNoteActivity): LeadNoteActivity => ({
+    ...a,
+    _id: String(a._id),
+    type: 'note',
+    note: String(a.note || ''),
+    authorName: a.authorName ? String(a.authorName) : a.authorName,
+    authorEmail: a.authorEmail ? String(a.authorEmail) : a.authorEmail,
+  });
+
+  const loadNotes = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!lead?._id) return;
+    if (!opts?.quiet) setNotesLoading(true);
+    setNotesError('');
+    try {
+      const data = await getLeadActivities(String(lead._id));
+      const rows = (data?.activities || data || []) as LeadNoteActivity[];
+      const list = (Array.isArray(rows) ? rows : [])
+        .filter((a) => a && String(a.note || '').trim() && (a.type === 'note' || !a.type))
+        .map(normalizeNote);
+      setNotes(list);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Could not load notes. Try again.';
+      setNotesError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      if (!opts?.quiet) setNotes([]);
+    } finally {
+      if (!opts?.quiet) setNotesLoading(false);
+    }
+  }, [lead?._id]);
+
+  useEffect(() => {
+    if (!open || !lead?._id) return;
+    setDraft('');
+    setSaveError('');
+    setEditingId(null);
+    setEditDraft('');
+    setNoteBusyId(null);
+    setNotes([]);
+    void loadNotes();
+  }, [open, lead?._id, loadNotes]);
+
+  const handleSaveNote = async () => {
+    const text = draft.trim();
+    if (!text || !lead?._id || saving) return;
+    setSaving(true);
+    setSaveError('');
+    setNotesError('');
+
+    const tempId = `temp-${Date.now()}`;
+    const me = currentUserLabel();
+    const optimistic: LeadNoteActivity = {
+      _id: tempId,
+      type: 'note',
+      note: text,
+      createdAt: new Date().toISOString(),
+      authorName: me,
+      createdBy: { name: me },
+    };
+    setNotes((prev) => [optimistic, ...prev]);
+    setDraft('');
+
+    try {
+      const data = await addLeadNote(String(lead._id), text);
+      const saved = data?.activity as LeadNoteActivity | undefined;
+      if (!saved?._id || !String(saved.note || text).trim()) {
+        throw new Error('Note save did not return a saved note');
+      }
+      const normalized = normalizeNote({ ...saved, note: saved.note || text, authorName: saved.authorName || me });
+      setNotes((prev) => [normalized, ...prev.filter((n) => n._id !== tempId && n._id !== normalized._id)]);
+    } catch (err: any) {
+      setNotes((prev) => prev.filter((n) => n._id !== tempId));
+      setDraft(text);
+      const msg = err?.response?.data?.message || err?.message || 'Could not save the note. Try again.';
+      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onNoteKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      void handleSaveNote();
+    }
+  };
+
+  const startEditNote = (item: LeadNoteActivity) => {
+    if (item._id.startsWith('temp-') || noteBusyId) return;
+    setEditingId(item._id);
+    setEditDraft(item.note || '');
+    setSaveError('');
+  };
+
+  const cancelEditNote = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const handleUpdateNote = async (noteId: string) => {
+    const text = editDraft.trim();
+    const leadId = String(lead?._id || '');
+    const id = String(noteId || '');
+    if (!text || !leadId || !id || noteBusyId) return;
+    const previous = notes.find((n) => n._id === id)?.note;
+    setNoteBusyId(id);
+    setSaveError('');
+    setNotes((prev) => prev.map((n) => (n._id === id ? { ...n, note: text } : n)));
+    try {
+      const data = await updateLeadNote(leadId, id, text);
+      const saved = data?.activity as LeadNoteActivity | undefined;
+      if (saved) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n._id === id
+              ? {
+                  ...n,
+                  ...saved,
+                  _id: String(saved._id || id),
+                  note: String(saved.note || text),
+                }
+              : n,
+          ),
+        );
+      }
+      setEditingId(null);
+      setEditDraft('');
+    } catch (err: any) {
+      setNotes((prev) => prev.map((n) => (n._id === id ? { ...n, note: previous } : n)));
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not update the note. Try again.';
+      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    } finally {
+      setNoteBusyId(null);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    const leadId = String(lead?._id || '');
+    const id = String(noteId || '');
+    if (!leadId || !id || noteBusyId || id.startsWith('temp-')) return;
+    if (!window.confirm('Delete this note? This cannot be undone.')) return;
+    const previous = notes;
+    setNoteBusyId(id);
+    setSaveError('');
+    if (editingId === id) cancelEditNote();
+    setNotes((prev) => prev.filter((n) => n._id !== id));
+    try {
+      await deleteLeadNote(leadId, id);
+    } catch (err: any) {
+      setNotes(previous);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not delete the note. Try again.';
+      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    } finally {
+      setNoteBusyId(null);
+    }
+  };
+
 
   const activityLabel = (row: LeadActivityRow) => {
     if (row.type === 'stage_change') {
@@ -351,36 +592,15 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
             </Box>
           </Section>
 
-          <Section title="Activity">
+          <Section title="Stage history">
             <Box sx={{ py: 1.25 }}>
-              <TextField
-                fullWidth
-                size="small"
-                multiline
-                minRows={2}
-                label="Add a note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                sx={{ mb: 1.5 }}
-              />
-              {canSaveNote && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  sx={{ mb: 2 }}
-                  disabled={noteOnlyMutation.isPending}
-                  onClick={() => noteOnlyMutation.mutate()}
-                >
-                  {noteOnlyMutation.isPending ? 'Saving note…' : 'Save note'}
-                </Button>
-              )}
               {activitiesQuery.isLoading && (
                 <Typography variant="body2" color="text.secondary">Loading activity…</Typography>
               )}
-              {!activitiesQuery.isLoading && activities.length === 0 && (
-                <Typography variant="body2" color="text.secondary">No activity yet.</Typography>
+              {!activitiesQuery.isLoading && stageChanges.length === 0 && (
+                <Typography variant="body2" color="text.secondary">No stage changes yet.</Typography>
               )}
-              {activities.map((row) => (
+              {stageChanges.map((row) => (
                 <Box key={row._id} sx={{ mb: 1.25 }}>
                   <Typography variant="caption" color="text.secondary">
                     {row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}
@@ -400,6 +620,252 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
           </Section>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+<Box sx={{ mb: 3 }}>
+            <Typography
+              variant="overline"
+              sx={{ display: 'block', color: 'text.secondary', fontWeight: 700, letterSpacing: 0.08, mb: 1 }}
+            >
+              Team notes
+            </Typography>
+            <Box
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                overflow: 'hidden',
+                bgcolor: '#fff',
+              }}
+            >
+              <Box sx={{ px: 2, pt: 2, pb: 1.5, bgcolor: '#fafbfc', borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
+                  Log a call, summary, or follow-up
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  maxRows={8}
+                  placeholder="Example: Called at 3pm, interested in coaching, send KRISAH link..."
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onNoteKeyDown}
+                  disabled={saving}
+                  inputProps={{ maxLength: 4000 }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: '#fff',
+                      fontSize: '0.9rem',
+                      lineHeight: 1.55,
+                    },
+                  }}
+                />
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.25, gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {draft.trim().length > 0
+                      ? `${draft.trim().length} / 4000 · Ctrl+Enter to save`
+                      : 'Each save adds a dated entry below'}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disableElevation
+                    endIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SendOutlinedIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => void handleSaveNote()}
+                    disabled={!draft.trim() || saving}
+                    sx={{ textTransform: 'none', fontWeight: 600, px: 1.75 }}
+                  >
+                    {saving ? 'Saving...' : 'Save note'}
+                  </Button>
+                </Box>
+                {saveError && (
+                  <Alert severity="error" sx={{ mt: 1.25, py: 0 }} onClose={() => setSaveError('')}>
+                    {saveError}
+                  </Alert>
+                )}
+              </Box>
+
+              <Box sx={{ px: 2, py: 2 }}>
+                {notesLoading && notes.length === 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <CircularProgress size={22} />
+                  </Box>
+                )}
+
+                {!notesLoading && notesError && notes.length === 0 && (
+                  <Alert severity="warning" sx={{ mb: 0 }} action={
+                    <Button color="inherit" size="small" onClick={() => void loadNotes()}>Retry</Button>
+                  }>
+                    {notesError}
+                  </Alert>
+                )}
+
+                {!notesLoading && !notesError && notes.length === 0 && (
+                  <Box sx={{ py: 3.5, px: 1, textAlign: 'center', color: 'text.secondary' }}>
+                    <NotesOutlinedIcon sx={{ fontSize: 28, opacity: 0.45, mb: 1 }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
+                      No team notes yet
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Add what you did on this lead. It shows here with date and time.
+                    </Typography>
+                  </Box>
+                )}
+
+                {notes.length > 0 && (
+                  <Box sx={{ position: 'relative', pl: 0.5 }}>
+                    {notes.map((item, index) => {
+                      const when = formatNoteWhen(item.createdAt);
+                      const isLast = index === notes.length - 1;
+                      const isEditing = editingId === item._id;
+                      const isBusy = noteBusyId === item._id;
+                      const canManage = !item._id.startsWith('temp-');
+                      return (
+                        <Box
+                          key={item._id}
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '18px 1fr',
+                            gap: 1.5,
+                            position: 'relative',
+                            pb: isLast ? 0 : 2.25,
+                          }}
+                        >
+                          <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                            {!isLast && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 14,
+                                  bottom: -8,
+                                  width: 2,
+                                  bgcolor: 'divider',
+                                  borderRadius: 1,
+                                }}
+                              />
+                            )}
+                            <Box
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                bgcolor: 'primary.main',
+                                mt: 0.55,
+                                boxShadow: '0 0 0 3px rgba(25, 118, 210, 0.12)',
+                                zIndex: 1,
+                              }}
+                            />
+                          </Box>
+                          <Box>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                mb: 0.6,
+                              }}
+                            >
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                {authorLabel(item)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" title={when.full}>
+                                {when.date}
+                                {when.time ? ` · ${when.time}` : ''}
+                              </Typography>
+                              {canManage && !isEditing && (
+                                <Box sx={{ ml: 'auto', display: 'flex', gap: 0.25 }}>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Edit note"
+                                    onClick={() => startEditNote(item)}
+                                    disabled={Boolean(noteBusyId)}
+                                    sx={{ color: 'text.secondary' }}
+                                  >
+                                    <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Delete note"
+                                    onClick={() => void handleDeleteNote(item._id)}
+                                    disabled={Boolean(noteBusyId)}
+                                    sx={{ color: 'text.secondary' }}
+                                  >
+                                    {isBusy ? <CircularProgress size={14} /> : <DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+                                  </IconButton>
+                                </Box>
+                              )}
+                            </Box>
+                            <Box
+                              sx={{
+                                border: '1px solid',
+                                borderColor: isEditing ? 'primary.light' : 'divider',
+                                borderRadius: 1.5,
+                                px: 1.5,
+                                py: 1.15,
+                                bgcolor: '#fafbfc',
+                              }}
+                            >
+                              {isEditing ? (
+                                <>
+                                  <TextField
+                                    fullWidth
+                                    multiline
+                                    minRows={2}
+                                    maxRows={8}
+                                    value={editDraft}
+                                    onChange={(e) => setEditDraft(e.target.value)}
+                                    disabled={isBusy}
+                                    inputProps={{ maxLength: 4000 }}
+                                    sx={{
+                                      '& .MuiOutlinedInput-root': {
+                                        bgcolor: '#fff',
+                                        fontSize: '0.9rem',
+                                      },
+                                    }}
+                                  />
+                                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
+                                    <Button
+                                      size="small"
+                                      onClick={cancelEditNote}
+                                      disabled={isBusy}
+                                      sx={{ textTransform: 'none' }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      disableElevation
+                                      startIcon={isBusy ? <CircularProgress size={12} color="inherit" /> : <CheckIcon sx={{ fontSize: 14 }} />}
+                                      disabled={!editDraft.trim() || isBusy || editDraft.trim() === (item.note || '').trim()}
+                                      onClick={() => void handleUpdateNote(item._id)}
+                                      sx={{ textTransform: 'none', fontWeight: 600 }}
+                                    >
+                                      {isBusy ? 'Saving...' : 'Save'}
+                                    </Button>
+                                  </Box>
+                                </>
+                              ) : (
+                                <Typography
+                                  variant="body2"
+                                  sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}
+                                >
+                                  {item.note}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Box>
+
+
 
           <Section title="Contact">
             <FieldRow label="Name">{lead.name}</FieldRow>
@@ -523,13 +989,15 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
             </Section>
           )}
 
-          <Section title="Notes / message">
-            <Box sx={{ py: 1.25 }}>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: lead.message ? 'text.primary' : 'text.secondary' }}>
-                {lead.message || 'No message recorded.'}
-              </Typography>
-            </Box>
-          </Section>
+          {lead.message?.trim() && (
+            <Section title="Visitor message">
+              <Box sx={{ py: 1.25 }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.primary' }}>
+                  {lead.message}
+                </Typography>
+              </Box>
+            </Section>
+          )}
         </Box>
 
         <Box

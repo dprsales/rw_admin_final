@@ -7,9 +7,9 @@ Start to end. Do these in this order. The current task is the first step that is
 3. **HR employee screen** — Done. HR can open Employees, enter the person, and see the list.
 4. **Send the invitation** — Done. HR sends one email from an employee row. The record stores a hashed token, an expiry, and a revoked flag. A successful send replaces the previous invitation for that employee.
 5. **Open the link** — Done. `GET /join?token=` hashes the token and refuses missing, expired, and revoked invitations. Public `/join` shows valid or refused.
-6. **Verify the email** — Current task. The candidate confirms the invited address with a one-time code.
-7. **Candidate form** — The candidate saves their own details and can come back to finish them.
-8. **Documents** — The candidate uploads the required files to private storage.
+6. **Verify the email** — Done. Candidate requests a 6-digit code, verifies it on `/join`, with resend/attempt limits and audit events.
+7. **Candidate form** — Done for draft fields. Personal extras, education, previous employment, and bank save/resume on `/join`. Review-before-submit still outstanding.
+8. **Documents** — Current task. The candidate uploads the required files to private storage.
 9. **Policies and declaration** — The candidate acknowledges the policies that apply to them.
 10. **Submit** — The candidate reviews and submits once. A second submit does not create a second record.
 11. **HR review** — HR approves the file or sends it back with a reason.
@@ -17,8 +17,8 @@ Start to end. Do these in this order. The current task is the first step that is
 
 ## Current task
 
-**Title:** Verify the email
+**Title:** Documents
 
-- The candidate confirms the invited address with a one-time code.
-- Rate-limit OTP attempts and resends.
-- Record audit events for verification.
+- Private storage for required joining documents.
+- Upload, version, and employee-visible status.
+- Do not use public CDN paths.

@@ -1,3 +1,4 @@
+import axios from "axios";
 import { http } from "../http";
 
 // Auth
@@ -100,8 +101,39 @@ export const updateLead = (leadId: string, data: any) => {
   return http.patch(`/leads/${leadId}`, data);
 };
 
+export const addLeadNote = async (leadId: string, note: string) => {
+  const response = await http.post(`/leads/${leadId}/notes`, { note });
+  return response.data; // { activity }
+};
+
+export const updateLeadNote = async (leadId: string, noteId: string, note: string) => {
+  const response = await http.patch(
+    `/leads/${encodeURIComponent(String(leadId))}/notes/${encodeURIComponent(String(noteId))}`,
+    { note: String(note) },
+  );
+  return response.data; // { activity }
+};
+
+export const deleteLeadNote = async (leadId: string, noteId: string) => {
+  const response = await http.delete(
+    `/leads/${encodeURIComponent(String(leadId))}/notes/${encodeURIComponent(String(noteId))}`,
+  );
+  return response.data; // { ok, id }
+};
+
+export const assignLeadOwner = async (leadId: string, ownerId: string | null) => {
+  const response = await http.patch(`/leads/${encodeURIComponent(String(leadId))}/assign`, {
+    ownerId,
+  });
+  return response.data;
+};
+
 export const getLeadActivities = async (leadId: string) => {
-  const response = await http.get(`/leads/${leadId}/activities`);
+  // Cache-bust with query only. Do not send Cache-Control request headers
+  // (they trigger CORS preflight and our API allowlist blocks them).
+  const response = await http.get(`/leads/${leadId}/activities`, {
+    params: { _ts: Date.now() },
+  });
   return response.data; // { activities: [...] }
 };
 
@@ -370,12 +402,150 @@ export const sendEmployeeInvitation = (employeeId: string) => {
 export interface InvitationLookup {
   valid: true;
   firstName: string;
+  emailVerified: boolean;
+  maskedEmail: string;
 }
 
+export interface JoinSessionResult {
+  verified: true;
+  firstName: string;
+  accessToken: string;
+}
+
+export interface JoinEducationRow {
+  qualification: string;
+  institution: string;
+  yearOfPassing: string;
+  percentageOrCgpa: string;
+  specialization: string;
+}
+
+export interface JoinEmploymentRow {
+  companyName: string;
+  designation: string;
+  fromDate: string;
+  toDate: string;
+  lastCtc: string;
+  reasonForLeaving: string;
+  referenceName: string;
+  referencePhone: string;
+}
+
+export interface JoinReferenceRow {
+  name: string;
+  relation: string;
+  phone: string;
+  email: string;
+  organization: string;
+  designation: string;
+  address: string;
+  yearsKnown: string;
+}
+
+export interface JoinFormDraft {
+  firstName: string;
+  lastName: string;
+  personalEmail: string;
+  phone: string;
+  dateOfBirth: string;
+  gender: string;
+  alternatePhone: string;
+  fatherName: string;
+  motherName: string;
+  maritalStatus: string;
+  spouseName: string;
+  bloodGroup: string;
+  nationality: string;
+  currentCity: string;
+  hometown: string;
+  languagesKnown: string;
+  totalExperienceYears: string;
+  noticePeriodDays: string;
+  passportNumber: string;
+  drivingLicenseNumber: string;
+  uanNumber: string;
+  pfNumber: string;
+  esiNumber: string;
+  linkedInUrl: string;
+  currentAddress: string;
+  permanentAddress: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  emergencyContactRelation: string;
+  education: JoinEducationRow[];
+  isFresher: boolean;
+  previousEmployment: JoinEmploymentRow[];
+  references: JoinReferenceRow[];
+  bankAccountHolderName: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankIfsc: string;
+  bankBranch: string;
+  personalSectionSavedAt: string | null;
+  formDraftSavedAt: string | null;
+  onboardingStatus: string;
+}
+
+/** @deprecated use JoinFormDraft */
+export type JoinPersonalDraft = JoinFormDraft;
+
+/** Join APIs must not reuse the staff cookie Authorization header. */
+const joinHttp = axios.create({
+  baseURL: (http.defaults.baseURL as string) || '',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/plain, */*',
+  },
+});
+
+const joinAuth = (accessToken: string) => ({
+  headers: { Authorization: `Bearer ${accessToken}` },
+});
+
 export const resolveInvitation = async (token: string): Promise<InvitationLookup> => {
-  const response = await http.get('/join', { params: { token } });
+  const response = await joinHttp.get('/join', { params: { token } });
   return response.data;
 };
+
+export const requestJoinOtp = async (token: string) => {
+  const response = await joinHttp.post('/join/otp', { token });
+  return response.data as { message: string; maskedEmail: string; expiresAt: string };
+};
+
+export const verifyJoinOtp = async (token: string, code: string): Promise<JoinSessionResult> => {
+  const response = await joinHttp.post('/join/verify', { token, code });
+  return response.data;
+};
+
+export const resumeJoinSession = async (token: string): Promise<JoinSessionResult> => {
+  const response = await joinHttp.post('/join/session', { token });
+  return response.data;
+};
+
+export const getJoinForm = async (accessToken: string): Promise<JoinFormDraft> => {
+  const response = await joinHttp.get('/join/form', joinAuth(accessToken));
+  return response.data;
+};
+
+export const saveJoinForm = async (
+  accessToken: string,
+  data: Omit<
+    JoinFormDraft,
+    | 'firstName'
+    | 'lastName'
+    | 'personalEmail'
+    | 'personalSectionSavedAt'
+    | 'formDraftSavedAt'
+    | 'onboardingStatus'
+  >,
+) => {
+  const response = await joinHttp.put('/join/form', data, joinAuth(accessToken));
+  return response.data as JoinFormDraft;
+};
+
+/** @deprecated use getJoinForm / saveJoinForm */
+export const getJoinPersonal = getJoinForm;
+export const saveJoinPersonal = saveJoinForm;
 
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {

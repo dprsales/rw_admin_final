@@ -33,8 +33,8 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Employee creation API | Partial | `EmployeesController` exposes create, list, and detail behind `@Roles('hr')`. The server assigns the employee code and Draft/Prejoining status. No status-change route, idempotency key, or audit event yet | HR can create and view a candidate through an authorized endpoint |
 | Admin frontend onboarding pages | Partial | Staff `/employees` creates and lists; public `/join` shows valid or refused. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
-| Candidate invitation/OTP | Partial | Invitation send + public `GET /join?token=` refusal are in place; OTP is not | Expiring, revocable, rate-limited, single-employee invitation flow with OTP |
-| Employee self-service | Not started | No employee onboarding route/form | Candidate can save, resume, validate, review and submit only their own record |
+| Candidate invitation/OTP | Complete foundation | Invite send, `/join` lookup, OTP send/verify, rate limits, and audit events are in place | Candidate session for the form is still outstanding |
+| Employee self-service | Partial | Join session + full draft form (personal, education, employment, bank) on `/join` | Documents, policies, review/submit |
 | Private documents | Not started | Existing public upload/CDN paths are unsuitable | Private storage, authenticated delivery, versioning, verification and access logging |
 | Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
 | HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
@@ -83,9 +83,10 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 - [x] Create a cryptographically random, expiring, revocable invitation tied to one employee. `POST /employees/:id/invitation` stores a SHA-256 of a 32-byte token, a 7-day expiry, and `revoked: false`. The raw token is only in the email. Public `GET /join?token=` opens and validates the link.
 - [x] Invalidate or supersede prior invitations according to the approved resend policy. A successful send revokes other active invitations for that employee and sets `onboardingStatus` to `Invited`. If the email fails, the new invitation is deleted and the previous one stays active.
 - [x] Refuse the invitation link when it is expired, revoked, or replaced. Public `GET /join?token=` and admin `/join` page.
-- [ ] Add candidate email verification/OTP with rate limiting and audit events.
-- [ ] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone.
-- [ ] Add saved drafts and section progress for personal/contact, family/emergency, education, previous employment and bank details.
+- [x] Add candidate email verification/OTP with rate limiting and audit events. `POST /join/otp`, `POST /join/verify`, Team RW email shell, onboarding audit rows.
+- [x] Add employee-only routes that resolve the employee from the verified session/invitation, never from a client-supplied employee ID alone. Join access token + `JoinAuthGuard` on form routes.
+- [x] Add saved drafts for personal/contact (including emergency contact), education, previous employment and bank details on `GET/PUT /join/form`.
+- [ ] Add review-before-submit and duplicate-submit protection for the full form.
 - [ ] Add server validation, review-before-submit, duplicate-submit protection and separate onboarding/employment states.
 
 ### 5. Documents, policies and submission
@@ -212,7 +213,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-The invitation link opens. `GET /join?token=` is public, hashes the token, and refuses missing, expired, and revoked invitations with one message. The admin `/join` page shows a valid greeting or a refusal. Next: candidate email verification/OTP with rate limiting and audit events.
+Full joining draft fields are in place on `GET/PUT /join/form` (personal extras, education, previous employment / fresher, bank). Next: private document uploads for the joining checklist.
 
 ## Product and company decisions to collect
 
@@ -269,6 +270,31 @@ The invitation link opens. `GET /join?token=` is public, hashes the token, and r
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-13 — Full joining draft fields
+
+- Completed: Expanded the candidate draft to personal extras (alternate phone, parents, marital status, blood group, nationality), multiple education rows, previous employment rows with fresher flag, and bank details. `GET/PUT /join/form` saves the full draft under the join session. Admin `/join` shows all sections with Save all details.
+- Files changed: employee schema, `dto/join-form.dto.ts`, onboarding service/spec, join controller; admin `Join.tsx` and join API helpers; checklist + daily update.
+- Verification performed: invitation + onboarding Jest passed. Backend and admin `tsc` passed.
+- Next item: Private document uploads.
+
+### 2026-11-13 — Candidate personal draft after OTP
+
+- Completed: After OTP, `verify` and `POST /join/session` issue a join access token (`purpose: employee_join`). `GET/PUT /join/form/personal` load and save personal/contact draft fields under `JoinAuthGuard`. Audit records `session_issued` and `form_personal_saved`. Admin `/join` shows the personal form after verify and resumes from the invite link.
+- Files changed: `merchandising_backend/src/employees/join-session.ts`, `join-auth.guard.ts`, `employees.onboarding.service.ts`, `employees.onboarding.spec.ts`, `dto/join-personal.dto.ts`, `join.controller.ts`, `employees.invitation.service.ts`, `employees.module.ts`, `schema/employee.schema.ts`, `schema/employee-onboarding-audit.schema.ts`; `rw_admin_final/src/Pages/Join/Join.tsx`, `src/api/services/index.ts`; checklist docs.
+- Verification performed: invitation + onboarding Jest suites passed. Backend `tsc --noEmit -p tsconfig.build.json` passed. Admin `tsc --noEmit` passed.
+- Screenshots/artifacts: None.
+- Decisions or blockers: Education, prior employment, and bank sections not started. No document upload yet.
+- Next item: Education / previous employment / bank draft sections.
+
+### 2026-11-11 — Verify the invited email with OTP
+
+- Completed: Public `POST /join/otp` sends a hashed 6-digit code to the invited address only. Public `POST /join/verify` accepts the code once. Resend is blocked for 60 seconds and after 5 sends. Wrong codes stop after 5 attempts. OTP and invitation emails use the shared Team RW email shell with logo. Audit rows record otp_sent, otp_verified, otp_failed, and otp_rate_limited. On success, onboarding status becomes In Progress. Admin `/join` lets the candidate send and enter the code.
+- Files changed: `merchandising_backend/src/employees/employees.invitation.service.ts`, `join.controller.ts`, `employees.module.ts`, `dto/join-otp.dto.ts`, `schema/employee-invitation.schema.ts`, `schema/employee-onboarding-audit.schema.ts`, `employees.invitation.spec.ts`; `rw_admin_final/src/Pages/Join/Join.tsx`, `src/api/services/index.ts`; docs checklist files.
+- Verification performed: `npx jest src/employees/employees.invitation.spec.ts --no-coverage` passed. Backend `tsc --noEmit -p tsconfig.build.json` passed. Admin `tsc --noEmit` passed.
+- Screenshots/artifacts: None.
+- Decisions or blockers: No durable candidate session cookie yet. Form work starts next.
+- Next item: Candidate self-service form sections with saved drafts.
 
 ### 2026-11-02 — Open the invitation link
 
