@@ -22,11 +22,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
+  getJoinDocuments,
   getJoinForm,
   requestJoinOtp,
   resolveInvitation,
   resumeJoinSession,
   saveJoinForm,
+  uploadJoinDocument,
   verifyJoinOtp,
   type JoinEducationRow,
   type JoinEmploymentRow,
@@ -36,7 +38,15 @@ import {
 
 const JOIN_TOKEN_KEY = 'join_access_token';
 
-const STEPS = ['Personal', 'Professional', 'Education', 'Work history', 'References', 'Bank'];
+const STEPS = [
+  'Personal',
+  'Professional',
+  'Education',
+  'Work history',
+  'References',
+  'Bank',
+  'Documents',
+];
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
 const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Prefer not to say'];
@@ -224,6 +234,15 @@ const Join: React.FC = () => {
     retry: false,
   });
 
+  const documentsQuery = useQuery({
+    queryKey: ['join-documents', accessToken],
+    queryFn: () => getJoinDocuments(accessToken),
+    enabled: Boolean(accessToken),
+    retry: false,
+  });
+
+  const [uploadingType, setUploadingType] = useState('');
+
   useEffect(() => {
     const draft = formQuery.data as JoinFormDraft | undefined;
     if (!draft) return;
@@ -296,6 +315,19 @@ const Join: React.FC = () => {
     },
   });
 
+  const uploadDocument = useMutation({
+    mutationFn: ({ documentType, file }: { documentType: string; file: File }) =>
+      uploadJoinDocument(accessToken, documentType, file),
+    onSuccess: (checklist) => {
+      setUploadingType('');
+      setStatusMessage(
+        `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`,
+      );
+      queryClient.setQueryData(['join-documents', accessToken], checklist);
+    },
+    onError: () => setUploadingType(''),
+  });
+
   const setField = (key: keyof typeof emptyForm, value: string | boolean) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -323,8 +355,15 @@ const Join: React.FC = () => {
     }));
   };
 
-  const actionError = sendOtp.error || verifyOtp.error || saveForm.error || formQuery.error;
+  const actionError =
+    sendOtp.error ||
+    verifyOtp.error ||
+    saveForm.error ||
+    formQuery.error ||
+    documentsQuery.error ||
+    uploadDocument.error;
   const showForm = Boolean(accessToken) && verified;
+  const isDocumentsStep = activeStep === STEPS.length - 1;
 
   const renderStep = () => {
     if (activeStep === 0) {
@@ -485,14 +524,85 @@ const Join: React.FC = () => {
       );
     }
 
+    if (activeStep === 5) {
+      return (
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} /></Grid>
+          <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} /></Grid>
+        </Grid>
+      );
+    }
+
+    const checklist = documentsQuery.data;
+    if (documentsQuery.isPending) {
+      return (
+        <Stack alignItems="center" py={2}>
+          <CircularProgress size={24} />
+        </Stack>
+      );
+    }
+
     return (
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} /></Grid>
-        <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} /></Grid>
-        <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} /></Grid>
-        <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} /></Grid>
-        <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} /></Grid>
-      </Grid>
+      <Stack spacing={2}>
+        <Typography variant="body2" color="text.secondary">
+          Upload PDF, JPG, or PNG files up to 5 MB. Files are stored privately and are not public links.
+        </Typography>
+        {checklist && (
+          <Typography variant="body2" fontWeight={600}>
+            {checklist.uploadedCount} of {checklist.requiredCount} required files uploaded
+          </Typography>
+        )}
+        {(checklist?.documents || []).map((doc) => {
+          const inputId = `join-doc-${doc.documentType}`;
+          const busy = uploadingType === doc.documentType && uploadDocument.isPending;
+          return (
+            <Paper key={doc.documentType} variant="outlined" sx={{ p: 2 }}>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1.5}
+                alignItems={{ sm: 'center' }}
+                justifyContent="space-between"
+              >
+                <Box>
+                  <Typography fontWeight={700}>{doc.label}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {doc.status === 'Missing'
+                      ? 'Not uploaded yet'
+                      : `${doc.status}${doc.originalFileName ? ` · ${doc.originalFileName}` : ''}${
+                          doc.version ? ` · v${doc.version}` : ''
+                        }`}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    disabled={busy || doc.status === 'Locked' || doc.status === 'Approved'}
+                  >
+                    {busy ? 'Uploading…' : doc.status === 'Missing' ? 'Upload' : 'Replace'}
+                    <input
+                      id={inputId}
+                      hidden
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = '';
+                        if (!file) return;
+                        setUploadingType(doc.documentType);
+                        uploadDocument.mutate({ documentType: doc.documentType, file });
+                      }}
+                    />
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Stack>
     );
   };
 
@@ -596,26 +706,27 @@ const Join: React.FC = () => {
                           Back
                         </Button>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                          <Button
-                            variant="contained"
-                            onClick={() => saveForm.mutate()}
-                            disabled={saveForm.isPending || !form.phone.trim()}
-                          >
-                            {saveForm.isPending ? 'Saving…' : 'Save draft'}
-                          </Button>
-                          {activeStep < STEPS.length - 1 ? (
-                            <Button variant="contained" color="secondary" onClick={() => setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))}>
-                              Next section
-                            </Button>
-                          ) : (
+                          {!isDocumentsStep && (
                             <Button
                               variant="contained"
-                              color="secondary"
                               onClick={() => saveForm.mutate()}
                               disabled={saveForm.isPending || !form.phone.trim()}
                             >
-                              {saveForm.isPending ? 'Saving…' : 'Save all details'}
+                              {saveForm.isPending ? 'Saving…' : 'Save draft'}
                             </Button>
+                          )}
+                          {activeStep < STEPS.length - 1 ? (
+                            <Button
+                              variant="contained"
+                              color="secondary"
+                              onClick={() => setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))}
+                            >
+                              Next section
+                            </Button>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                              Uploads save as soon as you choose a file.
+                            </Typography>
                           )}
                         </Stack>
                       </Stack>

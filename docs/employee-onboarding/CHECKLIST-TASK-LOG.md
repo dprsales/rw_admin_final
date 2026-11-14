@@ -9,7 +9,7 @@ Start to end. Do these in this order. The current task is the first step that is
 5. **Open the link** — Done. `GET /join?token=` hashes the token and refuses missing, expired, and revoked invitations. Public `/join` shows valid or refused.
 6. **Verify the email** — Done. Candidate requests a 6-digit code, verifies it on `/join`, with resend/attempt limits and audit events.
 7. **Candidate form** — Done for draft fields. Personal extras, education, previous employment, and bank save/resume on `/join`. Review-before-submit still outstanding.
-8. **Documents** — Current task. The candidate uploads the required files to private storage.
+8. **Documents** — Started. Fixed checklist, private disk storage, session-gated list/upload, and `/join` Documents step. HR download, approve/reject, and full version history still outstanding.
 9. **Policies and declaration** — The candidate acknowledges the policies that apply to them.
 10. **Submit** — The candidate reviews and submits once. A second submit does not create a second record.
 11. **HR review** — HR approves the file or sends it back with a reason.
@@ -17,8 +17,8 @@ Start to end. Do these in this order. The current task is the first step that is
 
 ## Current task
 
-**Title:** Documents
+**Title:** Documents (continue)
 
-- Private storage for required joining documents.
-- Upload, version, and employee-visible status.
-- Do not use public CDN paths.
+- Authenticated download for the candidate/HR.
+- Approve / reject / re-upload workflow.
+- Keep files off the public CDN (private disk path is in place for uploads).

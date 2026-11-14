@@ -540,6 +540,54 @@ export const saveJoinForm = async (
 export const getJoinPersonal = getJoinForm;
 export const saveJoinPersonal = saveJoinForm;
 
+export type JoinDocumentItem = {
+  documentType: string;
+  label: string;
+  required: boolean;
+  status: string;
+  version: number;
+  originalFileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string | null;
+};
+
+export type JoinDocumentsChecklist = {
+  documents: JoinDocumentItem[];
+  requiredCount: number;
+  uploadedCount: number;
+};
+
+export const getJoinDocuments = async (accessToken: string): Promise<JoinDocumentsChecklist> => {
+  const response = await joinHttp.get('/join/documents', joinAuth(accessToken));
+  return response.data;
+};
+
+export const uploadJoinDocument = async (
+  accessToken: string,
+  documentType: string,
+  file: File,
+): Promise<JoinDocumentsChecklist> => {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await joinHttp.post(`/join/documents/${documentType}`, body, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      // Let the browser set multipart boundary; do not force JSON.
+      'Content-Type': undefined as unknown as string,
+    },
+    transformRequest: [
+      (data, headers) => {
+        if (data instanceof FormData && headers) {
+          delete (headers as Record<string, unknown>)['Content-Type'];
+        }
+        return data;
+      },
+    ],
+  });
+  return response.data;
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');
