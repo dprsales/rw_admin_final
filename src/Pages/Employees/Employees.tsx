@@ -480,19 +480,24 @@ const Employees: React.FC = () => {
       </Box>
 
       <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
-        <TableContainer>
-          <Table size="small">
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: 1100 }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Employee ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Employee ID</TableCell>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Designation</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Joining date</TableCell>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Joining date</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Onboarding</TableCell>
-                <TableCell sx={{ fontWeight: 700 }} />
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: 280, pr: 3 }}
+                >
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -507,23 +512,55 @@ const Employees: React.FC = () => {
               ) : (
                 rows.map((employee) => (
                   <TableRow key={employee._id} hover>
-                    <TableCell>{employee.employeeCode}</TableCell>
-                    <TableCell>{`${employee.firstName} ${employee.lastName}`.trim()}</TableCell>
-                    <TableCell>{employee.personalEmail}</TableCell>
-                    <TableCell>{employee.phone}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.employeeCode}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 140 }}>
+                      {`${employee.firstName} ${employee.lastName}`.trim()}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 200 }}>{employee.personalEmail}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.phone}</TableCell>
                     <TableCell>{employee.designation}</TableCell>
                     <TableCell>{employee.department}</TableCell>
-                    <TableCell>{formatDate(employee.joiningDate)}</TableCell>
-                    <TableCell>{employee.onboardingStatus}</TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <Button size="small" onClick={() => setReviewEmployee(employee)}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(employee.joiningDate)}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.onboardingStatus}</TableCell>
+                    <TableCell align="right" sx={{ minWidth: 280, pr: 3, py: 1.5 }}>
+                      <Stack
+                        direction="row"
+                        spacing={1.5}
+                        justifyContent="flex-end"
+                        alignItems="center"
+                        flexWrap="nowrap"
+                      >
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setReviewEmployee(employee)}
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: 1.5,
+                            px: 1.5,
+                          }}
+                        >
                           Documents
                         </Button>
                         <Button
                           size="small"
+                          variant="contained"
                           disabled={inviteMutation.isPending}
                           onClick={() => inviteMutation.mutate(employee._id)}
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: 1.5,
+                            px: 1.5,
+                            bgcolor: '#0f63a5',
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: '#0b4f83', boxShadow: 'none' },
+                          }}
                         >
                           {inviteMutation.isPending && inviteMutation.variables === employee._id
                             ? 'Sending…'

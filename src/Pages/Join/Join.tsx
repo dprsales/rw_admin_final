@@ -1147,7 +1147,7 @@ const Join: React.FC = () => {
 
                       <Divider sx={{ borderColor: JOIN.border }} />
 
-                      <Box>
+                      <Box sx={{ pb: 1 }}>
                         <Typography variant="h6" sx={{ fontWeight: 800, color: JOIN.ink, mb: 0.5 }}>
                           {STEPS[activeStep]}
                         </Typography>
@@ -1157,37 +1157,38 @@ const Join: React.FC = () => {
                         {renderStep()}
                       </Box>
 
-                      <Paper
-                        elevation={0}
+                      <Divider sx={{ borderColor: JOIN.border, my: 0.5 }} />
+
+                      <Box
                         sx={{
-                          p: 2,
-                          borderRadius: 2,
-                          bgcolor: '#F8FBFE',
-                          border: `1px solid ${JOIN.border}`,
-                          position: 'sticky',
-                          bottom: 12,
-                          zIndex: 2,
+                          width: '100%',
+                          pt: 1,
+                          pb: 0.5,
                         }}
                       >
                         <Stack
                           direction={{ xs: 'column', sm: 'row' }}
                           spacing={1.5}
                           justifyContent="space-between"
-                          alignItems={{ sm: 'center' }}
+                          alignItems={{ xs: 'stretch', sm: 'center' }}
                         >
                           <Button
                             variant="outlined"
-                            sx={OutlineButtonSx}
+                            sx={{ ...OutlineButtonSx, width: { xs: '100%', sm: 'auto' } }}
                             disabled={activeStep === 0}
                             onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
                           >
                             Back
                           </Button>
-                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+                          <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            spacing={1.25}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
+                          >
                             {!isDocumentsStep && (
                               <Button
                                 variant="outlined"
-                                sx={OutlineButtonSx}
+                                sx={{ ...OutlineButtonSx, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() => saveForm.mutate()}
                                 disabled={saveForm.isPending || !form.phone.trim()}
                               >
@@ -1197,7 +1198,7 @@ const Join: React.FC = () => {
                             {activeStep < STEPS.length - 1 ? (
                               <Button
                                 variant="contained"
-                                sx={PrimaryButtonSx}
+                                sx={{ ...PrimaryButtonSx, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() =>
                                   setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))
                                 }
@@ -1205,18 +1206,21 @@ const Join: React.FC = () => {
                                 Next section
                               </Button>
                             ) : (
-                              <Typography variant="body2" sx={{ color: JOIN.muted, alignSelf: 'center' }}>
+                              <Typography
+                                variant="body2"
+                                sx={{ color: JOIN.muted, alignSelf: { sm: 'center' }, py: 1 }}
+                              >
                                 Uploads save as soon as you choose a file.
                               </Typography>
                             )}
                           </Stack>
                         </Stack>
                         {savedAt && (
-                          <Typography variant="caption" sx={{ color: JOIN.muted, display: 'block', mt: 1.25 }}>
+                          <Typography variant="caption" sx={{ color: JOIN.muted, display: 'block', mt: 1.5 }}>
                             Last saved {new Date(savedAt).toLocaleString()}
                           </Typography>
                         )}
-                      </Paper>
+                      </Box>
                     </Stack>
                   )}
                 </>
