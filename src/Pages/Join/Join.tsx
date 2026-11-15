@@ -10,10 +10,12 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControl,
   FormControlLabel,
   Grid,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -27,6 +29,8 @@ import {
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import VerifiedOutlinedIcon from '@mui/icons-material/VerifiedOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -48,6 +52,43 @@ import {
 
 const JOIN_TOKEN_KEY = 'join_access_token';
 
+/** Team RW join portal tokens (Swiss-minimal, brand blue). */
+const JOIN = {
+  primary: '#0F63A5',
+  primaryDark: '#0B4F83',
+  primarySoft: '#E8F2FA',
+  ink: '#0F172A',
+  muted: '#64748B',
+  border: '#D9E4EF',
+  bg: '#F5F8FC',
+  card: '#FFFFFF',
+  success: '#15803D',
+  warn: '#C2410C',
+};
+
+const fieldSx = {
+  '& .MuiOutlinedInput-root': {
+    bgcolor: '#fff',
+    borderRadius: 1.5,
+    transition: 'box-shadow 180ms ease, border-color 180ms ease',
+    '& fieldset': { borderColor: JOIN.border },
+    '&:hover fieldset': { borderColor: '#9BB8D1' },
+    '&.Mui-focused': {
+      boxShadow: `0 0 0 3px ${JOIN.primarySoft}`,
+    },
+    '&.Mui-focused fieldset': { borderColor: JOIN.primary, borderWidth: 1.5 },
+  },
+  '& .MuiInputLabel-root.Mui-focused': { color: JOIN.primary },
+};
+
+const cardSx = {
+  p: { xs: 2.5, md: 3 },
+  borderRadius: 2.5,
+  border: `1px solid ${JOIN.border}`,
+  boxShadow: '0 10px 30px rgba(15, 99, 165, 0.06)',
+  bgcolor: JOIN.card,
+};
+
 const STEPS = [
   'Personal',
   'Professional',
@@ -57,6 +98,16 @@ const STEPS = [
   'Bank',
   'Documents',
 ];
+
+const STEP_HELP: Record<string, string> = {
+  Personal: 'Your contact and family details for the joining record.',
+  Professional: 'Experience and ID numbers used for onboarding checks.',
+  Education: 'Add every relevant qualification, starting with the highest.',
+  'Work history': 'Previous employers, or mark yourself as a fresher.',
+  References: 'People who can confirm your background. Add at least two.',
+  Bank: 'Salary account details. Double-check IFSC and account number.',
+  Documents: 'Upload clear PDF or image files. Preview before you finish.',
+};
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
 const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Prefer not to say'];
@@ -176,7 +227,7 @@ const OptionSelect = ({
   options: string[];
   onChange: (value: string) => void;
 }) => (
-  <FormControl fullWidth size="small">
+  <FormControl fullWidth size="medium" sx={fieldSx}>
     <InputLabel id={`${label}-label`}>{label}</InputLabel>
     <Select
       labelId={`${label}-label`}
@@ -196,9 +247,63 @@ const OptionSelect = ({
   </FormControl>
 );
 
-const Field = (props: React.ComponentProps<typeof TextField>) => (
-  <TextField size="small" fullWidth {...props} />
+const Field = ({ sx, ...props }: React.ComponentProps<typeof TextField>) => (
+  <TextField
+    size="medium"
+    fullWidth
+    sx={[fieldSx, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])] as any}
+    {...props}
+  />
 );
+
+const RepeatCard = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <Paper
+    elevation={0}
+    sx={{
+      p: 2.25,
+      borderRadius: 2,
+      border: `1px solid ${JOIN.border}`,
+      bgcolor: '#FBFCFE',
+    }}
+  >
+    <Typography
+      variant="subtitle2"
+      sx={{ fontWeight: 700, color: JOIN.ink, mb: 1.75, letterSpacing: 0.2 }}
+    >
+      {title}
+    </Typography>
+    {children}
+  </Paper>
+);
+
+const PrimaryButtonSx = {
+  borderRadius: 1.5,
+  textTransform: 'none' as const,
+  fontWeight: 700,
+  px: 2.5,
+  py: 1.1,
+  bgcolor: JOIN.primary,
+  boxShadow: 'none',
+  transition: 'background-color 180ms ease, box-shadow 180ms ease',
+  '&:hover': { bgcolor: JOIN.primaryDark, boxShadow: '0 6px 16px rgba(15, 99, 165, 0.25)' },
+};
+
+const OutlineButtonSx = {
+  borderRadius: 1.5,
+  textTransform: 'none' as const,
+  fontWeight: 600,
+  px: 2.25,
+  py: 1.05,
+  borderColor: JOIN.border,
+  color: JOIN.ink,
+  '&:hover': { borderColor: JOIN.primary, bgcolor: JOIN.primarySoft },
+};
 
 const isImageMime = (mime: string) => mime.startsWith('image/');
 const isPdfMime = (mime: string) => mime === 'application/pdf' || mime.includes('pdf');
@@ -215,7 +320,8 @@ const DocumentPreviewCard = ({
   onUpload: (file: File) => void;
 }) => {
   const inputId = `join-doc-${doc.documentType}`;
-  const uploaded = doc.status !== 'Missing';
+  const hasFile = doc.status !== 'Missing';
+  const needsReupload = doc.status === 'Re-upload Required';
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewMime, setPreviewMime] = useState(doc.mimeType || '');
   const [previewError, setPreviewError] = useState('');
@@ -226,7 +332,7 @@ const DocumentPreviewCard = ({
     let cancelled = false;
     let objectUrl = '';
 
-    if (!uploaded || !accessToken) {
+    if (!hasFile || !accessToken) {
       setPreviewUrl('');
       setPreviewMime('');
       setPreviewError('');
@@ -259,12 +365,32 @@ const DocumentPreviewCard = ({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [accessToken, doc.documentType, doc.version, doc.status, doc.mimeType, uploaded]);
+  }, [accessToken, doc.documentType, doc.version, doc.status, doc.mimeType, hasFile]);
 
   const locked = doc.status === 'Locked' || doc.status === 'Approved';
+  const chipColor =
+    doc.status === 'Approved' || doc.status === 'Locked'
+      ? 'success'
+      : needsReupload
+        ? 'warning'
+        : hasFile
+          ? 'info'
+          : 'default';
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.25,
+        borderRadius: 2,
+        border: `1px solid ${needsReupload ? '#FDBA74' : JOIN.border}`,
+        bgcolor: needsReupload ? '#FFF7ED' : JOIN.card,
+        transition: 'border-color 180ms ease, box-shadow 180ms ease',
+        '&:hover': {
+          boxShadow: '0 8px 20px rgba(15, 99, 165, 0.08)',
+        },
+      }}
+    >
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'stretch' }}>
         <Box
           sx={{
@@ -272,8 +398,12 @@ const DocumentPreviewCard = ({
             minHeight: 104,
             borderRadius: 1.5,
             border: '1px dashed',
-            borderColor: uploaded ? 'success.light' : 'divider',
-            bgcolor: uploaded ? 'rgba(46, 125, 50, 0.04)' : 'grey.50',
+            borderColor: needsReupload ? 'warning.light' : hasFile ? 'success.light' : 'divider',
+            bgcolor: needsReupload
+              ? 'rgba(237, 108, 2, 0.06)'
+              : hasFile
+                ? 'rgba(46, 125, 50, 0.04)'
+                : 'grey.50',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -282,7 +412,7 @@ const DocumentPreviewCard = ({
           }}
           aria-busy={previewLoading}
         >
-          {!uploaded && (
+          {!hasFile && (
             <Stack alignItems="center" spacing={0.5} px={1} textAlign="center">
               <UploadFileOutlinedIcon color="disabled" aria-hidden="true" />
               <Typography variant="caption" color="text.secondary">
@@ -290,13 +420,13 @@ const DocumentPreviewCard = ({
               </Typography>
             </Stack>
           )}
-          {uploaded && previewLoading && <CircularProgress size={22} />}
-          {uploaded && !previewLoading && previewError && (
+          {hasFile && previewLoading && <CircularProgress size={22} />}
+          {hasFile && !previewLoading && previewError && (
             <Typography variant="caption" color="error" px={1} textAlign="center">
               {previewError}
             </Typography>
           )}
-          {uploaded && !previewLoading && previewUrl && isImageMime(previewMime) && (
+          {hasFile && !previewLoading && previewUrl && isImageMime(previewMime) && (
             <Box
               component="img"
               src={previewUrl}
@@ -304,7 +434,7 @@ const DocumentPreviewCard = ({
               sx={{ width: '100%', height: 104, objectFit: 'cover', display: 'block' }}
             />
           )}
-          {uploaded && !previewLoading && previewUrl && isPdfMime(previewMime) && (
+          {hasFile && !previewLoading && previewUrl && isPdfMime(previewMime) && (
             <Stack alignItems="center" spacing={0.5}>
               <PictureAsPdfOutlinedIcon color="error" aria-hidden="true" />
               <Typography variant="caption" color="text.secondary">
@@ -312,7 +442,7 @@ const DocumentPreviewCard = ({
               </Typography>
             </Stack>
           )}
-          {uploaded &&
+          {hasFile &&
             !previewLoading &&
             previewUrl &&
             !isImageMime(previewMime) &&
@@ -332,26 +462,46 @@ const DocumentPreviewCard = ({
               <Typography fontWeight={700}>{doc.label}</Typography>
               <Chip
                 size="small"
-                color={uploaded ? 'success' : 'default'}
-                label={uploaded ? doc.status : 'Missing'}
+                color={chipColor}
+                label={hasFile ? doc.status : 'Missing'}
                 role="status"
               />
             </Stack>
             <Typography variant="body2" color="text.secondary" mt={0.5}>
-              {uploaded
+              {hasFile
                 ? `${doc.originalFileName || 'Uploaded file'}${doc.version ? ` · v${doc.version}` : ''}`
                 : 'PDF, JPG, or PNG up to 5 MB'}
             </Typography>
+            {needsReupload && doc.rejectionReason && (
+              <Alert severity="warning" sx={{ mt: 1 }} role="alert">
+                Re-upload needed: {doc.rejectionReason}
+              </Alert>
+            )}
           </Box>
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {uploaded && previewUrl && (
-              <Button variant="outlined" onClick={() => setDialogOpen(true)} disabled={previewLoading}>
+            {hasFile && previewUrl && (
+              <Button
+                variant="outlined"
+                sx={OutlineButtonSx}
+                onClick={() => setDialogOpen(true)}
+                disabled={previewLoading}
+              >
                 Preview
               </Button>
             )}
-            <Button variant="contained" component="label" disabled={busy || locked}>
-              {busy ? 'Uploading…' : uploaded ? 'Replace' : 'Upload'}
+            <Button
+              variant="contained"
+              component="label"
+              disabled={busy || locked}
+              sx={{
+                ...PrimaryButtonSx,
+                ...(needsReupload
+                  ? { bgcolor: JOIN.warn, '&:hover': { bgcolor: '#9A3412' } }
+                  : {}),
+              }}
+            >
+              {busy ? 'Uploading…' : needsReupload ? 'Re-upload' : hasFile ? 'Replace' : 'Upload'}
               <input
                 id={inputId}
                 hidden
@@ -617,9 +767,8 @@ const Join: React.FC = () => {
       return (
         <Stack spacing={2}>
           {form.education.map((row, index) => (
-            <Paper key={`edu-${index}`} variant="outlined" sx={{ p: 2 }}>
+            <RepeatCard key={`edu-${index}`} title={`Qualification ${index + 1}`}>
               <Stack spacing={2}>
-                <Typography variant="subtitle2" fontWeight={700}>Qualification {index + 1}</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <OptionSelect
@@ -635,14 +784,14 @@ const Join: React.FC = () => {
                   <Grid item xs={12} sm={4}><Field label="Specialization" value={row.specialization} onChange={(e) => updateEducation(index, 'specialization', e.target.value)} /></Grid>
                 </Grid>
                 {form.education.length > 1 && (
-                  <Button color="inherit" onClick={() => setForm((c) => ({ ...c, education: c.education.filter((_, i) => i !== index) }))}>
+                  <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, education: c.education.filter((_, i) => i !== index) }))}>
                     Remove
                   </Button>
                 )}
               </Stack>
-            </Paper>
+            </RepeatCard>
           ))}
-          <Button variant="outlined" onClick={() => setForm((c) => ({ ...c, education: [...c.education, emptyEducation()] }))}>
+          <Button variant="outlined" sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, education: [...c.education, emptyEducation()] }))}>
             Add education
           </Button>
         </Stack>
@@ -659,9 +808,8 @@ const Join: React.FC = () => {
           {!form.isFresher && (
             <>
               {form.previousEmployment.map((row, index) => (
-                <Paper key={`emp-${index}`} variant="outlined" sx={{ p: 2 }}>
+                <RepeatCard key={`emp-${index}`} title={`Employer ${index + 1}`}>
                   <Stack spacing={2}>
-                    <Typography variant="subtitle2" fontWeight={700}>Employer {index + 1}</Typography>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}><Field label="Company name" value={row.companyName} onChange={(e) => updateEmployment(index, 'companyName', e.target.value)} /></Grid>
                       <Grid item xs={12} sm={6}><Field label="Designation" value={row.designation} onChange={(e) => updateEmployment(index, 'designation', e.target.value)} /></Grid>
@@ -673,14 +821,14 @@ const Join: React.FC = () => {
                       <Grid item xs={12} sm={6}><Field label="Manager / reference phone" value={row.referencePhone} onChange={(e) => updateEmployment(index, 'referencePhone', e.target.value)} /></Grid>
                     </Grid>
                     {form.previousEmployment.length > 1 && (
-                      <Button color="inherit" onClick={() => setForm((c) => ({ ...c, previousEmployment: c.previousEmployment.filter((_, i) => i !== index) }))}>
+                      <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, previousEmployment: c.previousEmployment.filter((_, i) => i !== index) }))}>
                         Remove
                       </Button>
                     )}
                   </Stack>
-                </Paper>
+                </RepeatCard>
               ))}
-              <Button variant="outlined" onClick={() => setForm((c) => ({ ...c, previousEmployment: [...c.previousEmployment, emptyEmployment()] }))}>
+              <Button variant="outlined" sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, previousEmployment: [...c.previousEmployment, emptyEmployment()] }))}>
                 Add employer
               </Button>
             </>
@@ -696,9 +844,8 @@ const Join: React.FC = () => {
             Add at least two people who can confirm your background.
           </Typography>
           {form.references.map((row, index) => (
-            <Paper key={`ref-${index}`} variant="outlined" sx={{ p: 2 }}>
+            <RepeatCard key={`ref-${index}`} title={`Reference ${index + 1}`}>
               <Stack spacing={2}>
-                <Typography variant="subtitle2" fontWeight={700}>Reference {index + 1}</Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}><Field label="Full name" value={row.name} onChange={(e) => updateReference(index, 'name', e.target.value)} /></Grid>
                   <Grid item xs={12} sm={6}>
@@ -717,14 +864,14 @@ const Join: React.FC = () => {
                   <Grid item xs={12} sm={4}><Field label="Years known" value={row.yearsKnown} onChange={(e) => updateReference(index, 'yearsKnown', e.target.value)} inputProps={{ inputMode: 'numeric' }} /></Grid>
                 </Grid>
                 {form.references.length > 1 && (
-                  <Button color="inherit" onClick={() => setForm((c) => ({ ...c, references: c.references.filter((_, i) => i !== index) }))}>
+                  <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, references: c.references.filter((_, i) => i !== index) }))}>
                     Remove
                   </Button>
                 )}
               </Stack>
-            </Paper>
+            </RepeatCard>
           ))}
-          <Button variant="outlined" onClick={() => setForm((c) => ({ ...c, references: [...c.references, emptyReference()] }))}>
+          <Button variant="outlined" sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, references: [...c.references, emptyReference()] }))}>
             Add reference
           </Button>
         </Stack>
@@ -782,144 +929,306 @@ const Join: React.FC = () => {
     );
   };
 
-  return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f4f7fb', px: { xs: 2, md: 5 }, py: { xs: 4, md: 8 } }}>
-      <Box sx={{ maxWidth: 860, mx: 'auto' }}>
-        <Typography variant="h4" fontWeight={700} sx={{ color: '#0f63a5' }} mb={0.5}>
-          Team RW
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          Employee joining invitation
-        </Typography>
+  const progressValue = ((activeStep + 1) / STEPS.length) * 100;
 
-        <Paper sx={{ p: { xs: 2.5, md: 4 } }}>
-          {!token && <Alert severity="error">This invitation link cannot be used.</Alert>}
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: JOIN.bg,
+        backgroundImage:
+          'radial-gradient(ellipse at top, rgba(15, 99, 165, 0.10), transparent 55%), linear-gradient(180deg, #EEF4FA 0%, #F5F8FC 40%, #F8FAFC 100%)',
+        px: { xs: 1.5, md: 4 },
+        py: { xs: 3, md: 6 },
+      }}
+    >
+      <Box sx={{ maxWidth: 920, mx: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          justifyContent="space-between"
+          mb={2.5}
+          flexWrap="wrap"
+          useFlexGap
+        >
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                color: JOIN.primary,
+                letterSpacing: '-0.02em',
+                textWrap: 'balance',
+                lineHeight: 1.15,
+              }}
+            >
+              Team RW
+            </Typography>
+            <Typography variant="body2" sx={{ color: JOIN.muted, mt: 0.4 }}>
+              Secure employee joining portal
+            </Typography>
+          </Box>
+          <Chip
+            icon={<LockOutlinedIcon sx={{ fontSize: 16 }} />}
+            label="Private invitation"
+            sx={{
+              bgcolor: JOIN.primarySoft,
+              color: JOIN.primaryDark,
+              fontWeight: 600,
+              borderRadius: 2,
+            }}
+          />
+        </Stack>
+
+        <Paper elevation={0} sx={cardSx}>
+          {!token && (
+            <Alert severity="error" sx={{ borderRadius: 2 }}>
+              This invitation link cannot be used.
+            </Alert>
+          )}
 
           {token && isPending && (
-            <Stack alignItems="center" spacing={2} py={2}>
-              <CircularProgress size={28} />
-              <Typography color="text.secondary">Checking your invitation…</Typography>
+            <Stack alignItems="center" spacing={2} py={4}>
+              <CircularProgress size={28} sx={{ color: JOIN.primary }} />
+              <Typography sx={{ color: JOIN.muted }}>Checking your invitation…</Typography>
             </Stack>
           )}
 
           {token && !isPending && data?.valid && (
-            <Stack spacing={2.5}>
-              <Typography variant="h5" fontWeight={700}>
-                Hello, {data.firstName}
-              </Typography>
+            <Stack spacing={3}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: JOIN.ink, letterSpacing: '-0.01em' }}>
+                  Hello, {data.firstName}
+                </Typography>
+                <Typography variant="body2" sx={{ color: JOIN.muted, mt: 0.75, maxWidth: 62 * 8 }}>
+                  Complete each section carefully. You can save a draft and return with the same
+                  invitation link.
+                </Typography>
+              </Box>
 
               {!showForm && verified && (
-                <Stack alignItems="center" spacing={2} py={2}>
-                  <CircularProgress size={28} />
-                  <Typography color="text.secondary">Opening your joining form…</Typography>
+                <Stack alignItems="center" spacing={2} py={3}>
+                  <CircularProgress size={28} sx={{ color: JOIN.primary }} />
+                  <Typography sx={{ color: JOIN.muted }}>Opening your joining form…</Typography>
                 </Stack>
               )}
 
               {!showForm && !verified && (
-                <>
-                  <Typography color="text.secondary">
-                    We will send a one-time code to {data.maskedEmail}. Enter that code to confirm
-                    this invitation is yours.
-                  </Typography>
-                  <Button variant="contained" onClick={() => sendOtp.mutate()} disabled={sendOtp.isPending}>
-                    {sendOtp.isPending ? 'Sending…' : otpSent ? 'Resend code' : 'Send verification code'}
-                  </Button>
-                  {(otpSent || statusMessage) && (
-                    <Field
-                      label="6-digit code"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      inputProps={{ inputMode: 'numeric', maxLength: 6 }}
-                    />
-                  )}
-                  {(otpSent || statusMessage) && (
-                    <Button
-                      variant="outlined"
-                      onClick={() => verifyOtp.mutate()}
-                      disabled={verifyOtp.isPending || code.trim().length !== 6}
-                    >
-                      {verifyOtp.isPending ? 'Checking…' : 'Verify email'}
-                    </Button>
-                  )}
-                </>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: { xs: 2.5, md: 3 },
+                    borderRadius: 2,
+                    bgcolor: JOIN.primarySoft,
+                    border: `1px solid ${JOIN.border}`,
+                  }}
+                >
+                  <Stack spacing={2.25}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <VerifiedOutlinedIcon sx={{ color: JOIN.primary }} aria-hidden="true" />
+                      <Typography fontWeight={700} color={JOIN.ink}>
+                        Verify your email
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" sx={{ color: JOIN.muted }}>
+                      We will send a one-time code to {data.maskedEmail}. Enter that code to confirm
+                      this invitation is yours.
+                    </Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                      <Button
+                        variant="contained"
+                        sx={PrimaryButtonSx}
+                        onClick={() => sendOtp.mutate()}
+                        disabled={sendOtp.isPending}
+                      >
+                        {sendOtp.isPending ? 'Sending…' : otpSent ? 'Resend code' : 'Send verification code'}
+                      </Button>
+                    </Stack>
+                    {(otpSent || statusMessage) && (
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'flex-start' }}>
+                        <Field
+                          label="6-digit code"
+                          value={code}
+                          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          inputProps={{ inputMode: 'numeric', maxLength: 6, 'aria-label': '6-digit verification code' }}
+                          sx={{ ...fieldSx, maxWidth: { sm: 220 } }}
+                        />
+                        <Button
+                          variant="outlined"
+                          sx={{ ...OutlineButtonSx, mt: { sm: 0.5 } }}
+                          onClick={() => verifyOtp.mutate()}
+                          disabled={verifyOtp.isPending || code.trim().length !== 6}
+                        >
+                          {verifyOtp.isPending ? 'Checking…' : 'Verify email'}
+                        </Button>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Paper>
               )}
 
               {showForm && (
                 <>
-                  <Alert severity="success">
-                    Email verified. Use the steps below. Save when ready. You can return with the same
-                    link.
+                  <Alert
+                    icon={<VerifiedOutlinedIcon fontSize="inherit" />}
+                    severity="success"
+                    sx={{ borderRadius: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}
+                  >
+                    Email verified. Progress through the sections below. Save whenever you need a
+                    break.
                   </Alert>
 
                   {formQuery.isPending ? (
-                    <Stack alignItems="center" py={2}>
-                      <CircularProgress size={24} />
+                    <Stack alignItems="center" py={3}>
+                      <CircularProgress size={24} sx={{ color: JOIN.primary }} />
                     </Stack>
                   ) : (
                     <Stack spacing={3}>
-                      <Stepper activeStep={activeStep} alternativeLabel sx={{ display: { xs: 'none', md: 'flex' } }}>
-                        {STEPS.map((label) => (
-                          <Step key={label}><StepLabel>{label}</StepLabel></Step>
-                        ))}
-                      </Stepper>
-                      <Typography variant="subtitle1" fontWeight={700} sx={{ display: { md: 'none' } }}>
-                        Step {activeStep + 1} of {STEPS.length}: {STEPS[activeStep]}
-                      </Typography>
+                      <Box>
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mb={1}
+                        >
+                          <Typography variant="caption" sx={{ color: JOIN.muted, fontWeight: 600 }}>
+                            Step {activeStep + 1} of {STEPS.length}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: JOIN.primary, fontWeight: 700 }}>
+                            {Math.round(progressValue)}% complete
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant="determinate"
+                          value={progressValue}
+                          aria-label="Joining form progress"
+                          sx={{
+                            height: 8,
+                            borderRadius: 999,
+                            bgcolor: JOIN.primarySoft,
+                            mb: 2,
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 999,
+                              bgcolor: JOIN.primary,
+                            },
+                          }}
+                        />
+                        <Stepper
+                          activeStep={activeStep}
+                          alternativeLabel
+                          sx={{
+                            display: { xs: 'none', md: 'flex' },
+                            '& .MuiStepIcon-root.Mui-active, & .MuiStepIcon-root.Mui-completed': {
+                              color: JOIN.primary,
+                            },
+                            '& .MuiStepLabel-label': {
+                              typography: 'caption',
+                              fontWeight: 600,
+                              color: JOIN.muted,
+                            },
+                            '& .MuiStepLabel-label.Mui-active': { color: JOIN.ink },
+                          }}
+                        >
+                          {STEPS.map((label) => (
+                            <Step key={label}>
+                              <StepLabel>{label}</StepLabel>
+                            </Step>
+                          ))}
+                        </Stepper>
+                        <Typography
+                          variant="subtitle1"
+                          fontWeight={700}
+                          sx={{ display: { md: 'none' }, color: JOIN.ink }}
+                        >
+                          {STEPS[activeStep]}
+                        </Typography>
+                      </Box>
+
+                      <Divider sx={{ borderColor: JOIN.border }} />
 
                       <Box>
-                        <Typography variant="h6" fontWeight={700} mb={2}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: JOIN.ink, mb: 0.5 }}>
                           {STEPS[activeStep]}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: JOIN.muted, mb: 2.5 }}>
+                          {STEP_HELP[STEPS[activeStep]]}
                         </Typography>
                         {renderStep()}
                       </Box>
 
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between">
-                        <Button
-                          variant="outlined"
-                          disabled={activeStep === 0}
-                          onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: '#F8FBFE',
+                          border: `1px solid ${JOIN.border}`,
+                          position: 'sticky',
+                          bottom: 12,
+                          zIndex: 2,
+                        }}
+                      >
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={1.5}
+                          justifyContent="space-between"
+                          alignItems={{ sm: 'center' }}
                         >
-                          Back
-                        </Button>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                          {!isDocumentsStep && (
-                            <Button
-                              variant="contained"
-                              onClick={() => saveForm.mutate()}
-                              disabled={saveForm.isPending || !form.phone.trim()}
-                            >
-                              {saveForm.isPending ? 'Saving…' : 'Save draft'}
-                            </Button>
-                          )}
-                          {activeStep < STEPS.length - 1 ? (
-                            <Button
-                              variant="contained"
-                              color="secondary"
-                              onClick={() => setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))}
-                            >
-                              Next section
-                            </Button>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                              Uploads save as soon as you choose a file.
-                            </Typography>
-                          )}
+                          <Button
+                            variant="outlined"
+                            sx={OutlineButtonSx}
+                            disabled={activeStep === 0}
+                            onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
+                          >
+                            Back
+                          </Button>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+                            {!isDocumentsStep && (
+                              <Button
+                                variant="outlined"
+                                sx={OutlineButtonSx}
+                                onClick={() => saveForm.mutate()}
+                                disabled={saveForm.isPending || !form.phone.trim()}
+                              >
+                                {saveForm.isPending ? 'Saving…' : 'Save draft'}
+                              </Button>
+                            )}
+                            {activeStep < STEPS.length - 1 ? (
+                              <Button
+                                variant="contained"
+                                sx={PrimaryButtonSx}
+                                onClick={() =>
+                                  setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))
+                                }
+                              >
+                                Next section
+                              </Button>
+                            ) : (
+                              <Typography variant="body2" sx={{ color: JOIN.muted, alignSelf: 'center' }}>
+                                Uploads save as soon as you choose a file.
+                              </Typography>
+                            )}
+                          </Stack>
                         </Stack>
-                      </Stack>
-
-                      {savedAt && (
-                        <Typography variant="caption" color="text.secondary">
-                          Last saved {new Date(savedAt).toLocaleString()}
-                        </Typography>
-                      )}
+                        {savedAt && (
+                          <Typography variant="caption" sx={{ color: JOIN.muted, display: 'block', mt: 1.25 }}>
+                            Last saved {new Date(savedAt).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Paper>
                     </Stack>
                   )}
                 </>
               )}
 
-              {statusMessage && <Alert severity="info">{statusMessage}</Alert>}
+              {statusMessage && (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  {statusMessage}
+                </Alert>
+              )}
               {actionError && (
-                <Alert severity="error" role="alert">
+                <Alert severity="error" role="alert" sx={{ borderRadius: 2 }}>
                   {errorMessage(actionError)}
                 </Alert>
               )}
@@ -927,7 +1236,9 @@ const Join: React.FC = () => {
           )}
 
           {token && !isPending && refused && (
-            <Alert severity="error">This invitation link cannot be used.</Alert>
+            <Alert severity="error" sx={{ borderRadius: 2 }}>
+              This invitation link cannot be used.
+            </Alert>
           )}
         </Paper>
       </Box>

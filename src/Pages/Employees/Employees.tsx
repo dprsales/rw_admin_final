@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -21,9 +22,22 @@ import {
   Typography,
 } from '@mui/material';
 import { PersonAddAlt1 } from '@mui/icons-material';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { createEmployee, getEmployees, sendEmployeeInvitation, type CreateEmployeeInput, type EmployeeRecord } from '../../api/services';
+import {
+  approveEmployeeDocument,
+  createEmployee,
+  fetchEmployeeDocumentBlob,
+  getEmployeeDocuments,
+  getEmployees,
+  rejectEmployeeDocument,
+  sendEmployeeInvitation,
+  type CreateEmployeeInput,
+  type EmployeeRecord,
+  type JoinDocumentItem,
+  type JoinDocumentsChecklist,
+} from '../../api/services';
 
 const EMPTY_FORM: CreateEmployeeInput = {
   firstName: '',
@@ -74,10 +88,289 @@ const fields: { key: keyof CreateEmployeeInput; label: string; type?: string }[]
   { key: 'joiningDate', label: 'Joining date', type: 'date' },
 ];
 
+const isImageMime = (mime: string) => mime.startsWith('image/');
+const isPdfMime = (mime: string) => mime === 'application/pdf' || mime.includes('pdf');
+
+const statusChipColor = (status: string): 'default' | 'success' | 'warning' | 'info' | 'error' => {
+  if (status === 'Approved' || status === 'Locked') return 'success';
+  if (status === 'Re-upload Required') return 'warning';
+  if (status === 'Missing') return 'default';
+  return 'info';
+};
+
+const HrDocumentRow = ({
+  employeeId,
+  doc,
+  onChanged,
+}: {
+  employeeId: string;
+  doc: JoinDocumentItem;
+  onChanged: (checklist: JoinDocumentsChecklist) => void;
+}) => {
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewMime, setPreviewMime] = useState(doc.mimeType || '');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const hasFile = doc.status !== 'Missing';
+  const canReview =
+    hasFile &&
+    doc.status !== 'Approved' &&
+    doc.status !== 'Locked' &&
+    doc.status !== 'Re-upload Required';
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = '';
+    if (!hasFile) {
+      setPreviewUrl('');
+      return undefined;
+    }
+    fetchEmployeeDocumentBlob(employeeId, doc.documentType)
+      .then(({ blob, mimeType }) => {
+        const url = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setPreviewUrl(url);
+        setPreviewMime(mimeType || doc.mimeType || blob.type || '');
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewUrl('');
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [employeeId, doc.documentType, doc.version, doc.status, doc.mimeType, hasFile]);
+
+  const approveMutation = useMutation({
+    mutationFn: () => approveEmployeeDocument(employeeId, doc.documentType),
+    onSuccess: (checklist) => {
+      toast.success(`${doc.label} approved`);
+      onChanged(checklist);
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: () => rejectEmployeeDocument(employeeId, doc.documentType, reason.trim()),
+    onSuccess: (checklist) => {
+      toast.success(`${doc.label} sent back for re-upload`);
+      setRejectOpen(false);
+      setReason('');
+      onChanged(checklist);
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+        <Box
+          sx={{
+            width: { xs: '100%', md: 120 },
+            minHeight: 96,
+            borderRadius: 1.5,
+            border: '1px dashed',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            flexShrink: 0,
+            bgcolor: 'grey.50',
+          }}
+        >
+          {!hasFile && (
+            <Typography variant="caption" color="text.secondary">
+              Missing
+            </Typography>
+          )}
+          {hasFile && previewUrl && isImageMime(previewMime) && (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt={`${doc.label} preview`}
+              sx={{ width: '100%', height: 96, objectFit: 'cover' }}
+            />
+          )}
+          {hasFile && previewUrl && isPdfMime(previewMime) && (
+            <PictureAsPdfOutlinedIcon color="error" aria-hidden="true" />
+          )}
+          {hasFile && !previewUrl && <CircularProgress size={20} />}
+        </Box>
+
+        <Stack spacing={1} flex={1}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Typography fontWeight={700}>{doc.label}</Typography>
+            <Chip size="small" color={statusChipColor(doc.status)} label={doc.status} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            {hasFile
+              ? `${doc.originalFileName || 'File'}${doc.version ? ` · v${doc.version}` : ''}`
+              : 'Candidate has not uploaded this file yet'}
+          </Typography>
+          {doc.rejectionReason && (
+            <Alert severity="warning">Last rejection: {doc.rejectionReason}</Alert>
+          )}
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {hasFile && previewUrl && (
+              <Button size="small" variant="outlined" onClick={() => setPreviewOpen(true)}>
+                Open
+              </Button>
+            )}
+            {canReview && (
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                disabled={approveMutation.isPending}
+                onClick={() => approveMutation.mutate()}
+              >
+                {approveMutation.isPending ? 'Saving…' : 'Approve'}
+              </Button>
+            )}
+            {canReview && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                onClick={() => setRejectOpen(true)}
+              >
+                Reject
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Stack>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{doc.label}</DialogTitle>
+        <DialogContent dividers>
+          {previewUrl && isImageMime(previewMime) && (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt={`${doc.label} full preview`}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', display: 'block', mx: 'auto' }}
+            />
+          )}
+          {previewUrl && isPdfMime(previewMime) && (
+            <Box
+              component="iframe"
+              title={`${doc.label} PDF`}
+              src={previewUrl}
+              sx={{ width: '100%', height: '70vh', border: 0 }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Reject {doc.label}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Reason for the candidate"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            helperText="Explain what to fix. The candidate will see this on the joining form."
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectOpen(false)} disabled={rejectMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={rejectMutation.isPending || reason.trim().length < 3}
+            onClick={() => rejectMutation.mutate()}
+          >
+            {rejectMutation.isPending ? 'Saving…' : 'Send for re-upload'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Paper>
+  );
+};
+
+const DocumentReviewDialog = ({
+  employee,
+  open,
+  onClose,
+}: {
+  employee: EmployeeRecord | null;
+  open: boolean;
+  onClose: () => void;
+}) => {
+  const queryClient = useQueryClient();
+  const employeeId = employee?._id || '';
+
+  const docsQuery = useQuery({
+    queryKey: ['employee-documents', employeeId],
+    queryFn: () => getEmployeeDocuments(employeeId),
+    enabled: open && Boolean(employeeId),
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle>
+        Documents
+        {employee ? ` · ${employee.firstName} ${employee.lastName}` : ''}
+      </DialogTitle>
+      <Divider />
+      <DialogContent>
+        {docsQuery.isPending && (
+          <Stack alignItems="center" py={4}>
+            <CircularProgress size={28} />
+          </Stack>
+        )}
+        {docsQuery.error && (
+          <Alert severity="error">{errorMessage(docsQuery.error)}</Alert>
+        )}
+        {docsQuery.data && (
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
+              {docsQuery.data.uploadedCount} ready for review · {docsQuery.data.approvedCount ?? 0}{' '}
+              approved · {docsQuery.data.requiredCount} required
+            </Typography>
+            {docsQuery.data.documents.map((doc) => (
+              <HrDocumentRow
+                key={`${doc.documentType}-${doc.version}-${doc.status}`}
+                employeeId={employeeId}
+                doc={doc}
+                onChanged={(checklist) => {
+                  queryClient.setQueryData(['employee-documents', employeeId], checklist);
+                  queryClient.invalidateQueries({ queryKey: ['employees'] });
+                }}
+              />
+            ))}
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const Employees: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [reviewEmployee, setReviewEmployee] = useState<EmployeeRecord | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isPending, error, refetch } = useQuery<EmployeeRecord[], Error>({
@@ -166,7 +459,7 @@ const Employees: React.FC = () => {
             Employees
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Create a draft employee record. The employee ID is assigned by the server.
+            Create a draft employee record. Review uploaded joining documents from each row.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -223,15 +516,20 @@ const Employees: React.FC = () => {
                     <TableCell>{formatDate(employee.joiningDate)}</TableCell>
                     <TableCell>{employee.onboardingStatus}</TableCell>
                     <TableCell>
-                      <Button
-                        size="small"
-                        disabled={inviteMutation.isPending}
-                        onClick={() => inviteMutation.mutate(employee._id)}
-                      >
-                        {inviteMutation.isPending && inviteMutation.variables === employee._id
-                          ? 'Sending…'
-                          : 'Send invitation'}
-                      </Button>
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button size="small" onClick={() => setReviewEmployee(employee)}>
+                          Documents
+                        </Button>
+                        <Button
+                          size="small"
+                          disabled={inviteMutation.isPending}
+                          onClick={() => inviteMutation.mutate(employee._id)}
+                        >
+                          {inviteMutation.isPending && inviteMutation.variables === employee._id
+                            ? 'Sending…'
+                            : 'Send invitation'}
+                        </Button>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))
@@ -270,6 +568,12 @@ const Employees: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <DocumentReviewDialog
+        employee={reviewEmployee}
+        open={Boolean(reviewEmployee)}
+        onClose={() => setReviewEmployee(null)}
+      />
     </Box>
   );
 };

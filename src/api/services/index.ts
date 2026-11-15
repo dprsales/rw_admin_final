@@ -392,6 +392,43 @@ export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
 };
 
+export const getEmployeeDocuments = async (
+  employeeId: string,
+): Promise<JoinDocumentsChecklist> => {
+  const response = await http.get(`/employees/${employeeId}/documents`);
+  return response.data;
+};
+
+export const fetchEmployeeDocumentBlob = async (
+  employeeId: string,
+  documentType: string,
+): Promise<{ blob: Blob; mimeType: string }> => {
+  const response = await http.get(`/employees/${employeeId}/documents/${documentType}/file`, {
+    responseType: 'blob',
+  });
+  const mimeType =
+    (response.headers['content-type'] as string) ||
+    response.data.type ||
+    'application/octet-stream';
+  return { blob: response.data as Blob, mimeType };
+};
+
+export const approveEmployeeDocument = async (employeeId: string, documentType: string) => {
+  const response = await http.post(`/employees/${employeeId}/documents/${documentType}/approve`);
+  return response.data as JoinDocumentsChecklist;
+};
+
+export const rejectEmployeeDocument = async (
+  employeeId: string,
+  documentType: string,
+  reason: string,
+) => {
+  const response = await http.post(`/employees/${employeeId}/documents/${documentType}/reject`, {
+    reason,
+  });
+  return response.data as JoinDocumentsChecklist;
+};
+
 export interface InvitationLookup {
   valid: true;
   firstName: string;
@@ -550,12 +587,15 @@ export type JoinDocumentItem = {
   mimeType: string;
   sizeBytes: number;
   uploadedAt: string | null;
+  rejectionReason?: string;
+  reviewedAt?: string | null;
 };
 
 export type JoinDocumentsChecklist = {
   documents: JoinDocumentItem[];
   requiredCount: number;
   uploadedCount: number;
+  approvedCount?: number;
 };
 
 export const getJoinDocuments = async (accessToken: string): Promise<JoinDocumentsChecklist> => {

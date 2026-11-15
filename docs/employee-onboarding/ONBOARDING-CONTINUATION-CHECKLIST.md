@@ -35,7 +35,7 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
 | Candidate invitation/OTP | Complete foundation | Invite send, `/join` lookup, OTP send/verify, rate limits, and audit events are in place | Candidate session for the form is still outstanding |
 | Employee self-service | Partial | Join session + full draft form and Documents step on `/join` | Policies, review/submit |
-| Private documents | Partial foundation | Local private folder + `GET/POST /join/documents`; CDN URLs are not returned | Authenticated download, HR verification, full version retention and access logging |
+| Private documents | Partial foundation | Candidate upload/preview + HR list/open/approve/reject; private disk only | Full version archive and broader HR queues still outstanding |
 | Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
 | HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
 | Joining Form PDF | Not started | No PDF module | Server-generated, versioned HR/employee copies stored privately |
@@ -94,8 +94,9 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 - [x] Approve a first fixed document checklist with PDF/JPG/PNG and 5 MB limit (HR can later replace with config).
 - [x] Implement private storage separate from public `/uploads` and public CDN assets (`private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR`).
 - [x] Validate file type/size, generate server-side storage names, store version number, and never return storage keys to the browser.
-- [x] Implement authenticated candidate file preview/delivery via `GET /join/documents/:type/file` (HR staff download still outstanding).
-- [ ] Implement Pending, Approved, Re-upload Required and Locked document states with reviewer/reason metadata (Uploaded/Missing/Locked checks exist for replace).
+- [x] Implement authenticated candidate file preview/delivery via `GET /join/documents/:type/file`.
+- [x] Implement HR open/download via `GET /employees/:id/documents/:type/file` plus approve/reject with reason.
+- [x] Implement Pending Review, Approved, Re-upload Required and Locked checks with rejection reason metadata.
 - [ ] Add policy versions, applicability and acknowledgement timestamps.
 - [ ] Add final declaration, submission snapshot and correction/reopen flow.
 
@@ -270,6 +271,13 @@ Full joining draft fields are in place on `GET/PUT /join/form` (personal extras,
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-15 — Joining document review (HR approve / reject)
+
+- Completed: HR `GET /employees/:id/documents`, private file open, approve, and reject-with-reason. Candidate sees Re-upload Required + reason and can re-upload; Approved blocks replace. Audits for hr view, approve, reject, reupload. Employees page Documents dialog with preview/actions.
+- Files changed: documents service/controller/DTO/schema/audit/spec; admin `Employees.tsx`, `Join.tsx`, API helpers; checklist + daily update.
+- Verification performed: documents Jest suite; admin/backend typecheck.
+- Next item: Policies and declaration.
 
 ### 2026-11-14 — Joining documents checklist (start)
 
