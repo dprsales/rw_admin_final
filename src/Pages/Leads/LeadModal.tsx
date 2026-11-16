@@ -398,7 +398,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {lead.email}
                 {lead.phoneNumber ? ` · ${lead.phoneNumber}` : ''}
-              </Typography>
+            </Typography>
             </Box>
             <IconButton aria-label="Close lead details" onClick={handleClose} size="small">
               <CloseIcon fontSize="small" />
@@ -469,9 +469,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
               )}
               {callInfo && !callError && (
                 <Alert severity="success" sx={{ py: 0 }}>{callInfo}</Alert>
-              )}
-            </Box>
-          )}
+            )}
+          </Box>
+        )}
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
@@ -634,9 +634,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Add what you did on this lead. It shows here with date and time.
-                    </Typography>
-                  </Box>
-                )}
+            </Typography>
+          </Box>
+        )}
 
                 {notes.length > 0 && (
                   <Box sx={{ position: 'relative', pl: 0.5 }}>
@@ -698,7 +698,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                               <Typography variant="caption" color="text.secondary" title={when.full}>
                                 {when.date}
                                 {when.time ? ` · ${when.time}` : ''}
-                              </Typography>
+        </Typography>
                               {canManage && !isEditing && (
                                 <Box sx={{ ml: 'auto', display: 'flex', gap: 0.25 }}>
                                   <IconButton
@@ -778,7 +778,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                   sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}
                                 >
                                   {item.note}
-                                </Typography>
+        </Typography>
                               )}
                             </Box>
                           </Box>
