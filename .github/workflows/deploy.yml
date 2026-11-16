@@ -45,21 +45,37 @@ jobs:
           printf '%s\n' "$HOSTINGER_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy-key
           chmod 600 ~/.ssh/deploy-key
           ssh-keygen -y -f ~/.ssh/deploy-key > /dev/null && echo "Key format OK"
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          # Hostinger shared SSH often drops GitHub runners on the first scan.
+          # Do not fail the job here — Verify SSH below is the real check.
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          for i in 1 2 3 4 5; do
+            echo "ssh-keyscan attempt $i"
+            if ssh-keyscan -T 30 -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err; then
+              echo "Host key saved"
+              break
+            fi
+            cat /tmp/keyscan.err || true
+            sleep 8
+          done
         env:
           HOSTINGER_SSH_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
 
       - name: Verify SSH connection
         run: |
-          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'echo "SSH connection works"'
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'echo "SSH connection works"'
 
       - name: Upload build to Hostinger
         run: |
-          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $REMOTE_DIR"
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $REMOTE_DIR"
           # dist/. includes .htaccess; dist/* would skip that hidden file.
-          scp -i ~/.ssh/deploy-key -P "$SSH_PORT" -r dist/. "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
+          scp -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            -i ~/.ssh/deploy-key -P "$SSH_PORT" -r dist/. "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
 
       - name: Fix file permissions
         run: |
-          ssh -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            -i ~/.ssh/deploy-key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
             "cd $REMOTE_DIR && find . -type d -exec chmod 755 {} \; && find . -type f -exec chmod 644 {} \;"

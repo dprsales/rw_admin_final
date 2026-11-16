@@ -34,9 +34,9 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Admin frontend onboarding pages | Partial | Staff `/employees` creates and lists; public `/join` shows valid or refused. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
 | Candidate invitation/OTP | Complete foundation | Invite send, `/join` lookup, OTP send/verify, rate limits, and audit events are in place | Candidate session for the form is still outstanding |
-| Employee self-service | Partial | Join session + full draft form (personal, education, employment, bank) on `/join` | Documents, policies, review/submit |
-| Private documents | Not started | Existing public upload/CDN paths are unsuitable | Private storage, authenticated delivery, versioning, verification and access logging |
-| Policies/declaration | Not started | No policy module | Versioned policy assignment and attributable acknowledgement |
+| Employee self-service | Partial | Join session + full draft form, Documents, and Policies steps on `/join` | Review/submit |
+| Private documents | Partial foundation | Candidate upload/preview + HR list/open/approve/reject; private disk only | Full version archive and broader HR queues still outstanding |
+| Policies/declaration | Partial | Versioned catalog, ack APIs, declaration after all policies, Join step | HR-approved final copy; assignment rules later |
 | HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
 | Joining Form PDF | Not started | No PDF module | Server-generated, versioned HR/employee copies stored privately |
 | Audit log | Not started | No onboarding audit module | Append-only events for all sensitive actions and downloads |
@@ -91,11 +91,12 @@ Do these in sequence. Do not expose employee creation before steps 1–3 are com
 
 ### 5. Documents, policies and submission
 
-- [ ] Approve the document checklist, conditional requirements, accepted alternatives, file limits and missing-document exception process.
-- [ ] Implement private storage separate from public `/uploads` and public CDN assets.
-- [ ] Validate file content/type/size, generate server-side storage names, retain versions and prevent predictable public URLs.
-- [ ] Implement authenticated file delivery with employee ownership and HR permission checks.
-- [ ] Implement Pending, Approved, Re-upload Required and Locked document states with reviewer/reason metadata.
+- [x] Approve a first fixed document checklist with PDF/JPG/PNG and 5 MB limit (HR can later replace with config).
+- [x] Implement private storage separate from public `/uploads` and public CDN assets (`private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR`).
+- [x] Validate file type/size, generate server-side storage names, store version number, and never return storage keys to the browser.
+- [x] Implement authenticated candidate file preview/delivery via `GET /join/documents/:type/file`.
+- [x] Implement HR open/download via `GET /employees/:id/documents/:type/file` plus approve/reject with reason.
+- [x] Implement Pending Review, Approved, Re-upload Required and Locked checks with rejection reason metadata.
 - [ ] Add policy versions, applicability and acknowledgement timestamps.
 - [ ] Add final declaration, submission snapshot and correction/reopen flow.
 
@@ -213,7 +214,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-Full joining draft fields are in place on `GET/PUT /join/form` (personal extras, education, previous employment / fresher, bank). Next: private document uploads for the joining checklist.
+Policies and declaration are in place on `GET /join/policies`, `POST /join/policies/:policyId/acknowledge`, and `POST /join/declaration`, with a Policies step on `/join`. Next: review-before-submit and one-shot package submit.
 
 ## Product and company decisions to collect
 
@@ -245,8 +246,8 @@ Full joining draft fields are in place on `GET/PUT /join/form` (personal extras,
 - [x] Expiring/revocable invitation tied to the intended employee. Send is implemented. Opening the link is implemented: public lookup refuses expired, revoked, and missing tokens; `/join` shows valid or refused.
 - [ ] Employee self-service sections for personal/contact, family/emergency, education, prior employment, and bank details, with field-level access decisions.
 - [ ] Saved drafts, clear progress/next action, validation, and a review-before-submit step.
-- [ ] Versioned applicable document checklist, private uploads, replacement history, and employee-visible correction reasons.
-- [ ] Versioned policies and attributable acknowledgements/declaration.
+- [x] Versioned applicable document checklist, private uploads, replacement history, and employee-visible correction reasons. First-release checklist and review loop done; full historical archive still light.
+- [x] Versioned policies and attributable acknowledgements/declaration. First-release catalog and Join step done; HR-approved copy still marked [to confirm].
 - [ ] Submission snapshot, duplicate-submit handling, HR correction/reopen flow, and separate onboarding/employment states.
 
 ### HR operations and documents
@@ -270,6 +271,28 @@ Full joining draft fields are in place on `GET/PUT /join/form` (personal extras,
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-16 — Policies and declaration
+
+- Completed: Versioned joining policies (code of conduct, data privacy, IT use) plus joining declaration. Session-gated `GET /join/policies`, `POST /join/policies/:policyId/acknowledge`, and `POST /join/declaration` (all policies required first). Employee stores policy acknowledgements and declaration version/time. Audits `policy_acknowledged` / `declaration_accepted`. Admin `/join` Policies step with accept buttons, declaration checkbox, and footer copy. Draft policy bodies keep `[to confirm with HR]`.
+- Files changed: `join-policies.ts`, `employees.policies.service.ts`, `employees.policies.spec.ts`, `join-declaration.dto.ts`, employee schema, onboarding audit schema, `join.controller.ts`, `employees.module.ts`; admin `Join.tsx`, `api/services/index.ts`; checklist + daily update.
+- Verification performed: policies Jest suite (3/3 passed); admin typecheck where run.
+- Next item: Submit (review + one-shot package submit).
+
+### 2026-11-15 — Joining document review (HR approve / reject)
+
+- Completed: HR `GET /employees/:id/documents`, private file open, approve, and reject-with-reason. Candidate sees Re-upload Required + reason and can re-upload; Approved blocks replace. Audits for hr view, approve, reject, reupload. Employees page Documents dialog with preview/actions.
+- Files changed: documents service/controller/DTO/schema/audit/spec; admin `Employees.tsx`, `Join.tsx`, API helpers; checklist + daily update.
+- Verification performed: documents Jest suite; admin/backend typecheck.
+- Next item: Policies and declaration.
+
+### 2026-11-14 — Joining documents checklist (start)
+
+- Completed: Fixed required document list (photo, Aadhaar, PAN, address proof, bank proof, education certificate, resume). Private disk storage under `private-employee-docs` / `PRIVATE_EMPLOYEE_DOCS_DIR` (not public `/uploads` or CDN URLs). Session-gated `GET /join/documents`, `POST /join/documents/:documentType`, and `GET /join/documents/:type/file` preview. Admin `/join` Documents step shows empty state, image/PDF thumbnail, Preview dialog, upload/replace, and upload count status. Audits `document_uploaded` / `document_viewed`.
+- Files changed: `join-documents.ts`, `employees.documents.service.ts`, `employees.documents.spec.ts`, employee schema, onboarding audit schema, `join.controller.ts`, `employees.module.ts`, `.gitignore`; admin `Join.tsx`, `api/services/index.ts`; checklist docs.
+- Verification performed: documents Jest suite passed. Admin `tsc --noEmit` passed.
+- Decisions or blockers: HR staff download and approve/reject not started. Version number increments; prior file bytes remain on disk but only the current row is in Mongo.
+- Next item: HR document review states (approve / reject / re-upload).
 
 ### 2026-11-13 — Full joining draft fields
 

@@ -10,7 +10,7 @@ import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
-import { deleteLead, getLeads } from '../../api/services';
+import { deleteLead, getLeads, sendLeadCall } from '../../api/services';
 
 // ----------------------
 // Type Declarations
@@ -67,6 +67,44 @@ export interface Lead {
   saleLeadId?: string;
   formSubmittedAt?: string;
   createdAt: string;
+  lastCallId?: string;
+  lastCallStatus?: string;
+  lastCallOutcome?: string;
+  lastCallSummary?: string;
+  lastCallRecordingUrl?: string;
+  lastCallAt?: string;
+}
+
+/** Same rule as the API: only coaching enquiries get Outpero dial. */
+export function isCoachingLead(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): boolean {
+  if (lead.type === 'coaching') return true;
+  if (lead.formTrack === 'coaching') return true;
+  if (lead.recommendedService === 'coaching') return true;
+  return false;
+}
+
+export const CALL_STATUS_LABEL: Record<string, string> = {
+  queued: 'Queued',
+  in_progress: 'Calling',
+  completed: 'Completed',
+  no_answer: 'No answer',
+  voicemail: 'Voicemail',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
+
+/** True only for a live dial. Stale queued/in_progress on old rows must not lock the button. */
+const ACTIVE_CALL_MAX_AGE_MS = 10 * 60 * 1000;
+export function isLeadCallInFlight(
+  lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
+): boolean {
+  if (lead.lastCallStatus !== 'queued' && lead.lastCallStatus !== 'in_progress') {
+    return false;
+  }
+  if (!lead.lastCallAt) return false;
+  const started = new Date(lead.lastCallAt).getTime();
+  if (Number.isNaN(started)) return false;
+  return Date.now() - started < ACTIVE_CALL_MAX_AGE_MS;
 }
 
 /** Labels for the guided-finder keys stored on a lead. */
@@ -250,7 +288,7 @@ const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: st
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
   const key = krisahStatusKey(lead);
   if (key === 'none') {
-    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>—</Typography>;
+    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>-</Typography>;
   }
   const chip = KRISAH_CHIP[key];
   const label = key === 'completed' && lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : chip.label;
@@ -265,6 +303,10 @@ export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSo
 
 interface LeadsApiResponse {
   leads: Lead[];
+  totalCount?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 }
 
 // ----------------------
@@ -277,6 +319,8 @@ const AllLeads: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [searchText, setSearchText] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openModal, setOpenModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -286,11 +330,70 @@ const AllLeads: React.FC = () => {
   const [actionsAnchor, setActionsAnchor] = useState<null | HTMLElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [callBusyId, setCallBusyId] = useState<string | null>(null);
+  const [callError, setCallError] = useState('');
+  const [callInfo, setCallInfo] = useState('');
 
-  // ✅ useQuery with proper typing
+  // Day 11 — ask the server for one page (stage + phone filters).
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
-    queryKey: ['leads'],
-    queryFn: getLeads,
+    queryKey: ['leads', currentPage, rowsPerPage, stageFilter, phoneFilter],
+    queryFn: () =>
+      getLeads({
+        page: currentPage,
+        limit: rowsPerPage,
+        ...(stageFilter ? { stage: stageFilter } : {}),
+        ...(phoneFilter ? { phone: phoneFilter } : {}),
+      }),
+    placeholderData: (prev) => prev,
+  });
+
+  // Keep the open drawer on the freshest lead row after call / list refresh.
+  React.useEffect(() => {
+    if (!selectedLead?._id || !data?.leads?.length) return;
+    const fresh = data.leads.find((row) => row._id === selectedLead._id);
+    if (fresh) setSelectedLead(fresh);
+  }, [data?.leads, selectedLead?._id]);
+
+  // While a call is queued / in progress, refresh so status + summary land after hang-up.
+  React.useEffect(() => {
+    const hasActive =
+      Boolean(callBusyId) || Boolean(data?.leads?.some((row) => isLeadCallInFlight(row)));
+    if (!hasActive) return;
+    const timer = window.setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [callBusyId, data?.leads, queryClient]);
+
+  const callMutation = useMutation({
+    mutationFn: (leadId: string) => sendLeadCall(leadId),
+    onMutate: (leadId) => {
+      setCallBusyId(leadId);
+      setCallError('');
+      setCallInfo('');
+    },
+    onSuccess: (result, leadId) => {
+      setCallBusyId(null);
+      setCallInfo(result?.message || 'Call queued with Outpero.');
+      setSelectedLead((prev) =>
+        prev && prev._id === leadId
+          ? {
+              ...prev,
+              lastCallStatus: result?.status || 'queued',
+              lastCallAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: (err: any) => {
+      setCallBusyId(null);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not start the call.';
+      setCallError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -339,7 +442,12 @@ const AllLeads: React.FC = () => {
   );
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchText(e.target.value);
+    const value = e.target.value;
+    setSearchText(value);
+    // Digits-heavy search goes to the server phone filter; name/email stay on this page.
+    const digits = value.replace(/\D/g, '');
+    const nextPhone = digits.length >= 4 ? digits : '';
+    setPhoneFilter(nextPhone);
     setCurrentPage(1);
   };
 
@@ -367,14 +475,19 @@ const AllLeads: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // ✅ Filter leads
+  // Page-local filters (type / source / service / KRISAH / name) on the server page.
   const filteredLeads = LeadsData.filter((lead) => {
+    const q = searchText.trim().toLowerCase();
+    const digits = searchText.replace(/\D/g, '');
+    const phoneServerActive = digits.length >= 4;
     const matchesSearch =
-      lead.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      lead.email.toLowerCase().includes(searchText.toLowerCase()) ||
+      !q ||
+      phoneServerActive ||
+      lead.name.toLowerCase().includes(q) ||
+      lead.email.toLowerCase().includes(q) ||
       lead.phoneNumber.includes(searchText);
 
-    const matchesType = !  type || lead.type.toLowerCase() === type.toLowerCase();
+    const matchesType = !type || lead.type.toLowerCase() === type.toLowerCase();
     const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source || '');
     const matchesService = selectedServices.length === 0 || selectedServices.includes(lead.recommendedService || '');
     const matchesKrisah = !krisahFilter || krisahStatusKey(lead) === krisahFilter;
@@ -382,8 +495,8 @@ const AllLeads: React.FC = () => {
     return matchesSearch && matchesType && matchesSource && matchesService && matchesKrisah;
   });
 
-  const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
-  const paginatedRows = filteredLeads.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const totalPages = Math.max(1, data?.totalPages || Math.ceil((data?.totalCount || 0) / rowsPerPage) || 1);
+  const paginatedRows = filteredLeads;
   const pageIds = paginatedRows.map((lead) => lead._id);
   const selectedCount = selectedIds.length;
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
@@ -417,7 +530,7 @@ const AllLeads: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <TextField
-            placeholder="Search for Leads..."
+            placeholder="Search name, email, or phone..."
             variant="outlined"
             size="small"
             onChange={handleSearch}
@@ -561,6 +674,34 @@ const AllLeads: React.FC = () => {
             </FormControl>
           )}
 
+          <FormControl sx={{ minWidth: 150 }}>
+            <Select
+              value={stageFilter}
+              onChange={(event) => {
+                setStageFilter(String(event.target.value || ''));
+                setCurrentPage(1);
+              }}
+              displayEmpty
+              sx={{
+                height: '40px',
+                border: '1px solid #1212121A',
+                borderRadius: '20px',
+                boxShadow: '0px 6px 14px #36408D08',
+                fontSize: '12px',
+                color: '#1D1D1D',
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="caption" sx={{ color: '#1D1D1D', opacity: 0.6 }}>CRM stage</Typography>
+              </MenuItem>
+              {STAGE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Typography variant="caption">{opt.label}</Typography>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <FormControl sx={{ minWidth: 140 }}>
             <Select
               value={krisahFilter}
@@ -660,7 +801,7 @@ const AllLeads: React.FC = () => {
         </Menu>
       </Box>
 
-      {/* Leads Table — horizontal scroll when the panel is narrow */}
+      {/* Leads Table: horizontal scroll when the panel is narrow */}
       <TableContainer
         component={Paper}
         sx={{
@@ -671,7 +812,22 @@ const AllLeads: React.FC = () => {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        <Table sx={{ minWidth: 920 }} stickyHeader={false}>
+        {(callError || callInfo) && (
+          <Box sx={{ mb: 1.5 }}>
+            {callError && (
+              <Typography variant="body2" color="error" sx={{ mb: callInfo ? 0.5 : 0 }}>
+                {callError}
+              </Typography>
+            )}
+            {callInfo && (
+              <Typography variant="body2" color="success.main">
+                {callInfo}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        <Table sx={{ minWidth: 1040 }} stickyHeader={false}>
           <TableHead sx={{ backgroundColor: '#30779d40' }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
@@ -683,7 +839,7 @@ const AllLeads: React.FC = () => {
                   inputProps={{ 'aria-label': 'Select leads on this page' }}
                 />
               </TableCell>
-              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Date'].map((text) => (
+              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Call', 'Date'].map((text) => (
                 <TableCell key={text} align="left" sx={{ padding: '8px 12px' }}>
                   <Typography variant="caption" sx={{ fontWeight: 600 }}>{text}</Typography>
                 </TableCell>
@@ -762,6 +918,43 @@ const AllLeads: React.FC = () => {
                 <TableCell sx={{ padding: '8px 12px' }}>
                   <KrisahStatusChip lead={lead} />
                 </TableCell>
+                <TableCell
+                  sx={{ padding: '8px 12px', minWidth: 120 }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {isCoachingLead(lead) ? (
+                    <Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={callBusyId === lead._id || isLeadCallInFlight(lead)}
+                        onClick={() => callMutation.mutate(lead._id)}
+                        sx={{ textTransform: 'none', fontWeight: 600, px: 1.25, minWidth: 0 }}
+                      >
+                        {callBusyId === lead._id
+                          ? 'Calling…'
+                          : isLeadCallInFlight(lead)
+                            ? 'In progress'
+                            : 'Call'}
+                      </Button>
+                      {lead.lastCallStatus &&
+                        lead.lastCallStatus !== 'queued' &&
+                        lead.lastCallStatus !== 'in_progress' && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                          {CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}
+                          {lead.lastCallOutcome ? ` · ${lead.lastCallOutcome}` : ''}
+                        </Typography>
+                      )}
+                      {isLeadCallInFlight(lead) && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                          {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || 'Calling'}
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">-</Typography>
+                  )}
+                </TableCell>
                 <TableCell sx={{ padding: '8px 12px' }}>
                   <Typography variant="caption">
                     {new Date(lead.createdAt).toLocaleDateString()}
@@ -773,32 +966,47 @@ const AllLeads: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* Pagination */}
-      <Box display="flex" justifyContent="center" mt={3}>
-        <Pagination
-          count={totalPages}
-          page={currentPage}
-          onChange={handleChangePage}
-          shape="rounded"
-          sx={{
-            "& .MuiPaginationItem-root": {
-              height: "22px",
-              minWidth: "22px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              backgroundColor: "#EFEFEF",
-            },
-            "& .Mui-selected": {
-              backgroundColor: theme.palette.primary.main,
-              color: "#fff",
-            },
-          }}
-        />
+      {/* Pagination — server pages (Day 11) */}
+      <Box display="flex" justifyContent="center" alignItems="center" flexWrap="wrap" gap={2} mt={3}>
+        <Typography variant="caption" color="text.secondary">
+          {data?.totalCount != null
+            ? `${data.totalCount} lead${data.totalCount === 1 ? '' : 's'} · page ${currentPage} of ${totalPages}`
+            : null}
+        </Typography>
+        {totalPages > 1 && (
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={handleChangePage}
+            shape="rounded"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                height: "22px",
+                minWidth: "22px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                backgroundColor: "#EFEFEF",
+              },
+              "& .Mui-selected": {
+                backgroundColor: theme.palette.primary.main,
+                color: "#fff",
+              },
+            }}
+          />
+        )}
       </Box>
 
       {/* Modal */}
       {selectedLead && (
-        <LeadModal lead={selectedLead} open={openModal} handleClose={handleModalClose} />
+        <LeadModal
+          lead={selectedLead}
+          open={openModal}
+          handleClose={handleModalClose}
+          onStartCall={() => callMutation.mutate(selectedLead._id)}
+          callBusy={callBusyId === selectedLead._id}
+          callError={callError}
+          callInfo={callInfo}
+        />
       )}
 
       <Dialog

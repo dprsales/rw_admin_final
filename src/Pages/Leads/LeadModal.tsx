@@ -4,6 +4,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, TextField, Alert, Grid, CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -12,10 +13,13 @@ import CheckIcon from '@mui/icons-material/Check';
 import Cookies from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  CALL_STATUS_LABEL,
   CRM_SOURCE_LABEL,
   FORM_ANSWER_LABELS,
   FORM_TRACK_LABEL,
   INTENT_LABEL,
+  isCoachingLead,
+  isLeadCallInFlight,
   KrisahStatusChip,
   Lead,
   leadSourceLabel,
@@ -39,6 +43,10 @@ interface LeadModalProps {
   open: boolean;
   handleClose: () => void;
   lead: Lead;
+  onStartCall?: () => void;
+  callBusy?: boolean;
+  callError?: string;
+  callInfo?: string;
 }
 
 type LeadNoteActivity = {
@@ -179,8 +187,24 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </Box>
 );
 
-const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
+const LeadModal: React.FC<LeadModalProps> = ({
+  open,
+  handleClose,
+  lead,
+  onStartCall,
+  callBusy = false,
+  callError = '',
+  callInfo = '',
+}) => {
   const queryClient = useQueryClient();
+
+  const coachingCall = isCoachingLead(lead);
+  const callInFlight = callBusy || isLeadCallInFlight(lead);
+  const showCallStatus =
+    Boolean(lead.lastCallStatus) &&
+    (isLeadCallInFlight(lead) ||
+      (lead.lastCallStatus !== 'queued' && lead.lastCallStatus !== 'in_progress'));
+
   const hasGuidance = Boolean(
     lead.visitorType || lead.challenge || lead.challengeNote || lead.goal || lead.recommendedService,
   );
@@ -478,7 +502,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {lead.email}
                 {lead.phoneNumber ? ` · ${lead.phoneNumber}` : ''}
-              </Typography>
+            </Typography>
             </Box>
             <IconButton aria-label="Close lead details" onClick={handleClose} size="small">
               <CloseIcon fontSize="small" />
@@ -500,7 +524,58 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
               />
             )}
             <KrisahStatusChip lead={lead} />
+            {showCallStatus && (
+              <Chip
+                size="small"
+                color={
+                  lead.lastCallStatus === 'completed'
+                    ? 'success'
+                    : lead.lastCallStatus === 'failed'
+                      ? 'error'
+                      : 'default'
+                }
+                variant="outlined"
+                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus}`}
+              />
+            )}
           </Stack>
+
+          {coachingCall && onStartCall && (
+            <Box sx={{ mt: 1.75, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+              <Button
+                variant="contained"
+                size="small"
+                disableElevation
+                startIcon={
+                  callBusy
+                    ? <CircularProgress size={14} color="inherit" />
+                    : <PhoneInTalkOutlinedIcon sx={{ fontSize: 16 }} />
+                }
+                onClick={onStartCall}
+                disabled={callInFlight}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                {callBusy
+                  ? 'Starting call…'
+                  : callInFlight
+                    ? 'Call in progress'
+                    : 'Call with Priti'}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Outpero dials this coaching enquiry. Results come back after the call.
+              </Typography>
+            </Box>
+          )}
+          {(callError || callInfo) && (
+            <Box sx={{ mt: 1 }}>
+              {callError && (
+                <Alert severity="error" sx={{ py: 0 }}>{callError}</Alert>
+              )}
+              {callInfo && !callError && (
+                <Alert severity="success" sx={{ py: 0 }}>{callInfo}</Alert>
+            )}
+          </Box>
+        )}
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
@@ -619,6 +694,54 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
             </Box>
           </Section>
 
+          {coachingCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
+            <Section title="Last Outpero call">
+              <FieldRow label="Status">
+                {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus || '-'}
+              </FieldRow>
+              {lead.lastCallOutcome && (
+                <>
+                  <Divider />
+                  <FieldRow label="Outcome">{lead.lastCallOutcome}</FieldRow>
+                </>
+              )}
+              {lead.lastCallSummary && (
+                <>
+                  <Divider />
+                  <FieldRow label="Summary">{lead.lastCallSummary}</FieldRow>
+                </>
+              )}
+              {lead.lastCallAt && (
+                <>
+                  <Divider />
+                  <FieldRow label="When">
+                    {new Date(lead.lastCallAt).toLocaleString()}
+                  </FieldRow>
+                </>
+              )}
+              {lead.lastCallRecordingUrl && (
+                <>
+                  <Divider />
+                  <FieldRow label="Recording">
+                    <Link href={lead.lastCallRecordingUrl} target="_blank" rel="noopener noreferrer" underline="hover">
+                      Open recording
+                    </Link>
+                  </FieldRow>
+                </>
+              )}
+            </Section>
+          )}
+
+          {lead.message?.trim() && (
+            <Section title="Visitor message">
+              <Box sx={{ py: 1.25 }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.primary' }}>
+                  {lead.message}
+                </Typography>
+              </Box>
+            </Section>
+          )}
+
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
 <Box sx={{ mb: 3 }}>
@@ -708,9 +831,9 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Add what you did on this lead. It shows here with date and time.
-                    </Typography>
-                  </Box>
-                )}
+            </Typography>
+          </Box>
+        )}
 
                 {notes.length > 0 && (
                   <Box sx={{ position: 'relative', pl: 0.5 }}>
@@ -772,7 +895,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
                               <Typography variant="caption" color="text.secondary" title={when.full}>
                                 {when.date}
                                 {when.time ? ` · ${when.time}` : ''}
-                              </Typography>
+        </Typography>
                               {canManage && !isEditing && (
                                 <Box sx={{ ml: 'auto', display: 'flex', gap: 0.25 }}>
                                   <IconButton
@@ -852,7 +975,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
                                   sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}
                                 >
                                   {item.note}
-                                </Typography>
+        </Typography>
                               )}
                             </Box>
                           </Box>
@@ -986,16 +1109,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
                   </FieldRow>
                 </React.Fragment>
               ))}
-            </Section>
-          )}
-
-          {lead.message?.trim() && (
-            <Section title="Visitor message">
-              <Box sx={{ py: 1.25 }}>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.primary' }}>
-                  {lead.message}
-                </Typography>
-              </Box>
             </Section>
           )}
         </Box>

@@ -84,10 +84,29 @@ export const getConnectedLiving   = (slug: string, connectedlivings: any) => {
 //   return http.get("/leads");
 // };
 
-export const getLeads = async () => {
-  const response = await http.get('/leads');
-  return response.data; // { leads: [...] }
-}
+export type GetLeadsParams = {
+  page?: number;
+  limit?: number;
+  ownerId?: string;
+  projectId?: string;
+  stage?: string;
+  phone?: string;
+};
+
+/** Day 11 — paged list; optional owner / project / stage / phone filters. */
+export const getLeads = async (params: GetLeadsParams = {}) => {
+  const response = await http.get('/leads', {
+    params: {
+      page: params.page ?? 1,
+      limit: params.limit ?? 25,
+      ...(params.ownerId ? { ownerId: params.ownerId } : {}),
+      ...(params.projectId ? { projectId: params.projectId } : {}),
+      ...(params.stage ? { stage: params.stage } : {}),
+      ...(params.phone ? { phone: params.phone } : {}),
+    },
+  });
+  return response.data; // { totalCount, page, limit, totalPages, leads }
+};
 
 export const getLeadDetails = (leadId: string) => {
   return http.get(`/leads/${leadId}`);
@@ -139,6 +158,23 @@ export const getLeadActivities = async (leadId: string) => {
 
 export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
+};
+
+/** Sales starts one Outpero call for a coaching lead. Secrets stay on the API. */
+export const sendLeadCall = async (leadId: string) => {
+  const response = await http.post(`/leads/${encodeURIComponent(String(leadId))}/call`);
+  return response.data as {
+    message: string;
+    callId: string;
+    outperoCallId?: string;
+    status: string;
+    phoneSent: string;
+  };
+};
+
+export const getLeadCalls = async (leadId: string) => {
+  const response = await http.get(`/leads/${encodeURIComponent(String(leadId))}/calls`);
+  return response.data;
 };
 
 // Career applications
@@ -399,6 +435,43 @@ export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
 };
 
+export const getEmployeeDocuments = async (
+  employeeId: string,
+): Promise<JoinDocumentsChecklist> => {
+  const response = await http.get(`/employees/${employeeId}/documents`);
+  return response.data;
+};
+
+export const fetchEmployeeDocumentBlob = async (
+  employeeId: string,
+  documentType: string,
+): Promise<{ blob: Blob; mimeType: string }> => {
+  const response = await http.get(`/employees/${employeeId}/documents/${documentType}/file`, {
+    responseType: 'blob',
+  });
+  const mimeType =
+    (response.headers['content-type'] as string) ||
+    response.data.type ||
+    'application/octet-stream';
+  return { blob: response.data as Blob, mimeType };
+};
+
+export const approveEmployeeDocument = async (employeeId: string, documentType: string) => {
+  const response = await http.post(`/employees/${employeeId}/documents/${documentType}/approve`);
+  return response.data as JoinDocumentsChecklist;
+};
+
+export const rejectEmployeeDocument = async (
+  employeeId: string,
+  documentType: string,
+  reason: string,
+) => {
+  const response = await http.post(`/employees/${employeeId}/documents/${documentType}/reject`, {
+    reason,
+  });
+  return response.data as JoinDocumentsChecklist;
+};
+
 export interface InvitationLookup {
   valid: true;
   firstName: string;
@@ -546,6 +619,125 @@ export const saveJoinForm = async (
 /** @deprecated use getJoinForm / saveJoinForm */
 export const getJoinPersonal = getJoinForm;
 export const saveJoinPersonal = saveJoinForm;
+
+export type JoinDocumentItem = {
+  documentType: string;
+  label: string;
+  required: boolean;
+  status: string;
+  version: number;
+  originalFileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string | null;
+  rejectionReason?: string;
+  reviewedAt?: string | null;
+};
+
+export type JoinDocumentsChecklist = {
+  documents: JoinDocumentItem[];
+  requiredCount: number;
+  uploadedCount: number;
+  approvedCount?: number;
+};
+
+export const getJoinDocuments = async (accessToken: string): Promise<JoinDocumentsChecklist> => {
+  const response = await joinHttp.get('/join/documents', joinAuth(accessToken));
+  return response.data;
+};
+
+export const uploadJoinDocument = async (
+  accessToken: string,
+  documentType: string,
+  file: File,
+): Promise<JoinDocumentsChecklist> => {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await joinHttp.post(`/join/documents/${documentType}`, body, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      // Let the browser set multipart boundary; do not force JSON.
+      'Content-Type': undefined as unknown as string,
+    },
+    transformRequest: [
+      (data, headers) => {
+        if (data instanceof FormData && headers) {
+          delete (headers as Record<string, unknown>)['Content-Type'];
+        }
+        return data;
+      },
+    ],
+  });
+  return response.data;
+};
+
+/** Private preview blob. Caller must revokeObjectURL when done. */
+export const fetchJoinDocumentBlob = async (
+  accessToken: string,
+  documentType: string,
+): Promise<{ blob: Blob; mimeType: string }> => {
+  const response = await joinHttp.get(`/join/documents/${documentType}/file`, {
+    ...joinAuth(accessToken),
+    responseType: 'blob',
+  });
+  const mimeType =
+    (response.headers['content-type'] as string) ||
+    response.data.type ||
+    'application/octet-stream';
+  return { blob: response.data as Blob, mimeType };
+};
+
+export type JoinPolicyItem = {
+  policyId: string;
+  version: string;
+  title: string;
+  summary: string;
+  body: string;
+  acknowledged: boolean;
+  acknowledgedAt: string | null;
+};
+
+export type JoinPoliciesState = {
+  policies: JoinPolicyItem[];
+  requiredCount: number;
+  acknowledgedCount: number;
+  allPoliciesAcknowledged: boolean;
+  declaration: {
+    version: string;
+    title: string;
+    body: string;
+    accepted: boolean;
+    acceptedAt: string | null;
+  };
+};
+
+export const getJoinPolicies = async (accessToken: string): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.get('/join/policies', joinAuth(accessToken));
+  return response.data;
+};
+
+export const acknowledgeJoinPolicy = async (
+  accessToken: string,
+  policyId: string,
+): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.post(
+    `/join/policies/${policyId}/acknowledge`,
+    {},
+    joinAuth(accessToken),
+  );
+  return response.data;
+};
+
+export const acceptJoinDeclaration = async (
+  accessToken: string,
+): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.post(
+    '/join/declaration',
+    { accepted: true },
+    joinAuth(accessToken),
+  );
+  return response.data;
+};
 
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
