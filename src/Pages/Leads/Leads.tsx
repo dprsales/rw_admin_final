@@ -242,6 +242,23 @@ const AllLeads: React.FC = () => {
     if (fresh) setSelectedLead(fresh);
   }, [data?.leads, selectedLead?._id]);
 
+  // While a call is queued / in progress, refresh so status + summary land after hang-up.
+  React.useEffect(() => {
+    const hasActive =
+      Boolean(callBusyId) ||
+      Boolean(
+        data?.leads?.some(
+          (row) =>
+            row.lastCallStatus === 'queued' || row.lastCallStatus === 'in_progress',
+        ),
+      );
+    if (!hasActive) return;
+    const timer = window.setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [callBusyId, data?.leads, queryClient]);
+
   const callMutation = useMutation({
     mutationFn: (leadId: string) => sendLeadCall(leadId),
     onMutate: (leadId) => {
