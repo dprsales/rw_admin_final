@@ -17,6 +17,7 @@ import {
   FORM_TRACK_LABEL,
   INTENT_LABEL,
   isCoachingLead,
+  isLeadCallInFlight,
   KrisahStatusChip,
   Lead,
   leadSourceLabel,
@@ -180,8 +181,11 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
 
   const coachingCall = isCoachingLead(lead);
-  const callInFlight =
-    callBusy || lead.lastCallStatus === 'queued' || lead.lastCallStatus === 'in_progress';
+  const callInFlight = callBusy || isLeadCallInFlight(lead);
+  const showCallStatus =
+    Boolean(lead.lastCallStatus) &&
+    (isLeadCallInFlight(lead) ||
+      (lead.lastCallStatus !== 'queued' && lead.lastCallStatus !== 'in_progress'));
 
   const hasGuidance = Boolean(
     lead.visitorType || lead.challenge || lead.challengeNote || lead.goal || lead.recommendedService,
@@ -416,7 +420,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
               />
             )}
             <KrisahStatusChip lead={lead} />
-            {lead.lastCallStatus && (
+            {showCallStatus && (
               <Chip
                 size="small"
                 color={
@@ -427,7 +431,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                       : 'default'
                 }
                 variant="outlined"
-                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}`}
+                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus}`}
               />
             )}
           </Stack>

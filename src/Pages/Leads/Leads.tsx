@@ -78,6 +78,20 @@ export const CALL_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+/** True only for a live dial. Stale queued/in_progress on old rows must not lock the button. */
+const ACTIVE_CALL_MAX_AGE_MS = 10 * 60 * 1000;
+export function isLeadCallInFlight(
+  lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
+): boolean {
+  if (lead.lastCallStatus !== 'queued' && lead.lastCallStatus !== 'in_progress') {
+    return false;
+  }
+  if (!lead.lastCallAt) return false;
+  const started = new Date(lead.lastCallAt).getTime();
+  if (Number.isNaN(started)) return false;
+  return Date.now() - started < ACTIVE_CALL_MAX_AGE_MS;
+}
+
 /** Labels for the guided-finder keys stored on a lead. */
 export const VISITOR_LABEL: Record<string, string> = {
   developer: 'Developer / Builder',
@@ -245,13 +259,7 @@ const AllLeads: React.FC = () => {
   // While a call is queued / in progress, refresh so status + summary land after hang-up.
   React.useEffect(() => {
     const hasActive =
-      Boolean(callBusyId) ||
-      Boolean(
-        data?.leads?.some(
-          (row) =>
-            row.lastCallStatus === 'queued' || row.lastCallStatus === 'in_progress',
-        ),
-      );
+      Boolean(callBusyId) || Boolean(data?.leads?.some((row) => isLeadCallInFlight(row)));
     if (!hasActive) return;
     const timer = window.setInterval(() => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
@@ -783,24 +791,27 @@ const AllLeads: React.FC = () => {
                       <Button
                         size="small"
                         variant="outlined"
-                        disabled={
-                          callBusyId === lead._id ||
-                          lead.lastCallStatus === 'queued' ||
-                          lead.lastCallStatus === 'in_progress'
-                        }
+                        disabled={callBusyId === lead._id || isLeadCallInFlight(lead)}
                         onClick={() => callMutation.mutate(lead._id)}
                         sx={{ textTransform: 'none', fontWeight: 600, px: 1.25, minWidth: 0 }}
                       >
                         {callBusyId === lead._id
                           ? 'Calling…'
-                          : lead.lastCallStatus === 'queued' || lead.lastCallStatus === 'in_progress'
+                          : isLeadCallInFlight(lead)
                             ? 'In progress'
                             : 'Call'}
                       </Button>
-                      {lead.lastCallStatus && (
+                      {lead.lastCallStatus &&
+                        lead.lastCallStatus !== 'queued' &&
+                        lead.lastCallStatus !== 'in_progress' && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                           {CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}
                           {lead.lastCallOutcome ? ` · ${lead.lastCallOutcome}` : ''}
+                        </Typography>
+                      )}
+                      {isLeadCallInFlight(lead) && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                          {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || 'Calling'}
                         </Typography>
                       )}
                     </Box>
