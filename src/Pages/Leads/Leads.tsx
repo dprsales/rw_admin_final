@@ -10,7 +10,7 @@ import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
-import { deleteLead, getLeads } from '../../api/services';
+import { deleteLead, getLeads, sendLeadCall } from '../../api/services';
 
 // ----------------------
 // Type Declarations
@@ -52,7 +52,31 @@ export interface Lead {
   saleLeadId?: string;
   formSubmittedAt?: string;
   createdAt: string;
+  lastCallId?: string;
+  lastCallStatus?: string;
+  lastCallOutcome?: string;
+  lastCallSummary?: string;
+  lastCallRecordingUrl?: string;
+  lastCallAt?: string;
 }
+
+/** Same rule as the API: only coaching enquiries get Outpero dial. */
+export function isCoachingLead(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): boolean {
+  if (lead.type === 'coaching') return true;
+  if (lead.formTrack === 'coaching') return true;
+  if (lead.recommendedService === 'coaching') return true;
+  return false;
+}
+
+export const CALL_STATUS_LABEL: Record<string, string> = {
+  queued: 'Queued',
+  in_progress: 'Calling',
+  completed: 'Completed',
+  no_answer: 'No answer',
+  voicemail: 'Voicemail',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
 
 /** Labels for the guided-finder keys stored on a lead. */
 export const VISITOR_LABEL: Record<string, string> = {
@@ -165,7 +189,7 @@ const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: st
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
   const key = krisahStatusKey(lead);
   if (key === 'none') {
-    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>—</Typography>;
+    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>-</Typography>;
   }
   const chip = KRISAH_CHIP[key];
   const label = key === 'completed' && lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : chip.label;
@@ -201,11 +225,52 @@ const AllLeads: React.FC = () => {
   const [actionsAnchor, setActionsAnchor] = useState<null | HTMLElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [callBusyId, setCallBusyId] = useState<string | null>(null);
+  const [callError, setCallError] = useState('');
+  const [callInfo, setCallInfo] = useState('');
 
   // ✅ useQuery with proper typing
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
     queryKey: ['leads'],
     queryFn: getLeads,
+  });
+
+  // Keep the open drawer on the freshest lead row after call / list refresh.
+  React.useEffect(() => {
+    if (!selectedLead?._id || !data?.leads?.length) return;
+    const fresh = data.leads.find((row) => row._id === selectedLead._id);
+    if (fresh) setSelectedLead(fresh);
+  }, [data?.leads, selectedLead?._id]);
+
+  const callMutation = useMutation({
+    mutationFn: (leadId: string) => sendLeadCall(leadId),
+    onMutate: (leadId) => {
+      setCallBusyId(leadId);
+      setCallError('');
+      setCallInfo('');
+    },
+    onSuccess: (result, leadId) => {
+      setCallBusyId(null);
+      setCallInfo(result?.message || 'Call queued with Outpero.');
+      setSelectedLead((prev) =>
+        prev && prev._id === leadId
+          ? {
+              ...prev,
+              lastCallStatus: result?.status || 'queued',
+              lastCallAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: (err: any) => {
+      setCallBusyId(null);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not start the call.';
+      setCallError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -575,7 +640,7 @@ const AllLeads: React.FC = () => {
         </Menu>
       </Box>
 
-      {/* Leads Table — horizontal scroll when the panel is narrow */}
+      {/* Leads Table: horizontal scroll when the panel is narrow */}
       <TableContainer
         component={Paper}
         sx={{
@@ -586,7 +651,22 @@ const AllLeads: React.FC = () => {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        <Table sx={{ minWidth: 920 }} stickyHeader={false}>
+        {(callError || callInfo) && (
+          <Box sx={{ mb: 1.5 }}>
+            {callError && (
+              <Typography variant="body2" color="error" sx={{ mb: callInfo ? 0.5 : 0 }}>
+                {callError}
+              </Typography>
+            )}
+            {callInfo && (
+              <Typography variant="body2" color="success.main">
+                {callInfo}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        <Table sx={{ minWidth: 1040 }} stickyHeader={false}>
           <TableHead sx={{ backgroundColor: '#30779d40' }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
@@ -598,7 +678,7 @@ const AllLeads: React.FC = () => {
                   inputProps={{ 'aria-label': 'Select leads on this page' }}
                 />
               </TableCell>
-              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Date'].map((text) => (
+              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Call', 'Date'].map((text) => (
                 <TableCell key={text} align="left" sx={{ padding: '8px 12px' }}>
                   <Typography variant="caption" sx={{ fontWeight: 600 }}>{text}</Typography>
                 </TableCell>
@@ -677,6 +757,40 @@ const AllLeads: React.FC = () => {
                 <TableCell sx={{ padding: '8px 12px' }}>
                   <KrisahStatusChip lead={lead} />
                 </TableCell>
+                <TableCell
+                  sx={{ padding: '8px 12px', minWidth: 120 }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {isCoachingLead(lead) ? (
+                    <Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={
+                          callBusyId === lead._id ||
+                          lead.lastCallStatus === 'queued' ||
+                          lead.lastCallStatus === 'in_progress'
+                        }
+                        onClick={() => callMutation.mutate(lead._id)}
+                        sx={{ textTransform: 'none', fontWeight: 600, px: 1.25, minWidth: 0 }}
+                      >
+                        {callBusyId === lead._id
+                          ? 'Calling…'
+                          : lead.lastCallStatus === 'queued' || lead.lastCallStatus === 'in_progress'
+                            ? 'In progress'
+                            : 'Call'}
+                      </Button>
+                      {lead.lastCallStatus && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                          {CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}
+                          {lead.lastCallOutcome ? ` · ${lead.lastCallOutcome}` : ''}
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">-</Typography>
+                  )}
+                </TableCell>
                 <TableCell sx={{ padding: '8px 12px' }}>
                   <Typography variant="caption">
                     {new Date(lead.createdAt).toLocaleDateString()}
@@ -713,7 +827,15 @@ const AllLeads: React.FC = () => {
 
       {/* Modal */}
       {selectedLead && (
-        <LeadModal lead={selectedLead} open={openModal} handleClose={handleModalClose} />
+        <LeadModal
+          lead={selectedLead}
+          open={openModal}
+          handleClose={handleModalClose}
+          onStartCall={() => callMutation.mutate(selectedLead._id)}
+          callBusy={callBusyId === selectedLead._id}
+          callError={callError}
+          callInfo={callInfo}
+        />
       )}
 
       <Dialog

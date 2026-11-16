@@ -4,6 +4,7 @@ import {
   TextField, CircularProgress, Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -11,9 +12,11 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckIcon from '@mui/icons-material/Check';
 import Cookies from 'js-cookie';
 import {
+  CALL_STATUS_LABEL,
   FORM_ANSWER_LABELS,
   FORM_TRACK_LABEL,
   INTENT_LABEL,
+  isCoachingLead,
   KrisahStatusChip,
   Lead,
   leadSourceLabel,
@@ -31,6 +34,10 @@ interface LeadModalProps {
   open: boolean;
   handleClose: () => void;
   lead: Lead;
+  onStartCall?: () => void;
+  callBusy?: boolean;
+  callError?: string;
+  callInfo?: string;
 }
 
 type LeadNoteActivity = {
@@ -153,7 +160,15 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </Box>
 );
 
-const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
+const LeadModal: React.FC<LeadModalProps> = ({
+  open,
+  handleClose,
+  lead,
+  onStartCall,
+  callBusy = false,
+  callError = '',
+  callInfo = '',
+}) => {
   const [notes, setNotes] = useState<LeadNoteActivity[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesError, setNotesError] = useState('');
@@ -163,6 +178,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+
+  const coachingCall = isCoachingLead(lead);
+  const callInFlight =
+    callBusy || lead.lastCallStatus === 'queued' || lead.lastCallStatus === 'in_progress';
 
   const hasGuidance = Boolean(
     lead.visitorType || lead.challenge || lead.challengeNote || lead.goal || lead.recommendedService,
@@ -397,7 +416,58 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
               />
             )}
             <KrisahStatusChip lead={lead} />
+            {lead.lastCallStatus && (
+              <Chip
+                size="small"
+                color={
+                  lead.lastCallStatus === 'completed'
+                    ? 'success'
+                    : lead.lastCallStatus === 'failed'
+                      ? 'error'
+                      : 'default'
+                }
+                variant="outlined"
+                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}`}
+              />
+            )}
           </Stack>
+
+          {coachingCall && onStartCall && (
+            <Box sx={{ mt: 1.75, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+              <Button
+                variant="contained"
+                size="small"
+                disableElevation
+                startIcon={
+                  callBusy
+                    ? <CircularProgress size={14} color="inherit" />
+                    : <PhoneInTalkOutlinedIcon sx={{ fontSize: 16 }} />
+                }
+                onClick={onStartCall}
+                disabled={callInFlight}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                {callBusy
+                  ? 'Starting call…'
+                  : callInFlight
+                    ? 'Call in progress'
+                    : 'Call with Arjun'}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Outpero dials this coaching enquiry. Results come back after the call.
+              </Typography>
+            </Box>
+          )}
+          {(callError || callInfo) && (
+            <Box sx={{ mt: 1 }}>
+              {callError && (
+                <Alert severity="error" sx={{ py: 0 }}>{callError}</Alert>
+              )}
+              {callInfo && !callError && (
+                <Alert severity="success" sx={{ py: 0 }}>{callInfo}</Alert>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
@@ -424,6 +494,44 @@ const LeadModal: React.FC<LeadModalProps> = ({ open, handleClose, lead }) => {
               </>
             )}
           </Section>
+
+          {coachingCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
+            <Section title="Last Outpero call">
+              <FieldRow label="Status">
+                {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus || '-'}
+              </FieldRow>
+              {lead.lastCallOutcome && (
+                <>
+                  <Divider />
+                  <FieldRow label="Outcome">{lead.lastCallOutcome}</FieldRow>
+                </>
+              )}
+              {lead.lastCallSummary && (
+                <>
+                  <Divider />
+                  <FieldRow label="Summary">{lead.lastCallSummary}</FieldRow>
+                </>
+              )}
+              {lead.lastCallAt && (
+                <>
+                  <Divider />
+                  <FieldRow label="When">
+                    {new Date(lead.lastCallAt).toLocaleString()}
+                  </FieldRow>
+                </>
+              )}
+              {lead.lastCallRecordingUrl && (
+                <>
+                  <Divider />
+                  <FieldRow label="Recording">
+                    <Link href={lead.lastCallRecordingUrl} target="_blank" rel="noopener noreferrer" underline="hover">
+                      Open recording
+                    </Link>
+                  </FieldRow>
+                </>
+              )}
+            </Section>
+          )}
 
           {lead.message?.trim() && (
             <Section title="Visitor message">

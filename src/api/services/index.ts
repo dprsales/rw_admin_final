@@ -134,6 +134,23 @@ export const deleteLead = (leadId: string) => {
   return http.delete(`/leads/${leadId}`);
 };
 
+/** Sales starts one Outpero call for a coaching lead. Secrets stay on the API. */
+export const sendLeadCall = async (leadId: string) => {
+  const response = await http.post(`/leads/${encodeURIComponent(String(leadId))}/call`);
+  return response.data as {
+    message: string;
+    callId: string;
+    outperoCallId?: string;
+    status: string;
+    phoneSent: string;
+  };
+};
+
+export const getLeadCalls = async (leadId: string) => {
+  const response = await http.get(`/leads/${encodeURIComponent(String(leadId))}/calls`);
+  return response.data;
+};
+
 // Career applications
 export const getApplications = async () => {
   const response = await http.get('/applications');
