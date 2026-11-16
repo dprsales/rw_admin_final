@@ -34,9 +34,12 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
+  acceptJoinDeclaration,
+  acknowledgeJoinPolicy,
   fetchJoinDocumentBlob,
   getJoinDocuments,
   getJoinForm,
+  getJoinPolicies,
   requestJoinOtp,
   resolveInvitation,
   resumeJoinSession,
@@ -97,6 +100,7 @@ const STEPS = [
   'References',
   'Bank',
   'Documents',
+  'Policies',
 ];
 
 const STEP_HELP: Record<string, string> = {
@@ -107,6 +111,7 @@ const STEP_HELP: Record<string, string> = {
   References: 'People who can confirm your background. Add at least two.',
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
+  Policies: 'Read each policy, accept it, then sign the final joining declaration.',
 };
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
@@ -598,7 +603,16 @@ const Join: React.FC = () => {
     retry: false,
   });
 
+  const policiesQuery = useQuery({
+    queryKey: ['join-policies', accessToken],
+    queryFn: () => getJoinPolicies(accessToken),
+    enabled: Boolean(accessToken),
+    retry: false,
+  });
+
   const [uploadingType, setUploadingType] = useState('');
+  const [ackingPolicyId, setAckingPolicyId] = useState('');
+  const [declarationChecked, setDeclarationChecked] = useState(false);
 
   useEffect(() => {
     const draft = formQuery.data as JoinFormDraft | undefined;
@@ -685,6 +699,33 @@ const Join: React.FC = () => {
     onError: () => setUploadingType(''),
   });
 
+  const acknowledgePolicy = useMutation({
+    mutationFn: (policyId: string) => acknowledgeJoinPolicy(accessToken, policyId),
+    onSuccess: (state) => {
+      setAckingPolicyId('');
+      setStatusMessage(
+        `Policies accepted: ${state.acknowledgedCount} of ${state.requiredCount}.`,
+      );
+      queryClient.setQueryData(['join-policies', accessToken], state);
+    },
+    onError: () => setAckingPolicyId(''),
+  });
+
+  const acceptDeclaration = useMutation({
+    mutationFn: () => acceptJoinDeclaration(accessToken),
+    onSuccess: (state) => {
+      setDeclarationChecked(true);
+      setStatusMessage('Joining declaration accepted. Final package submit comes next.');
+      queryClient.setQueryData(['join-policies', accessToken], state);
+    },
+  });
+
+  useEffect(() => {
+    if (policiesQuery.data?.declaration.accepted) {
+      setDeclarationChecked(true);
+    }
+  }, [policiesQuery.data?.declaration.accepted]);
+
   const setField = (key: keyof typeof emptyForm, value: string | boolean) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -718,9 +759,15 @@ const Join: React.FC = () => {
     saveForm.error ||
     formQuery.error ||
     documentsQuery.error ||
-    uploadDocument.error;
+    uploadDocument.error ||
+    policiesQuery.error ||
+    acknowledgePolicy.error ||
+    acceptDeclaration.error;
   const showForm = Boolean(accessToken) && verified;
-  const isDocumentsStep = activeStep === STEPS.length - 1;
+  const documentsStepIndex = STEPS.indexOf('Documents');
+  const isDocumentsStep = activeStep === documentsStepIndex;
+  const isPoliciesStep = activeStep === STEPS.length - 1;
+  const hideDraftSave = isDocumentsStep || isPoliciesStep;
 
   const renderStep = () => {
     if (activeStep === 0) {
@@ -890,8 +937,48 @@ const Join: React.FC = () => {
       );
     }
 
-    const checklist = documentsQuery.data;
-    if (documentsQuery.isPending) {
+    if (activeStep === documentsStepIndex) {
+      const checklist = documentsQuery.data;
+      if (documentsQuery.isPending) {
+        return (
+          <Stack alignItems="center" py={2}>
+            <CircularProgress size={24} />
+          </Stack>
+        );
+      }
+
+      return (
+        <Stack spacing={2}>
+          <Typography variant="body2" color="text.secondary">
+            Upload PDF, JPG, or PNG files up to 5 MB. Each uploaded file shows a preview so you can
+            confirm the right document before moving on.
+          </Typography>
+          {checklist && (
+            <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
+              {checklist.uploadedCount} of {checklist.requiredCount} required files uploaded
+            </Typography>
+          )}
+          {(checklist?.documents || []).map((doc) => {
+            const busy = uploadingType === doc.documentType && uploadDocument.isPending;
+            return (
+              <DocumentPreviewCard
+                key={`${doc.documentType}-${doc.version}-${doc.status}`}
+                doc={doc}
+                accessToken={accessToken}
+                busy={busy}
+                onUpload={(file) => {
+                  setUploadingType(doc.documentType);
+                  uploadDocument.mutate({ documentType: doc.documentType, file });
+                }}
+              />
+            );
+          })}
+        </Stack>
+      );
+    }
+
+    const policyState = policiesQuery.data;
+    if (policiesQuery.isPending) {
       return (
         <Stack alignItems="center" py={2}>
           <CircularProgress size={24} />
@@ -900,31 +987,137 @@ const Join: React.FC = () => {
     }
 
     return (
-      <Stack spacing={2}>
+      <Stack spacing={2.5}>
         <Typography variant="body2" color="text.secondary">
-          Upload PDF, JPG, or PNG files up to 5 MB. Each uploaded file shows a preview so you can
-          confirm the right document before moving on.
+          Read each policy in full, then accept it. After all policies are accepted, confirm the
+          joining declaration.
         </Typography>
-        {checklist && (
+        {policyState && (
           <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
-            {checklist.uploadedCount} of {checklist.requiredCount} required files uploaded
+            {policyState.acknowledgedCount} of {policyState.requiredCount} policies accepted
           </Typography>
         )}
-        {(checklist?.documents || []).map((doc) => {
-          const busy = uploadingType === doc.documentType && uploadDocument.isPending;
+        {(policyState?.policies || []).map((policy) => {
+          const busy = ackingPolicyId === policy.policyId && acknowledgePolicy.isPending;
           return (
-            <DocumentPreviewCard
-              key={`${doc.documentType}-${doc.version}-${doc.status}`}
-              doc={doc}
-              accessToken={accessToken}
-              busy={busy}
-              onUpload={(file) => {
-                setUploadingType(doc.documentType);
-                uploadDocument.mutate({ documentType: doc.documentType, file });
+            <Paper
+              key={`${policy.policyId}-${policy.version}`}
+              elevation={0}
+              sx={{
+                p: 2.25,
+                borderRadius: 2,
+                border: `1px solid ${policy.acknowledged ? '#BBF7D0' : JOIN.border}`,
+                bgcolor: policy.acknowledged ? '#F0FDF4' : JOIN.card,
               }}
-            />
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography fontWeight={700}>{policy.title}</Typography>
+                  <Chip
+                    size="small"
+                    color={policy.acknowledged ? 'success' : 'default'}
+                    label={policy.acknowledged ? 'Accepted' : 'Pending'}
+                    role="status"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Version {policy.version}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {policy.summary}
+                </Typography>
+                <Box
+                  sx={{
+                    maxHeight: 180,
+                    overflow: 'auto',
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    bgcolor: '#F8FAFC',
+                    border: `1px solid ${JOIN.border}`,
+                    whiteSpace: 'pre-wrap',
+                    typography: 'body2',
+                    color: JOIN.ink,
+                  }}
+                >
+                  {policy.body}
+                </Box>
+                <Button
+                  variant={policy.acknowledged ? 'outlined' : 'contained'}
+                  disabled={policy.acknowledged || busy}
+                  sx={policy.acknowledged ? OutlineButtonSx : PrimaryButtonSx}
+                  onClick={() => {
+                    setAckingPolicyId(policy.policyId);
+                    acknowledgePolicy.mutate(policy.policyId);
+                  }}
+                >
+                  {busy ? 'Saving…' : policy.acknowledged ? 'Accepted' : 'I accept this policy'}
+                </Button>
+              </Stack>
+            </Paper>
           );
         })}
+
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2.25,
+            borderRadius: 2,
+            border: `1px solid ${policyState?.declaration.accepted ? '#BBF7D0' : JOIN.border}`,
+            bgcolor: policyState?.declaration.accepted ? '#F0FDF4' : '#FFFBEB',
+          }}
+        >
+          <Stack spacing={1.5}>
+            <Typography fontWeight={700}>{policyState?.declaration.title || 'Joining declaration'}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Version {policyState?.declaration.version}
+            </Typography>
+            <Box
+              sx={{
+                whiteSpace: 'pre-wrap',
+                typography: 'body2',
+                color: JOIN.ink,
+              }}
+            >
+              {policyState?.declaration.body}
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={declarationChecked || Boolean(policyState?.declaration.accepted)}
+                  disabled={
+                    !policyState?.allPoliciesAcknowledged ||
+                    Boolean(policyState?.declaration.accepted) ||
+                    acceptDeclaration.isPending
+                  }
+                  onChange={(event) => setDeclarationChecked(event.target.checked)}
+                />
+              }
+              label="I confirm this declaration is true and complete"
+            />
+            {!policyState?.allPoliciesAcknowledged && (
+              <Typography variant="caption" color="text.secondary">
+                Accept every policy above before you can confirm the declaration.
+              </Typography>
+            )}
+            <Button
+              variant="contained"
+              sx={PrimaryButtonSx}
+              disabled={
+                !policyState?.allPoliciesAcknowledged ||
+                Boolean(policyState?.declaration.accepted) ||
+                !declarationChecked ||
+                acceptDeclaration.isPending
+              }
+              onClick={() => acceptDeclaration.mutate()}
+            >
+              {acceptDeclaration.isPending
+                ? 'Saving…'
+                : policyState?.declaration.accepted
+                  ? 'Declaration accepted'
+                  : 'Accept declaration'}
+            </Button>
+          </Stack>
+        </Paper>
       </Stack>
     );
   };
@@ -1185,7 +1378,7 @@ const Join: React.FC = () => {
                             spacing={1.25}
                             sx={{ width: { xs: '100%', sm: 'auto' } }}
                           >
-                            {!isDocumentsStep && (
+                            {!hideDraftSave && (
                               <Button
                                 variant="outlined"
                                 sx={{ ...OutlineButtonSx, width: { xs: '100%', sm: 'auto' } }}
@@ -1210,7 +1403,9 @@ const Join: React.FC = () => {
                                 variant="body2"
                                 sx={{ color: JOIN.muted, alignSelf: { sm: 'center' }, py: 1 }}
                               >
-                                Uploads save as soon as you choose a file.
+                                {policiesQuery.data?.declaration.accepted
+                                  ? 'Policies and declaration are saved. Final submit comes next.'
+                                  : 'Accept each policy, then the declaration, to finish this step.'}
                               </Typography>
                             )}
                           </Stack>

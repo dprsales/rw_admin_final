@@ -661,6 +661,58 @@ export const fetchJoinDocumentBlob = async (
   return { blob: response.data as Blob, mimeType };
 };
 
+export type JoinPolicyItem = {
+  policyId: string;
+  version: string;
+  title: string;
+  summary: string;
+  body: string;
+  acknowledged: boolean;
+  acknowledgedAt: string | null;
+};
+
+export type JoinPoliciesState = {
+  policies: JoinPolicyItem[];
+  requiredCount: number;
+  acknowledgedCount: number;
+  allPoliciesAcknowledged: boolean;
+  declaration: {
+    version: string;
+    title: string;
+    body: string;
+    accepted: boolean;
+    acceptedAt: string | null;
+  };
+};
+
+export const getJoinPolicies = async (accessToken: string): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.get('/join/policies', joinAuth(accessToken));
+  return response.data;
+};
+
+export const acknowledgeJoinPolicy = async (
+  accessToken: string,
+  policyId: string,
+): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.post(
+    `/join/policies/${policyId}/acknowledge`,
+    {},
+    joinAuth(accessToken),
+  );
+  return response.data;
+};
+
+export const acceptJoinDeclaration = async (
+  accessToken: string,
+): Promise<JoinPoliciesState> => {
+  const response = await joinHttp.post(
+    '/join/declaration',
+    { accepted: true },
+    joinAuth(accessToken),
+  );
+  return response.data;
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');
