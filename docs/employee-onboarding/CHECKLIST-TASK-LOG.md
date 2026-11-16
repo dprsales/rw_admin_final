@@ -10,14 +10,14 @@ Start to end. Do these in this order. The current task is the first step that is
 6. **Verify the email** — Done. Candidate requests a 6-digit code, verifies it on `/join`, with resend/attempt limits and audit events.
 7. **Candidate form** — Done for draft fields. Personal extras, education, previous employment, and bank save/resume on `/join`. Review-before-submit still outstanding.
 8. **Documents** — Done for first release review loop. Fixed checklist, private storage, candidate upload/preview, HR open/approve/reject with reason, and candidate re-upload. Full historical version archive still light.
-9. **Policies and declaration** — Current task. The candidate acknowledges the policies that apply to them.
-10. **Submit** — The candidate reviews and submits once. A second submit does not create a second record.
+9. **Policies and declaration** — Done for first release. Versioned policy catalog, per-policy acknowledge, joining declaration after all policies, Join Policies step, and audits.
+10. **Submit** — Current task. The candidate reviews and submits once. A second submit does not create a second record.
 11. **HR review** — Broader package review after policies/submit; document approve/reject is already in place.
 12. **Joining form and audit** — The system keeps the joining-form PDF and a history of the sensitive actions.
 
 ## Current task
 
-**Title:** Policies and declaration
+**Title:** Submit
 
-- Versioned policy text the candidate must acknowledge.
-- Final declaration before submit.
+- Review of form, documents, and policies before one submit.
+- Idempotent submit so a second click does not create a second record.
