@@ -455,7 +455,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                   ? 'Starting call…'
                   : callInFlight
                     ? 'Call in progress'
-                    : 'Call with Arjun'}
+                    : 'Call with Priti'}
               </Button>
               <Typography variant="caption" color="text.secondary">
                 Outpero dials this coaching enquiry. Results come back after the call.
