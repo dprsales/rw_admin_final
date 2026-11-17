@@ -111,7 +111,7 @@ const STEP_HELP: Record<string, string> = {
   Professional: 'Experience and ID numbers used for onboarding checks.',
   Education: 'Add every relevant qualification, starting with the highest.',
   'Work history': 'Previous employers, or mark yourself as a fresher.',
-  References: 'People who can confirm your background. Add at least two.',
+  References: 'People who can confirm your background. Add at least one.',
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
   Policies: 'Read each policy, accept it, then sign the final joining declaration.',
@@ -125,7 +125,7 @@ const FORM_ISSUE_LABELS: Record<string, string> = {
   emergencyContactPhone: 'Emergency contact phone',
   education: 'At least one education row',
   previousEmployment: 'Work history, or mark fresher',
-  references: 'At least two references',
+  references: 'At least one reference',
   bankAccountHolderName: 'Bank account holder name',
   bankName: 'Bank name',
   bankAccountNumber: 'Bank account number',
@@ -225,7 +225,7 @@ const emptyForm = {
   education: [emptyEducation()],
   isFresher: false,
   previousEmployment: [emptyEmployment()],
-  references: [emptyReference(), emptyReference()],
+      references: [emptyReference()],
   bankAccountHolderName: '',
   bankName: '',
   bankAccountNumber: '',
@@ -674,7 +674,7 @@ const Join: React.FC = () => {
       previousEmployment: draft.previousEmployment?.length
         ? draft.previousEmployment
         : [emptyEmployment()],
-      references: draft.references?.length ? draft.references : [emptyReference(), emptyReference()],
+      references: draft.references?.length ? draft.references : [emptyReference()],
       bankAccountHolderName: draft.bankAccountHolderName || '',
       bankName: draft.bankName || '',
       bankAccountNumber: draft.bankAccountNumber || '',
@@ -934,7 +934,7 @@ const Join: React.FC = () => {
       return (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            Add at least two people who can confirm your background.
+            Add at least one person who can confirm your background. You can add more if you want.
           </Typography>
           {form.references.map((row, index) => (
             <RepeatCard key={`ref-${index}`} title={`Reference ${index + 1}`}>
