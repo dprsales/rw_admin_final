@@ -728,6 +728,37 @@ export const acceptJoinDeclaration = async (
   return response.data;
 };
 
+export type JoinReadinessState = {
+  ready: boolean;
+  alreadySubmitted: boolean;
+  onboardingStatus: string;
+  packageSubmittedAt: string | null;
+  form: { ready: boolean; issues: string[] };
+  documents: {
+    ready: boolean;
+    issues: string[];
+    requiredCount: number;
+    uploadedCount: number;
+  };
+  policies: {
+    ready: boolean;
+    issues: string[];
+    requiredCount: number;
+    acknowledgedCount: number;
+    declarationAccepted: boolean;
+  };
+};
+
+export const getJoinReadiness = async (accessToken: string): Promise<JoinReadinessState> => {
+  const response = await joinHttp.get('/join/readiness', joinAuth(accessToken));
+  return response.data;
+};
+
+export const submitJoinPackage = async (accessToken: string): Promise<JoinReadinessState> => {
+  const response = await joinHttp.post('/join/submit', {}, joinAuth(accessToken));
+  return response.data;
+};
+
 // Site visits — daily unique-visitor tracker
 export const getSiteVisitsSummary = async () => {
   const response = await http.get('/site-visits/summary');

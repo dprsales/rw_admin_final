@@ -34,7 +34,7 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Admin frontend onboarding pages | Partial | Staff `/employees` creates and lists; public `/join` shows valid or refused. No dashboard queues, profile, or review pages | HR dashboard, create form, list, profile, review pages connected to API |
 | Stakeholder demo walkthrough | Complete locally / deployment pending | Public API-free route `/demo/onboarding` in `rw_admin_final` uses sample data and shows the four-stage flow | Deploy a preview link only after sharing the URL; keep it clearly labelled demo and never connect it to production data |
 | Candidate invitation/OTP | Complete foundation | Invite send, `/join` lookup, OTP send/verify, rate limits, and audit events are in place | Candidate session for the form is still outstanding |
-| Employee self-service | Partial | Join session + full draft form, Documents, and Policies steps on `/join` | Review/submit |
+| Employee self-service | Partial | Join session + form, Documents, Policies, and Review/submit on `/join` | Post-submit lock / correction reopen |
 | Private documents | Partial foundation | Candidate upload/preview + HR list/open/approve/reject; private disk only | Full version archive and broader HR queues still outstanding |
 | Policies/declaration | Partial | Versioned catalog, ack APIs, declaration after all policies, Join step | HR-approved final copy; assignment rules later |
 | HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
@@ -214,7 +214,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-Policies and declaration are in place on `GET /join/policies`, `POST /join/policies/:policyId/acknowledge`, and `POST /join/declaration`, with a Policies step on `/join`. Next: review-before-submit and one-shot package submit.
+Package submit is in place on `GET /join/readiness` and `POST /join/submit`, with a Review step on `/join`. Next: broader HR package review after submit (document approve/reject already exists).
 
 ## Product and company decisions to collect
 
@@ -248,7 +248,7 @@ Policies and declaration are in place on `GET /join/policies`, `POST /join/polic
 - [ ] Saved drafts, clear progress/next action, validation, and a review-before-submit step.
 - [x] Versioned applicable document checklist, private uploads, replacement history, and employee-visible correction reasons. First-release checklist and review loop done; full historical archive still light.
 - [x] Versioned policies and attributable acknowledgements/declaration. First-release catalog and Join step done; HR-approved copy still marked [to confirm].
-- [ ] Submission snapshot, duplicate-submit handling, HR correction/reopen flow, and separate onboarding/employment states.
+- [x] Submission readiness and one-shot package submit with idempotent second click. Snapshot PDF and correction/reopen flow still outstanding.
 
 ### HR operations and documents
 
@@ -271,6 +271,13 @@ Policies and declaration are in place on `GET /join/policies`, `POST /join/polic
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-17 — Package submit
+
+- Completed: Readiness checks for form minimums, required documents, and policies/declaration. Session-gated `GET /join/readiness` and idempotent `POST /join/submit` set status to Submitted with `packageSubmittedAt` and audit `package_submitted`. Admin `/join` Review step shows ready/pending rows and a one-click submit.
+- Files changed: `employees.submit.service.ts`, `employees.submit.spec.ts`, employee schema, onboarding audit schema, `join.controller.ts`, `employees.module.ts`; admin `Join.tsx`, `api/services/index.ts`; checklist + daily update.
+- Verification performed: submit Jest suite; admin typecheck where run.
+- Next item: Broader HR package review after submit.
 
 ### 2026-11-16 — Policies and declaration
 

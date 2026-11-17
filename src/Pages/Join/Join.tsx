@@ -40,10 +40,12 @@ import {
   getJoinDocuments,
   getJoinForm,
   getJoinPolicies,
+  getJoinReadiness,
   requestJoinOtp,
   resolveInvitation,
   resumeJoinSession,
   saveJoinForm,
+  submitJoinPackage,
   uploadJoinDocument,
   verifyJoinOtp,
   type JoinDocumentItem,
@@ -101,6 +103,7 @@ const STEPS = [
   'Bank',
   'Documents',
   'Policies',
+  'Review',
 ];
 
 const STEP_HELP: Record<string, string> = {
@@ -112,6 +115,21 @@ const STEP_HELP: Record<string, string> = {
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
   Policies: 'Read each policy, accept it, then sign the final joining declaration.',
+  Review: 'Check that form, documents, and policies are complete, then submit once.',
+};
+
+const FORM_ISSUE_LABELS: Record<string, string> = {
+  phone: 'Phone number',
+  currentAddress: 'Current address',
+  emergencyContactName: 'Emergency contact name',
+  emergencyContactPhone: 'Emergency contact phone',
+  education: 'At least one education row',
+  previousEmployment: 'Work history, or mark fresher',
+  references: 'At least two references',
+  bankAccountHolderName: 'Bank account holder name',
+  bankName: 'Bank name',
+  bankAccountNumber: 'Bank account number',
+  bankIfsc: 'IFSC',
 };
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
@@ -610,6 +628,13 @@ const Join: React.FC = () => {
     retry: false,
   });
 
+  const readinessQuery = useQuery({
+    queryKey: ['join-readiness', accessToken],
+    queryFn: () => getJoinReadiness(accessToken),
+    enabled: Boolean(accessToken),
+    retry: false,
+  });
+
   const [uploadingType, setUploadingType] = useState('');
   const [ackingPolicyId, setAckingPolicyId] = useState('');
   const [declarationChecked, setDeclarationChecked] = useState(false);
@@ -683,6 +708,7 @@ const Join: React.FC = () => {
       setSavedAt(draft.formDraftSavedAt || draft.personalSectionSavedAt);
       setStatusMessage('Details saved. You can return later with the same invitation link.');
       queryClient.setQueryData(['join-form', accessToken], draft);
+      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
   });
 
@@ -695,6 +721,7 @@ const Join: React.FC = () => {
         `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`,
       );
       queryClient.setQueryData(['join-documents', accessToken], checklist);
+      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
     onError: () => setUploadingType(''),
   });
@@ -707,6 +734,7 @@ const Join: React.FC = () => {
         `Policies accepted: ${state.acknowledgedCount} of ${state.requiredCount}.`,
       );
       queryClient.setQueryData(['join-policies', accessToken], state);
+      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
     onError: () => setAckingPolicyId(''),
   });
@@ -715,8 +743,21 @@ const Join: React.FC = () => {
     mutationFn: () => acceptJoinDeclaration(accessToken),
     onSuccess: (state) => {
       setDeclarationChecked(true);
-      setStatusMessage('Joining declaration accepted. Final package submit comes next.');
+      setStatusMessage('Joining declaration accepted. Open Review to submit your package.');
       queryClient.setQueryData(['join-policies', accessToken], state);
+      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
+    },
+  });
+
+  const submitPackage = useMutation({
+    mutationFn: () => submitJoinPackage(accessToken),
+    onSuccess: (state) => {
+      setStatusMessage(
+        state.alreadySubmitted
+          ? 'Your joining package is submitted. HR will review it next.'
+          : 'Joining package submitted.',
+      );
+      queryClient.setQueryData(['join-readiness', accessToken], state);
     },
   });
 
@@ -762,12 +803,17 @@ const Join: React.FC = () => {
     uploadDocument.error ||
     policiesQuery.error ||
     acknowledgePolicy.error ||
-    acceptDeclaration.error;
+    acceptDeclaration.error ||
+    readinessQuery.error ||
+    submitPackage.error;
   const showForm = Boolean(accessToken) && verified;
   const documentsStepIndex = STEPS.indexOf('Documents');
+  const policiesStepIndex = STEPS.indexOf('Policies');
+  const reviewStepIndex = STEPS.indexOf('Review');
   const isDocumentsStep = activeStep === documentsStepIndex;
-  const isPoliciesStep = activeStep === STEPS.length - 1;
-  const hideDraftSave = isDocumentsStep || isPoliciesStep;
+  const isPoliciesStep = activeStep === policiesStepIndex;
+  const isReviewStep = activeStep === reviewStepIndex;
+  const hideDraftSave = isDocumentsStep || isPoliciesStep || isReviewStep;
 
   const renderStep = () => {
     if (activeStep === 0) {
@@ -977,8 +1023,154 @@ const Join: React.FC = () => {
       );
     }
 
-    const policyState = policiesQuery.data;
-    if (policiesQuery.isPending) {
+    if (activeStep === policiesStepIndex) {
+      const policyState = policiesQuery.data;
+      if (policiesQuery.isPending) {
+        return (
+          <Stack alignItems="center" py={2}>
+            <CircularProgress size={24} />
+          </Stack>
+        );
+      }
+
+      return (
+        <Stack spacing={2.5}>
+          <Typography variant="body2" color="text.secondary">
+            Read each policy in full, then accept it. After all policies are accepted, confirm the
+            joining declaration.
+          </Typography>
+          {policyState && (
+            <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
+              {policyState.acknowledgedCount} of {policyState.requiredCount} policies accepted
+            </Typography>
+          )}
+          {(policyState?.policies || []).map((policy) => {
+            const busy = ackingPolicyId === policy.policyId && acknowledgePolicy.isPending;
+            return (
+              <Paper
+                key={`${policy.policyId}-${policy.version}`}
+                elevation={0}
+                sx={{
+                  p: 2.25,
+                  borderRadius: 2,
+                  border: `1px solid ${policy.acknowledged ? '#BBF7D0' : JOIN.border}`,
+                  bgcolor: policy.acknowledged ? '#F0FDF4' : JOIN.card,
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography fontWeight={700}>{policy.title}</Typography>
+                    <Chip
+                      size="small"
+                      color={policy.acknowledged ? 'success' : 'default'}
+                      label={policy.acknowledged ? 'Accepted' : 'Pending'}
+                      role="status"
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      Version {policy.version}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {policy.summary}
+                  </Typography>
+                  <Box
+                    sx={{
+                      maxHeight: 180,
+                      overflow: 'auto',
+                      p: 1.5,
+                      borderRadius: 1.5,
+                      bgcolor: '#F8FAFC',
+                      border: `1px solid ${JOIN.border}`,
+                      whiteSpace: 'pre-wrap',
+                      typography: 'body2',
+                      color: JOIN.ink,
+                    }}
+                  >
+                    {policy.body}
+                  </Box>
+                  <Button
+                    variant={policy.acknowledged ? 'outlined' : 'contained'}
+                    disabled={policy.acknowledged || busy}
+                    sx={policy.acknowledged ? OutlineButtonSx : PrimaryButtonSx}
+                    onClick={() => {
+                      setAckingPolicyId(policy.policyId);
+                      acknowledgePolicy.mutate(policy.policyId);
+                    }}
+                  >
+                    {busy ? 'Saving…' : policy.acknowledged ? 'Accepted' : 'I accept this policy'}
+                  </Button>
+                </Stack>
+              </Paper>
+            );
+          })}
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.25,
+              borderRadius: 2,
+              border: `1px solid ${policyState?.declaration.accepted ? '#BBF7D0' : JOIN.border}`,
+              bgcolor: policyState?.declaration.accepted ? '#F0FDF4' : '#FFFBEB',
+            }}
+          >
+            <Stack spacing={1.5}>
+              <Typography fontWeight={700}>{policyState?.declaration.title || 'Joining declaration'}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Version {policyState?.declaration.version}
+              </Typography>
+              <Box
+                sx={{
+                  whiteSpace: 'pre-wrap',
+                  typography: 'body2',
+                  color: JOIN.ink,
+                }}
+              >
+                {policyState?.declaration.body}
+              </Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={declarationChecked || Boolean(policyState?.declaration.accepted)}
+                    disabled={
+                      !policyState?.allPoliciesAcknowledged ||
+                      Boolean(policyState?.declaration.accepted) ||
+                      acceptDeclaration.isPending
+                    }
+                    onChange={(event) => setDeclarationChecked(event.target.checked)}
+                  />
+                }
+                label="I confirm this declaration is true and complete"
+              />
+              {!policyState?.allPoliciesAcknowledged && (
+                <Typography variant="caption" color="text.secondary">
+                  Accept every policy above before you can confirm the declaration.
+                </Typography>
+              )}
+              <Button
+                variant="contained"
+                sx={PrimaryButtonSx}
+                disabled={
+                  !policyState?.allPoliciesAcknowledged ||
+                  Boolean(policyState?.declaration.accepted) ||
+                  !declarationChecked ||
+                  acceptDeclaration.isPending
+                }
+                onClick={() => acceptDeclaration.mutate()}
+              >
+                {acceptDeclaration.isPending
+                  ? 'Saving…'
+                  : policyState?.declaration.accepted
+                    ? 'Declaration accepted'
+                    : 'Accept declaration'}
+              </Button>
+            </Stack>
+          </Paper>
+        </Stack>
+      );
+    }
+
+    const readiness = readinessQuery.data;
+    if (readinessQuery.isPending) {
       return (
         <Stack alignItems="center" py={2}>
           <CircularProgress size={24} />
@@ -986,138 +1178,100 @@ const Join: React.FC = () => {
       );
     }
 
+    const reviewRows = [
+      {
+        key: 'form',
+        title: 'Form details',
+        ready: Boolean(readiness?.form.ready),
+        detail: readiness?.form.ready
+          ? 'Personal, work, references, and bank details look complete.'
+          : `Still needed: ${(readiness?.form.issues || [])
+              .map((issue) => FORM_ISSUE_LABELS[issue] || issue)
+              .join(', ')}.`,
+      },
+      {
+        key: 'documents',
+        title: 'Documents',
+        ready: Boolean(readiness?.documents.ready),
+        detail: readiness?.documents.ready
+          ? `${readiness.documents.uploadedCount} of ${readiness.documents.requiredCount} required files uploaded.`
+          : `${readiness?.documents.uploadedCount || 0} of ${readiness?.documents.requiredCount || 0} required files ready. Fix missing or re-upload items.`,
+      },
+      {
+        key: 'policies',
+        title: 'Policies and declaration',
+        ready: Boolean(readiness?.policies.ready),
+        detail: readiness?.policies.ready
+          ? 'All policies and the joining declaration are accepted.'
+          : `${readiness?.policies.acknowledgedCount || 0} of ${readiness?.policies.requiredCount || 0} policies accepted${
+              readiness?.policies.declarationAccepted ? '' : ', declaration still pending'
+            }.`,
+      },
+    ];
+
     return (
       <Stack spacing={2.5}>
-        <Typography variant="body2" color="text.secondary">
-          Read each policy in full, then accept it. After all policies are accepted, confirm the
-          joining declaration.
-        </Typography>
-        {policyState && (
-          <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
-            {policyState.acknowledgedCount} of {policyState.requiredCount} policies accepted
+        {readiness?.alreadySubmitted ? (
+          <Alert severity="success" sx={{ borderRadius: 2 }}>
+            Package submitted
+            {readiness.packageSubmittedAt
+              ? ` on ${new Date(readiness.packageSubmittedAt).toLocaleString()}.`
+              : '.'}{' '}
+            HR will review it next. A second submit does not create another record.
+          </Alert>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Confirm each part below is complete, then submit once. You can go back to fix anything
+            that is still pending.
           </Typography>
         )}
-        {(policyState?.policies || []).map((policy) => {
-          const busy = ackingPolicyId === policy.policyId && acknowledgePolicy.isPending;
-          return (
-            <Paper
-              key={`${policy.policyId}-${policy.version}`}
-              elevation={0}
-              sx={{
-                p: 2.25,
-                borderRadius: 2,
-                border: `1px solid ${policy.acknowledged ? '#BBF7D0' : JOIN.border}`,
-                bgcolor: policy.acknowledged ? '#F0FDF4' : JOIN.card,
-              }}
-            >
-              <Stack spacing={1.5}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                  <Typography fontWeight={700}>{policy.title}</Typography>
-                  <Chip
-                    size="small"
-                    color={policy.acknowledged ? 'success' : 'default'}
-                    label={policy.acknowledged ? 'Accepted' : 'Pending'}
-                    role="status"
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Version {policy.version}
-                  </Typography>
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {policy.summary}
-                </Typography>
-                <Box
-                  sx={{
-                    maxHeight: 180,
-                    overflow: 'auto',
-                    p: 1.5,
-                    borderRadius: 1.5,
-                    bgcolor: '#F8FAFC',
-                    border: `1px solid ${JOIN.border}`,
-                    whiteSpace: 'pre-wrap',
-                    typography: 'body2',
-                    color: JOIN.ink,
-                  }}
-                >
-                  {policy.body}
-                </Box>
-                <Button
-                  variant={policy.acknowledged ? 'outlined' : 'contained'}
-                  disabled={policy.acknowledged || busy}
-                  sx={policy.acknowledged ? OutlineButtonSx : PrimaryButtonSx}
-                  onClick={() => {
-                    setAckingPolicyId(policy.policyId);
-                    acknowledgePolicy.mutate(policy.policyId);
-                  }}
-                >
-                  {busy ? 'Saving…' : policy.acknowledged ? 'Accepted' : 'I accept this policy'}
-                </Button>
-              </Stack>
-            </Paper>
-          );
-        })}
 
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2.25,
-            borderRadius: 2,
-            border: `1px solid ${policyState?.declaration.accepted ? '#BBF7D0' : JOIN.border}`,
-            bgcolor: policyState?.declaration.accepted ? '#F0FDF4' : '#FFFBEB',
-          }}
+        {reviewRows.map((row) => (
+          <Paper
+            key={row.key}
+            elevation={0}
+            sx={{
+              p: 2.25,
+              borderRadius: 2,
+              border: `1px solid ${row.ready ? '#BBF7D0' : JOIN.border}`,
+              bgcolor: row.ready ? '#F0FDF4' : JOIN.card,
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="flex-start" justifyContent="space-between">
+              <Box>
+                <Typography fontWeight={700}>{row.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {row.detail}
+                </Typography>
+              </Box>
+              <Chip
+                size="small"
+                color={row.ready ? 'success' : 'warning'}
+                label={row.ready ? 'Ready' : 'Pending'}
+                role="status"
+              />
+            </Stack>
+          </Paper>
+        ))}
+
+        <Button
+          variant="contained"
+          sx={PrimaryButtonSx}
+          disabled={
+            Boolean(readiness?.alreadySubmitted) ||
+            !readiness?.ready ||
+            submitPackage.isPending
+          }
+          onClick={() => submitPackage.mutate()}
         >
-          <Stack spacing={1.5}>
-            <Typography fontWeight={700}>{policyState?.declaration.title || 'Joining declaration'}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              Version {policyState?.declaration.version}
-            </Typography>
-            <Box
-              sx={{
-                whiteSpace: 'pre-wrap',
-                typography: 'body2',
-                color: JOIN.ink,
-              }}
-            >
-              {policyState?.declaration.body}
-            </Box>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={declarationChecked || Boolean(policyState?.declaration.accepted)}
-                  disabled={
-                    !policyState?.allPoliciesAcknowledged ||
-                    Boolean(policyState?.declaration.accepted) ||
-                    acceptDeclaration.isPending
-                  }
-                  onChange={(event) => setDeclarationChecked(event.target.checked)}
-                />
-              }
-              label="I confirm this declaration is true and complete"
-            />
-            {!policyState?.allPoliciesAcknowledged && (
-              <Typography variant="caption" color="text.secondary">
-                Accept every policy above before you can confirm the declaration.
-              </Typography>
-            )}
-            <Button
-              variant="contained"
-              sx={PrimaryButtonSx}
-              disabled={
-                !policyState?.allPoliciesAcknowledged ||
-                Boolean(policyState?.declaration.accepted) ||
-                !declarationChecked ||
-                acceptDeclaration.isPending
-              }
-              onClick={() => acceptDeclaration.mutate()}
-            >
-              {acceptDeclaration.isPending
-                ? 'Saving…'
-                : policyState?.declaration.accepted
-                  ? 'Declaration accepted'
-                  : 'Accept declaration'}
-            </Button>
-          </Stack>
-        </Paper>
+          {submitPackage.isPending
+            ? 'Submitting…'
+            : readiness?.alreadySubmitted
+              ? 'Already submitted'
+              : readiness?.ready
+                ? 'Submit joining package'
+                : 'Finish pending items first'}
+        </Button>
       </Stack>
     );
   };
@@ -1392,9 +1546,14 @@ const Join: React.FC = () => {
                               <Button
                                 variant="contained"
                                 sx={{ ...PrimaryButtonSx, width: { xs: '100%', sm: 'auto' } }}
-                                onClick={() =>
-                                  setActiveStep((step) => Math.min(STEPS.length - 1, step + 1))
-                                }
+                                onClick={() => {
+                                  if (activeStep === reviewStepIndex - 1) {
+                                    queryClient.invalidateQueries({
+                                      queryKey: ['join-readiness', accessToken],
+                                    });
+                                  }
+                                  setActiveStep((step) => Math.min(STEPS.length - 1, step + 1));
+                                }}
                               >
                                 Next section
                               </Button>
@@ -1403,9 +1562,9 @@ const Join: React.FC = () => {
                                 variant="body2"
                                 sx={{ color: JOIN.muted, alignSelf: { sm: 'center' }, py: 1 }}
                               >
-                                {policiesQuery.data?.declaration.accepted
-                                  ? 'Policies and declaration are saved. Final submit comes next.'
-                                  : 'Accept each policy, then the declaration, to finish this step.'}
+                                {readinessQuery.data?.alreadySubmitted
+                                  ? 'Package submitted. HR review comes next.'
+                                  : 'Submit only when form, documents, and policies are ready.'}
                               </Typography>
                             )}
                           </Stack>
