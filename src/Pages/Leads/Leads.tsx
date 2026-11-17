@@ -60,12 +60,30 @@ export interface Lead {
   lastCallAt?: string;
 }
 
-/** Same rule as the API: only coaching enquiries get Outpero dial. */
+/** Same rule as the API: coaching enquiries get Priti. */
 export function isCoachingLead(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): boolean {
   if (lead.type === 'coaching') return true;
   if (lead.formTrack === 'coaching') return true;
   if (lead.recommendedService === 'coaching') return true;
   return false;
+}
+
+/** Consulting enquiries get Meera. */
+export function isConsultingLead(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): boolean {
+  if (lead.type === 'consulting') return true;
+  if (lead.formTrack === 'consulting') return true;
+  if (lead.recommendedService === 'consulting') return true;
+  return false;
+}
+
+export function isCallableLead(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): boolean {
+  return isCoachingLead(lead) || isConsultingLead(lead);
+}
+
+export function callAgentLabel(lead: Pick<Lead, 'type' | 'formTrack' | 'recommendedService'>): string {
+  if (isConsultingLead(lead) && !isCoachingLead(lead)) return 'Call with Meera';
+  if (isConsultingLead(lead) && lead.formTrack === 'consulting') return 'Call with Meera';
+  return 'Call with Priti';
 }
 
 export const CALL_STATUS_LABEL: Record<string, string> = {
@@ -786,7 +804,7 @@ const AllLeads: React.FC = () => {
                   sx={{ padding: '8px 12px', minWidth: 120 }}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {isCoachingLead(lead) ? (
+                  {isCallableLead(lead) ? (
                     <Box>
                       <Button
                         size="small"
