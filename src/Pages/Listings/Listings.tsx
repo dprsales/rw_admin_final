@@ -5,15 +5,21 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  ClickAwayListener,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  Grow,
   IconButton,
   InputAdornment,
-  Link,
+  ListItemIcon,
+  ListItemText,
+  MenuItem,
+  MenuList,
   Paper,
+  Popper,
   Stack,
   Tab,
   Table,
@@ -29,11 +35,14 @@ import {
 import {
   CheckCircleOutline,
   DeleteOutline,
-  OpenInNew,
+  HighlightOff,
+  MailOutline,
+  MoreVert,
   Search,
   VisibilityOutlined,
 } from '@mui/icons-material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import {
   approveAdminListing,
@@ -44,7 +53,6 @@ import {
   createAdminListingUser,
   deleteAdminListing,
   deleteAdminListingUser,
-  getAdminListing,
   getAdminListings,
   getAdminListingUsers,
   rejectAdminListing,
@@ -100,7 +108,7 @@ const STATUS_COLOR: Record<ListingStatus, 'warning' | 'success' | 'error'> = {
 }
 
 const formatPrice = (value?: number) => {
-  if (!value || value <= 0) return '—'
+  if (!value || value <= 0) return '-'
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
@@ -109,7 +117,7 @@ const formatPrice = (value?: number) => {
 }
 
 const formatDate = (value?: string) => {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
@@ -133,28 +141,29 @@ export default function Listings() {
 }
 
 function PropertiesPanel() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | ListingStatus>('all')
   const [selected, setSelected] = useState<string[]>([])
-  const [viewId, setViewId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<{ ids: string[] } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [actionMenu, setActionMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null)
 
   const { data, isPending, error } = useQuery<AdminListing[]>({
     queryKey: ['admin-listings'],
     queryFn: () => getAdminListings(),
   })
 
-  const { data: detail, isFetching: detailLoading } = useQuery<AdminListing>({
-    queryKey: ['admin-listing', viewId],
-    queryFn: () => getAdminListing(viewId!),
-    enabled: !!viewId,
-  })
+  const actionRow = useMemo(
+    () => (data || []).find((row) => row._id === actionMenu?.id) || null,
+    [data, actionMenu?.id],
+  )
+
+  const closeActionMenu = () => setActionMenu(null)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-listings'] })
-    if (viewId) queryClient.invalidateQueries({ queryKey: ['admin-listing', viewId] })
   }
 
   const approveOne = useMutation({
@@ -180,7 +189,6 @@ function PropertiesPanel() {
     mutationFn: (id: string) => deleteAdminListing(id),
     onSuccess: () => {
       toast.success('Listing deleted')
-      setViewId(null)
       invalidate()
     },
     onError: () => toast.error('Could not delete listing'),
@@ -323,7 +331,12 @@ function PropertiesPanel() {
                         sx={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 1, bgcolor: '#eee', display: row.coverImage ? 'block' : 'none' }}
                       />
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600, maxWidth: 260 }} noWrap>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, maxWidth: 260, cursor: 'pointer', color: '#0f63a5' }}
+                          noWrap
+                          onClick={() => navigate(`/listings/${row._id}`)}
+                        >
                           {row.details?.oneLineDescription || row.title || 'Untitled'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -333,11 +346,11 @@ function PropertiesPanel() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{row.ownerName || '—'}</Typography>
+                    <Typography variant="body2">{row.ownerName || '-'}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.email}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{row.listingType || '—'}</Typography>
+                    <Typography variant="body2">{row.listingType || '-'}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.bhk || ''}</Typography>
                   </TableCell>
                   <TableCell>{formatPrice(row.priceValue)}</TableCell>
@@ -345,30 +358,29 @@ function PropertiesPanel() {
                     <Chip size="small" label={row.status} color={STATUS_COLOR[row.status]} sx={{ textTransform: 'capitalize' }} />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="caption" display="block">👁 {row.views || 0} · ✉️ {row.enquiryCount || 0}</Typography>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.25 }}>
+                      <VisibilityOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                      <Typography variant="caption">{row.views || 0}</Typography>
+                      <MailOutline sx={{ fontSize: 14, color: 'text.secondary', ml: 0.5 }} />
+                      <Typography variant="caption">{row.enquiryCount || 0}</Typography>
+                    </Stack>
                     <Typography variant="caption" color="text.secondary">{formatDate(row.createdAt)}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => setViewId(row._id)} title="View"><VisibilityOutlined fontSize="small" /></IconButton>
-                    {row.status !== 'approved' && (
-                      <IconButton size="small" color="success" onClick={() => approveOne.mutate(row._id)} title="Approve">
-                        <CheckCircleOutline fontSize="small" />
-                      </IconButton>
-                    )}
-                    {row.status !== 'rejected' && (
-                      <Button size="small" color="warning" onClick={() => { setRejectReason(''); setRejectTarget({ ids: [row._id] }) }}>
-                        Reject
-                      </Button>
-                    )}
                     <IconButton
                       size="small"
-                      color="error"
-                      title="Delete"
-                      onClick={() => {
-                        if (window.confirm('Delete this listing and its photos/videos from CDN permanently?')) deleteOne.mutate(row._id)
+                      aria-label="Listing actions"
+                      aria-haspopup="menu"
+                      aria-expanded={actionMenu?.id === row._id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActionMenu((cur) =>
+                          cur?.id === row._id ? null : { id: row._id, anchor: e.currentTarget },
+                        )
                       }}
+                      sx={{ minWidth: 40, minHeight: 40 }}
                     >
-                      <DeleteOutline fontSize="small" />
+                      <MoreVert fontSize="small" />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -378,87 +390,84 @@ function PropertiesPanel() {
         </TableContainer>
       </Paper>
 
-      <Dialog open={!!viewId} onClose={() => setViewId(null)} maxWidth="md" fullWidth>
-        <DialogTitle>Listing detail</DialogTitle>
-        <DialogContent dividers>
-          {detailLoading && !detail ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>
-          ) : detail ? (
-            <Stack spacing={2}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                {detail.coverImage && (
-                  <Box component="img" src={detail.coverImage} alt="" sx={{ width: { xs: '100%', sm: 220 }, height: 160, objectFit: 'cover', borderRadius: 2 }} />
-                )}
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h6">{detail.details?.oneLineDescription || detail.title}</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{detail.title}</Typography>
-                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                    <Chip size="small" label={detail.status} color={STATUS_COLOR[detail.status]} sx={{ textTransform: 'capitalize' }} />
-                    <Chip size="small" variant="outlined" label={detail.listingType || '-'} />
-                    {detail.bhk && <Chip size="small" variant="outlined" label={detail.bhk} />}
-                    <Chip size="small" variant="outlined" label={formatPrice(detail.priceValue)} />
-                  </Stack>
-                </Box>
-              </Stack>
-              <Divider />
-              <Typography variant="subtitle2">Owner</Typography>
-              <Typography variant="body2">{detail.ownerName || '-'} · {detail.email} · {detail.mobile || 'no mobile'}</Typography>
-              <Typography variant="subtitle2">Description</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{detail.details?.oneLineDescription || '-'}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>{detail.details?.description || ''}</Typography>
-              <Typography variant="subtitle2">Publish permissions</Typography>
-              {Array.isArray(detail.listingConsentsText) && detail.listingConsentsText.length ? (
-                detail.listingConsentsText.map((line) => (
-                  <Typography key={line} variant="body2">{line}</Typography>
-                ))
-              ) : (
-                <Typography variant="body2">Not recorded</Typography>
-              )}
-              {detail.listingConsentsAcceptedAt && (
-                <Typography variant="caption" color="text.secondary">Accepted {formatDate(detail.listingConsentsAcceptedAt)}</Typography>
-              )}
-              <Typography variant="subtitle2">Commission consent</Typography>
-              <Typography variant="body2">
-                {detail.commissionAccepted ? `Accepted ${formatDate(detail.commissionAcceptedAt)}` : 'Not recorded'}
-              </Typography>
-              {detail.commissionTermsText && (
-                <Typography variant="body2" color="text.secondary">{detail.commissionTermsText}</Typography>
-              )}
-              {detail.slug && (
-                <Link href={`https://www.rajivwilliams.com/realty/listings/${detail.slug}`} target="_blank" rel="noreferrer" underline="hover">
-                  Open public page <OpenInNew sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }} />
-                </Link>
-              )}
-              {!!detail.enquiries?.length && (
-                <>
-                  <Typography variant="subtitle2">Enquiries ({detail.enquiries.length})</Typography>
-                  {detail.enquiries.map((e) => (
-                    <Paper key={e._id} variant="outlined" sx={{ p: 1.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.name} · {e.email}{e.phone ? ` · ${e.phone}` : ''}</Typography>
-                      <Typography variant="caption" color="text.secondary">{formatDate(e.createdAt)} · desk only, not sent to the lister</Typography>
-                      {e.message && <Typography variant="body2" sx={{ mt: 0.5 }}>{e.message}</Typography>}
-                    </Paper>
-                  ))}
-                </>
-              )}
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: 'wrap' }}>
-          <Button onClick={() => setViewId(null)}>Close</Button>
-          {detail && detail.status !== 'approved' && (
-            <Button color="success" variant="contained" disabled={approveOne.isPending} onClick={() => approveOne.mutate(detail._id)}>Approve</Button>
-          )}
-          {detail && detail.status !== 'rejected' && (
-            <Button color="warning" variant="outlined" onClick={() => { setRejectReason(''); setRejectTarget({ ids: [detail._id] }) }}>Reject</Button>
-          )}
-          {detail && (
-            <Button color="error" variant="contained" disabled={deleteOne.isPending} onClick={() => { if (window.confirm('Delete this listing and its photos/videos from CDN permanently?')) deleteOne.mutate(detail._id) }}>
-              Delete
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+      <Popper
+        open={Boolean(actionMenu)}
+        anchorEl={actionMenu?.anchor || null}
+        placement="bottom-end"
+        transition
+        disablePortal={false}
+        style={{ zIndex: 1300 }}
+      >
+        {({ TransitionProps }) => (
+          <Grow {...TransitionProps} style={{ transformOrigin: 'right top' }}>
+            <Paper
+              elevation={4}
+              sx={{
+                mt: 0.5,
+                minWidth: 180,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                overflow: 'hidden',
+              }}
+            >
+              <ClickAwayListener onClickAway={closeActionMenu}>
+                <MenuList dense autoFocusItem={Boolean(actionMenu)} sx={{ py: 0.5 }}>
+                  <MenuItem
+                    onClick={() => {
+                      if (!actionRow) return
+                      closeActionMenu()
+                      navigate(`/listings/${actionRow._id}`)
+                    }}
+                  >
+                    <ListItemIcon><VisibilityOutlined fontSize="small" /></ListItemIcon>
+                    <ListItemText>View details</ListItemText>
+                  </MenuItem>
+                  {actionRow && actionRow.status !== 'approved' && (
+                    <MenuItem
+                      onClick={() => {
+                        closeActionMenu()
+                        approveOne.mutate(actionRow._id)
+                      }}
+                      disabled={approveOne.isPending}
+                    >
+                      <ListItemIcon><CheckCircleOutline fontSize="small" color="success" /></ListItemIcon>
+                      <ListItemText>Approve</ListItemText>
+                    </MenuItem>
+                  )}
+                  {actionRow && actionRow.status !== 'rejected' && (
+                    <MenuItem
+                      onClick={() => {
+                        closeActionMenu()
+                        setRejectReason('')
+                        setRejectTarget({ ids: [actionRow._id] })
+                      }}
+                    >
+                      <ListItemIcon><HighlightOff fontSize="small" color="warning" /></ListItemIcon>
+                      <ListItemText>Reject</ListItemText>
+                    </MenuItem>
+                  )}
+                  <Divider sx={{ my: 0.5 }} />
+                  <MenuItem
+                    onClick={() => {
+                      if (!actionRow) return
+                      closeActionMenu()
+                      if (window.confirm('Delete this listing and its photos/videos from CDN permanently?')) {
+                        deleteOne.mutate(actionRow._id)
+                      }
+                    }}
+                    disabled={deleteOne.isPending}
+                    sx={{ color: 'error.main' }}
+                  >
+                    <ListItemIcon><DeleteOutline fontSize="small" color="error" /></ListItemIcon>
+                    <ListItemText>Delete</ListItemText>
+                  </MenuItem>
+                </MenuList>
+              </ClickAwayListener>
+            </Paper>
+          </Grow>
+        )}
+      </Popper>
 
       <Dialog open={!!rejectTarget} onClose={() => setRejectTarget(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Reject listing{rejectTarget && rejectTarget.ids.length > 1 ? 's' : ''}</DialogTitle>
@@ -621,11 +630,11 @@ function ListingUsersPanel() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.name || '—'}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.name || '-'}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.email}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{row.mobile || '—'}</Typography>
+                    <Typography variant="body2">{row.mobile || '-'}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.city || ''}</Typography>
                   </TableCell>
                   <TableCell>{row.listingCount ?? 0}</TableCell>

@@ -255,6 +255,21 @@ export const getAdminListing = async (id: string) => {
   return response.data;
 };
 
+export const updateAdminListing = async (
+  id: string,
+  data: {
+    city?: string;
+    listingType?: string;
+    details?: Record<string, unknown>;
+    ownerName?: string;
+    email?: string;
+    mobile?: string;
+  },
+) => {
+  const response = await http.patch(`/properties/admin/${id}`, data);
+  return response.data;
+};
+
 export const approveAdminListing = async (id: string) => {
   const response = await http.patch(`/properties/admin/${id}/approve`);
   return response.data;

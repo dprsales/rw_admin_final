@@ -30,8 +30,9 @@ const Header: React.FC<HeaderProps> = ({ selectedTab }) => {
     '/blogs': 'Blogs',
   };
 
-  // Get the current tab label, default to 'Dashboard' if route not found
-  const currentTabLabel = tabLabels[selectedTab] || 'Dashboard';
+  const currentTabLabel =
+    selectedTab.startsWith('/listings') ? 'Listings'
+    : tabLabels[selectedTab] || 'Dashboard';
 
   const handleLogout = () => {
     Cookies.remove("access_token");

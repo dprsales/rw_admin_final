@@ -21,6 +21,7 @@ import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnbo
 import Join from "../Pages/Join/Join";
 import Blogs from "../Pages/Blogs/Blogs";
 import Listings from "../Pages/Listings/Listings";
+import ListingDetail from "../Pages/Listings/ListingDetail";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
 const isAuthenticated = () => Boolean(Cookies.get("access_token"));
@@ -148,6 +149,10 @@ const router = createBrowserRouter([
       {
         path: "/listings",
         element: <ProtectedRoute allow="/listings" component={<Listings />} />,
+      },
+      {
+        path: "/listings/:id",
+        element: <ProtectedRoute allow="/listings" component={<ListingDetail />} />,
       },
     ],
   },
