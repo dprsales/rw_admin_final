@@ -461,6 +461,11 @@ export const rejectEmployeeDocument = async (
   return response.data as JoinDocumentsChecklist;
 };
 
+export const deleteEmployeeDocument = async (employeeId: string, documentType: string) => {
+  const response = await http.delete(`/employees/${employeeId}/documents/${documentType}`);
+  return response.data as JoinDocumentsChecklist;
+};
+
 export type EmployeePackageReview = {
   employeeId: string;
   employeeCode: string;
@@ -745,6 +750,14 @@ export const uploadJoinDocument = async (
       },
     ],
   });
+  return response.data;
+};
+
+export const deleteJoinDocument = async (
+  accessToken: string,
+  documentType: string,
+): Promise<JoinDocumentsChecklist> => {
+  const response = await joinHttp.delete(`/join/documents/${documentType}`, joinAuth(accessToken));
   return response.data;
 };
 

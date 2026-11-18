@@ -29,6 +29,7 @@ import {
   approveEmployeeDocument,
   approveEmployeePackage,
   createEmployee,
+  deleteEmployeeDocument,
   fetchEmployeeDocumentBlob,
   getEmployeeDocuments,
   getEmployeePackageReview,
@@ -116,13 +117,18 @@ const HrDocumentRow = ({
   const [previewMime, setPreviewMime] = useState(doc.mimeType || '');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [reason, setReason] = useState('');
-  const hasFile = doc.status !== 'Missing';
+  const hasFile = (doc.sizeBytes || 0) > 0 && Boolean(doc.mimeType);
   const canReview =
     hasFile &&
     doc.status !== 'Approved' &&
     doc.status !== 'Locked' &&
     doc.status !== 'Re-upload Required';
+  const canDelete =
+    (hasFile || doc.status === 'Re-upload Required') &&
+    doc.status !== 'Approved' &&
+    doc.status !== 'Locked';
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +172,16 @@ const HrDocumentRow = ({
       toast.success(`${doc.label} sent back for re-upload`);
       setRejectOpen(false);
       setReason('');
+      onChanged(checklist);
+    },
+    onError: (error: any) => toast.error(errorMessage(error)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteEmployeeDocument(employeeId, doc.documentType),
+    onSuccess: (checklist) => {
+      toast.success(`${doc.label} deleted from storage`);
+      setDeleteOpen(false);
       onChanged(checklist);
     },
     onError: (error: any) => toast.error(errorMessage(error)),
@@ -248,6 +264,16 @@ const HrDocumentRow = ({
                 Reject
               </Button>
             )}
+            {canDelete && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => setDeleteOpen(true)}
+              >
+                Delete
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Stack>
@@ -278,8 +304,11 @@ const HrDocumentRow = ({
       </Dialog>
 
       <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Reject {doc.label}</DialogTitle>
+        <DialogTitle>Reject {doc.label}?</DialogTitle>
         <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            The current file will be deleted from storage. The candidate must upload a new one.
+          </Alert>
           <TextField
             autoFocus
             fullWidth
@@ -302,7 +331,30 @@ const HrDocumentRow = ({
             disabled={rejectMutation.isPending || reason.trim().length < 3}
             onClick={() => rejectMutation.mutate()}
           >
-            {rejectMutation.isPending ? 'Saving…' : 'Send for re-upload'}
+            {rejectMutation.isPending ? 'Saving…' : 'Confirm reject and delete file'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Delete {doc.label}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This removes the file from the joining record and deletes it from storage. This cannot
+            be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={deleteMutation.isPending}
+            onClick={() => deleteMutation.mutate()}
+          >
+            {deleteMutation.isPending ? 'Deleting…' : 'Delete file'}
           </Button>
         </DialogActions>
       </Dialog>

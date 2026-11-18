@@ -36,6 +36,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   acceptJoinDeclaration,
   acknowledgeJoinPolicy,
+  deleteJoinDocument,
   fetchJoinDocumentBlob,
   getJoinDocuments,
   getJoinForm,
@@ -335,21 +336,27 @@ const DocumentPreviewCard = ({
   doc,
   accessToken,
   busy,
+  deleting,
   onUpload,
+  onDelete,
 }: {
   doc: JoinDocumentItem;
   accessToken: string;
   busy: boolean;
+  deleting: boolean;
   onUpload: (file: File) => void;
+  onDelete: () => void;
 }) => {
   const inputId = `join-doc-${doc.documentType}`;
-  const hasFile = doc.status !== 'Missing';
+  const hasFile = (doc.sizeBytes || 0) > 0 && Boolean(doc.mimeType);
   const needsReupload = doc.status === 'Re-upload Required';
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewMime, setPreviewMime] = useState(doc.mimeType || '');
   const [previewError, setPreviewError] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -486,14 +493,16 @@ const DocumentPreviewCard = ({
               <Chip
                 size="small"
                 color={chipColor}
-                label={hasFile ? doc.status : 'Missing'}
+                label={needsReupload ? 'Re-upload Required' : hasFile ? doc.status : 'Missing'}
                 role="status"
               />
             </Stack>
             <Typography variant="body2" color="text.secondary" mt={0.5}>
               {hasFile
                 ? `${doc.originalFileName || 'Uploaded file'}${doc.version ? ` · v${doc.version}` : ''}`
-                : 'PDF, JPG, or PNG up to 5 MB'}
+                : needsReupload
+                  ? 'Previous file removed. Upload a new file.'
+                  : 'PDF, JPG, or PNG up to 5 MB'}
             </Typography>
             {needsReupload && doc.rejectionReason && (
               <Alert severity="warning" sx={{ mt: 1 }} role="alert">
@@ -516,7 +525,7 @@ const DocumentPreviewCard = ({
             <Button
               variant="contained"
               component="label"
-              disabled={busy || locked}
+              disabled={busy || deleting || locked}
               sx={{
                 ...PrimaryButtonSx,
                 ...(needsReupload
@@ -534,13 +543,76 @@ const DocumentPreviewCard = ({
                   const file = event.target.files?.[0];
                   event.target.value = '';
                   if (!file) return;
+                  if (hasFile) {
+                    setPendingFile(file);
+                    return;
+                  }
                   onUpload(file);
                 }}
               />
             </Button>
+            {hasFile && !locked && (
+              <Button
+                variant="outlined"
+                color="warning"
+                disabled={busy || deleting}
+                sx={OutlineButtonSx}
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Stack>
+
+      <Dialog open={Boolean(pendingFile)} onClose={() => setPendingFile(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Replace this file?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            The current file will be removed from storage and replaced with{' '}
+            {pendingFile?.name || 'the new file'}.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingFile(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            sx={PrimaryButtonSx}
+            onClick={() => {
+              if (!pendingFile) return;
+              const file = pendingFile;
+              setPendingFile(null);
+              onUpload(file);
+            }}
+          >
+            Replace file
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Delete this file?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {doc.label} will be removed from the joining form and deleted from storage. This cannot
+            be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => {
+              setDeleteConfirmOpen(false);
+              onDelete();
+            }}
+          >
+            Delete file
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{doc.label}</DialogTitle>
@@ -636,6 +708,7 @@ const Join: React.FC = () => {
   });
 
   const [uploadingType, setUploadingType] = useState('');
+  const [deletingType, setDeletingType] = useState('');
   const [ackingPolicyId, setAckingPolicyId] = useState('');
   const [declarationChecked, setDeclarationChecked] = useState(false);
 
@@ -726,6 +799,19 @@ const Join: React.FC = () => {
     onError: () => setUploadingType(''),
   });
 
+  const deleteDocument = useMutation({
+    mutationFn: (documentType: string) => deleteJoinDocument(accessToken, documentType),
+    onSuccess: (checklist) => {
+      setDeletingType('');
+      setStatusMessage(
+        `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`,
+      );
+      queryClient.setQueryData(['join-documents', accessToken], checklist);
+      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
+    },
+    onError: () => setDeletingType(''),
+  });
+
   const acknowledgePolicy = useMutation({
     mutationFn: (policyId: string) => acknowledgeJoinPolicy(accessToken, policyId),
     onSuccess: (state) => {
@@ -801,6 +887,7 @@ const Join: React.FC = () => {
     formQuery.error ||
     documentsQuery.error ||
     uploadDocument.error ||
+    deleteDocument.error ||
     policiesQuery.error ||
     acknowledgePolicy.error ||
     acceptDeclaration.error ||
@@ -1006,15 +1093,21 @@ const Join: React.FC = () => {
           )}
           {(checklist?.documents || []).map((doc) => {
             const busy = uploadingType === doc.documentType && uploadDocument.isPending;
+            const deleting = deletingType === doc.documentType && deleteDocument.isPending;
             return (
               <DocumentPreviewCard
                 key={`${doc.documentType}-${doc.version}-${doc.status}`}
                 doc={doc}
                 accessToken={accessToken}
                 busy={busy}
+                deleting={deleting}
                 onUpload={(file) => {
                   setUploadingType(doc.documentType);
                   uploadDocument.mutate({ documentType: doc.documentType, file });
+                }}
+                onDelete={() => {
+                  setDeletingType(doc.documentType);
+                  deleteDocument.mutate(doc.documentType);
                 }}
               />
             );

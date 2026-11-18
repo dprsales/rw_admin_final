@@ -37,7 +37,7 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | Employee self-service | Partial | Join session + form, Documents, Policies, and Review/submit on `/join` | Post-submit lock / correction reopen |
 | Private documents | Partial foundation | Candidate upload/preview + HR list/open/approve/reject; private disk only | Full version archive and broader HR queues still outstanding |
 | Policies/declaration | Partial | Versioned catalog, ack APIs, declaration after all policies, Join step | HR-approved final copy; assignment rules later |
-| HR review/corrections | Not started | No review workflow | Approve/reject/re-upload/reopen with reasons and state checks |
+| HR review/corrections | Partial | Document approve/reject + package start/approve/return | Queues, reopen polish, email reminders |
 | Joining Form PDF | Not started | No PDF module | Server-generated, versioned HR/employee copies stored privately |
 | Audit log | Not started | No onboarding audit module | Append-only events for all sensitive actions and downloads |
 | Notifications/reminders | Not started | No onboarding delivery history/job flow | Durable, retryable invitation and reminder jobs without duplicates |
@@ -214,7 +214,7 @@ Whenever work on this project is started or completed, update this checklist in 
 
 ## Next recommended work item
 
-Package submit is in place on `GET /join/readiness` and `POST /join/submit`, with a Review step on `/join`. Next: broader HR package review after submit (document approve/reject already exists).
+HR package review is in place on `GET /employees/:id/review` plus start / approve / return. Next: joining-form PDF generation and storing HR/employee copies privately.
 
 ## Product and company decisions to collect
 
@@ -271,6 +271,13 @@ Package submit is in place on `GET /join/readiness` and `POST /join/submit`, wit
 ## Progress log
 
 Add newest entries at the top. Keep this log factual and include the date, summary, files, verification performed, screenshot/artifact location, and remaining issues.
+
+### 2026-11-18 — HR package review
+
+- Completed: HR package summary with form, documents, and policies. `GET /employees/:id/review`, `POST .../review/start`, `.../approve` (requires all required docs approved), and `.../return` with reason. Status moves to Under Review, Completed, or Corrections Required. Audits for start, approve, return. Employees Review dialog. Candidate sees return reason on Join Review and can submit again.
+- Files changed: `employees.review.service.ts`, `employees.review.spec.ts`, `return-package.dto.ts`, employee schema, audit schema, `employees.controller.ts`, `employees.module.ts`, submit readiness correction reason; admin `Employees.tsx`, `Join.tsx`, API helpers; checklist + daily update.
+- Verification performed: review Jest suite; admin typecheck where run.
+- Next item: Joining form PDF.
 
 ### 2026-11-17 — Package submit
 
