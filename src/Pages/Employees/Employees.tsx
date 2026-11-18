@@ -19,6 +19,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { PersonAddAlt1 } from '@mui/icons-material';
@@ -239,40 +240,50 @@ const HrDocumentRow = ({
           )}
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             {hasFile && previewUrl && (
-              <Button size="small" variant="outlined" onClick={() => setPreviewOpen(true)}>
-                Open
-              </Button>
+              <Tooltip title="Open a larger preview of this file">
+                <Button size="small" variant="outlined" onClick={() => setPreviewOpen(true)}>
+                  Open
+                </Button>
+              </Tooltip>
             )}
             {canReview && (
-              <Button
-                size="small"
-                variant="contained"
-                color="success"
-                disabled={approveMutation.isPending}
-                onClick={() => approveMutation.mutate()}
-              >
-                {approveMutation.isPending ? 'Saving…' : 'Approve'}
-              </Button>
+              <Tooltip title="Accept this document. Needed before the full package can be approved.">
+                <span>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="success"
+                    disabled={approveMutation.isPending}
+                    onClick={() => approveMutation.mutate()}
+                  >
+                    {approveMutation.isPending ? 'Saving…' : 'Approve'}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
             {canReview && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="warning"
-                onClick={() => setRejectOpen(true)}
-              >
-                Reject
-              </Button>
+              <Tooltip title="Reject this one file, delete it from storage, and ask the candidate to upload again.">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => setRejectOpen(true)}
+                >
+                  Reject
+                </Button>
+              </Tooltip>
             )}
             {canDelete && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                onClick={() => setDeleteOpen(true)}
-              >
-                Delete
-              </Button>
+              <Tooltip title="Remove this file from the record and delete it from storage.">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  Delete
+                </Button>
+              </Tooltip>
             )}
           </Stack>
         </Stack>
@@ -598,30 +609,48 @@ const PackageReviewDialog = ({
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, flexWrap: 'wrap', gap: 1 }}>
-          <Button onClick={onClose}>Close</Button>
+          <Tooltip title="Close this review window">
+            <Button onClick={onClose}>Close</Button>
+          </Tooltip>
           {review?.canStartReview && (
-            <Button
-              variant="outlined"
-              disabled={startMutation.isPending}
-              onClick={() => startMutation.mutate()}
-            >
-              {startMutation.isPending ? 'Starting…' : 'Start review'}
-            </Button>
+            <Tooltip title="Mark the package as Under Review and email the candidate that HR has started checking it.">
+              <span>
+                <Button
+                  variant="outlined"
+                  disabled={startMutation.isPending}
+                  onClick={() => startMutation.mutate()}
+                >
+                  {startMutation.isPending ? 'Starting…' : 'Start review'}
+                </Button>
+              </span>
+            </Tooltip>
           )}
           {review?.canReturn && (
-            <Button color="warning" variant="outlined" onClick={() => setReturnOpen(true)}>
-              Send back
-            </Button>
+            <Tooltip title="Return the whole joining package to the candidate for corrections. You will add a reason, and they can fix and submit again.">
+              <Button color="warning" variant="outlined" onClick={() => setReturnOpen(true)}>
+                Send back
+              </Button>
+            </Tooltip>
           )}
           {review && (review.canApprove || review.onboardingStatus === 'Under Review' || review.onboardingStatus === 'Submitted') && (
-            <Button
-              variant="contained"
-              disabled={!review.canApprove || approveMutation.isPending}
-              onClick={() => approveMutation.mutate()}
-              sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+            <Tooltip
+              title={
+                review.canApprove
+                  ? 'Mark the full joining package as complete after all required documents are approved. The candidate is emailed.'
+                  : 'Approve every required document in Documents first, then you can complete the package.'
+              }
             >
-              {approveMutation.isPending ? 'Saving…' : 'Approve package'}
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  disabled={!review.canApprove || approveMutation.isPending}
+                  onClick={() => approveMutation.mutate()}
+                  sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+                >
+                  {approveMutation.isPending ? 'Saving…' : 'Approve package'}
+                </Button>
+              </span>
+            </Tooltip>
           )}
           {review?.onboardingStatus === 'Completed' && (
             <Chip color="success" label="Package completed" />
@@ -825,57 +854,65 @@ const Employees: React.FC = () => {
                         flexWrap="wrap"
                         useFlexGap
                       >
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => setReviewEmployee(employee)}
-                          sx={{
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: 1.5,
-                            px: 1.5,
-                          }}
-                        >
-                          Documents
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => setPackageEmployee(employee)}
-                          sx={{
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: 1.5,
-                            px: 1.5,
-                          }}
-                        >
-                          Review
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          disabled={inviteMutation.isPending}
-                          onClick={() => inviteMutation.mutate(employee._id)}
-                          sx={{
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            borderRadius: 1.5,
-                            px: 1.5,
-                            bgcolor: '#0f63a5',
-                            boxShadow: 'none',
-                            '&:hover': { bgcolor: '#0b4f83', boxShadow: 'none' },
-                          }}
-                        >
-                          {inviteMutation.isPending && inviteMutation.variables === employee._id
-                            ? 'Sending…'
-                            : 'Send invitation'}
-                        </Button>
+                        <Tooltip title="Open and approve or reject each joining document one by one.">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setReviewEmployee(employee)}
+                            sx={{
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              borderRadius: 1.5,
+                              px: 1.5,
+                            }}
+                          >
+                            Documents
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Review the full joining package: form summary, documents, and policies. Start review, send back, or approve.">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setPackageEmployee(employee)}
+                            sx={{
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              borderRadius: 1.5,
+                              px: 1.5,
+                            }}
+                          >
+                            Review
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Email the candidate their personal joining invitation link.">
+                          <span>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disabled={inviteMutation.isPending}
+                              onClick={() => inviteMutation.mutate(employee._id)}
+                              sx={{
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                borderRadius: 1.5,
+                                px: 1.5,
+                                bgcolor: '#0f63a5',
+                                boxShadow: 'none',
+                                '&:hover': { bgcolor: '#0b4f83', boxShadow: 'none' },
+                              }}
+                            >
+                              {inviteMutation.isPending && inviteMutation.variables === employee._id
+                                ? 'Sending…'
+                                : 'Send invitation'}
+                            </Button>
+                          </span>
+                        </Tooltip>
                       </Stack>
                     </TableCell>
                   </TableRow>
