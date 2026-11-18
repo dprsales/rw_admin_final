@@ -246,6 +246,13 @@ const LeadModal: React.FC<LeadModalProps> = ({
     void loadNotes();
   }, [open, lead?._id, loadNotes]);
 
+  // After Outpero webhook lands, lead row gains status/summary; refresh notes quietly.
+  useEffect(() => {
+    if (!open || !lead?._id) return;
+    if (!lead.lastCallStatus && !lead.lastCallSummary) return;
+    void loadNotes({ quiet: true });
+  }, [open, lead?._id, lead?.lastCallStatus, lead?.lastCallSummary, lead?.lastCallAt, loadNotes]);
+
   const handleSaveNote = async () => {
     const text = draft.trim();
     if (!text || !lead?._id || saving) return;
