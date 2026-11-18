@@ -487,6 +487,99 @@ export const rejectEmployeeDocument = async (
   return response.data as JoinDocumentsChecklist;
 };
 
+export const deleteEmployeeDocument = async (employeeId: string, documentType: string) => {
+  const response = await http.delete(`/employees/${employeeId}/documents/${documentType}`);
+  return response.data as JoinDocumentsChecklist;
+};
+
+export type EmployeePackageReview = {
+  employeeId: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  personalEmail: string;
+  phone: string;
+  designation: string;
+  department: string;
+  joiningDate: string;
+  onboardingStatus: string;
+  packageSubmittedAt: string | null;
+  packageReviewedAt: string | null;
+  packageCorrectionReason: string;
+  canStartReview: boolean;
+  canApprove: boolean;
+  canReturn: boolean;
+  form: {
+    phone: string;
+    currentAddress: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    educationCount: number;
+    isFresher: boolean;
+    previousEmploymentCount: number;
+    referencesCount: number;
+    bankName: string;
+    bankIfsc: string;
+    formDraftSavedAt: string | null;
+  };
+  documents: {
+    requiredCount: number;
+    uploadedCount: number;
+    approvedCount: number;
+    allRequiredApproved: boolean;
+    rows: Array<{
+      documentType: string;
+      label: string;
+      required: boolean;
+      status: string;
+      rejectionReason: string;
+    }>;
+  };
+  policies: {
+    requiredCount: number;
+    acknowledgedCount: number;
+    allAcknowledged: boolean;
+    declarationAccepted: boolean;
+    declarationVersion: string;
+    rows: Array<{
+      policyId: string;
+      title: string;
+      version: string;
+      acknowledged: boolean;
+      acknowledgedAt: string | null;
+    }>;
+  };
+};
+
+export const getEmployeePackageReview = async (
+  employeeId: string,
+): Promise<EmployeePackageReview> => {
+  const response = await http.get(`/employees/${employeeId}/review`);
+  return response.data;
+};
+
+export const startEmployeePackageReview = async (
+  employeeId: string,
+): Promise<EmployeePackageReview> => {
+  const response = await http.post(`/employees/${employeeId}/review/start`);
+  return response.data;
+};
+
+export const approveEmployeePackage = async (
+  employeeId: string,
+): Promise<EmployeePackageReview> => {
+  const response = await http.post(`/employees/${employeeId}/review/approve`);
+  return response.data;
+};
+
+export const returnEmployeePackage = async (
+  employeeId: string,
+  reason: string,
+): Promise<EmployeePackageReview> => {
+  const response = await http.post(`/employees/${employeeId}/review/return`, { reason });
+  return response.data;
+};
+
 export interface InvitationLookup {
   valid: true;
   firstName: string;
@@ -686,6 +779,14 @@ export const uploadJoinDocument = async (
   return response.data;
 };
 
+export const deleteJoinDocument = async (
+  accessToken: string,
+  documentType: string,
+): Promise<JoinDocumentsChecklist> => {
+  const response = await joinHttp.delete(`/join/documents/${documentType}`, joinAuth(accessToken));
+  return response.data;
+};
+
 /** Private preview blob. Caller must revokeObjectURL when done. */
 export const fetchJoinDocumentBlob = async (
   accessToken: string,
@@ -759,6 +860,7 @@ export type JoinReadinessState = {
   alreadySubmitted: boolean;
   onboardingStatus: string;
   packageSubmittedAt: string | null;
+  packageCorrectionReason?: string;
   form: { ready: boolean; issues: string[] };
   documents: {
     ready: boolean;

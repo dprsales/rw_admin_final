@@ -18,6 +18,8 @@ import {
   FORM_ANSWER_LABELS,
   FORM_TRACK_LABEL,
   INTENT_LABEL,
+  callAgentLabel,
+  isCallableLead,
   isCoachingLead,
   isLeadCallInFlight,
   KrisahStatusChip,
@@ -199,6 +201,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const queryClient = useQueryClient();
 
   const coachingCall = isCoachingLead(lead);
+  const canOutperoCall = isCallableLead(lead);
   const callInFlight = callBusy || isLeadCallInFlight(lead);
   const showCallStatus =
     Boolean(lead.lastCallStatus) &&
@@ -336,6 +339,13 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setNotes([]);
     void loadNotes();
   }, [open, lead?._id, loadNotes]);
+
+  // After Outpero webhook lands, lead row gains status/summary; refresh notes quietly.
+  useEffect(() => {
+    if (!open || !lead?._id) return;
+    if (!lead.lastCallStatus && !lead.lastCallSummary) return;
+    void loadNotes({ quiet: true });
+  }, [open, lead?._id, lead?.lastCallStatus, lead?.lastCallSummary, lead?.lastCallAt, loadNotes]);
 
   const handleSaveNote = async () => {
     const text = draft.trim();
@@ -540,7 +550,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
             )}
           </Stack>
 
-          {coachingCall && onStartCall && (
+          {canOutperoCall && onStartCall && (
             <Box sx={{ mt: 1.75, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
               <Button
                 variant="contained"
@@ -559,10 +569,12 @@ const LeadModal: React.FC<LeadModalProps> = ({
                   ? 'Starting call…'
                   : callInFlight
                     ? 'Call in progress'
-                    : 'Call with Priti'}
+                    : callAgentLabel(lead)}
               </Button>
               <Typography variant="caption" color="text.secondary">
-                Outpero dials this coaching enquiry. Results come back after the call.
+                {coachingCall
+                  ? 'Outpero dials this coaching enquiry. Results come back after the call.'
+                  : 'Outpero dials this consulting enquiry. Results come back after the call.'}
               </Typography>
             </Box>
           )}
@@ -694,7 +706,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
             </Box>
           </Section>
 
-          {coachingCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
+          {canOutperoCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
             <Section title="Last Outpero call">
               <FieldRow label="Status">
                 {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus || '-'}
