@@ -1211,20 +1211,31 @@ const Join: React.FC = () => {
 
     return (
       <Stack spacing={2.5}>
+        {readiness?.onboardingStatus === 'Corrections Required' && (
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            HR asked for corrections
+            {readiness.packageCorrectionReason
+              ? `: ${readiness.packageCorrectionReason}`
+              : '.'}{' '}
+            Fix the items below, then submit again.
+          </Alert>
+        )}
         {readiness?.alreadySubmitted ? (
           <Alert severity="success" sx={{ borderRadius: 2 }}>
-            Package submitted
-            {readiness.packageSubmittedAt
-              ? ` on ${new Date(readiness.packageSubmittedAt).toLocaleString()}.`
-              : '.'}{' '}
-            HR will review it next. A second submit does not create another record.
+            {readiness.onboardingStatus === 'Completed'
+              ? 'HR has completed your joining package review.'
+              : `Package submitted${
+                  readiness.packageSubmittedAt
+                    ? ` on ${new Date(readiness.packageSubmittedAt).toLocaleString()}`
+                    : ''
+                }. HR will review it next. A second submit does not create another record.`}
           </Alert>
-        ) : (
+        ) : readiness?.onboardingStatus !== 'Corrections Required' ? (
           <Typography variant="body2" color="text.secondary">
             Confirm each part below is complete, then submit once. You can go back to fix anything
             that is still pending.
           </Typography>
-        )}
+        ) : null}
 
         {reviewRows.map((row) => (
           <Paper

@@ -27,13 +27,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
   approveEmployeeDocument,
+  approveEmployeePackage,
   createEmployee,
   fetchEmployeeDocumentBlob,
   getEmployeeDocuments,
+  getEmployeePackageReview,
   getEmployees,
   rejectEmployeeDocument,
+  returnEmployeePackage,
   sendEmployeeInvitation,
+  startEmployeePackageReview,
   type CreateEmployeeInput,
+  type EmployeePackageReview,
   type EmployeeRecord,
   type JoinDocumentItem,
   type JoinDocumentsChecklist,
@@ -353,6 +358,7 @@ const DocumentReviewDialog = ({
                 onChanged={(checklist) => {
                   queryClient.setQueryData(['employee-documents', employeeId], checklist);
                   queryClient.invalidateQueries({ queryKey: ['employees'] });
+                  queryClient.invalidateQueries({ queryKey: ['employee-package-review', employeeId] });
                 }}
               />
             ))}
@@ -366,11 +372,247 @@ const DocumentReviewDialog = ({
   );
 };
 
+const PackageReviewDialog = ({
+  employee,
+  open,
+  onClose,
+}: {
+  employee: EmployeeRecord | null;
+  open: boolean;
+  onClose: () => void;
+}) => {
+  const queryClient = useQueryClient();
+  const employeeId = employee?._id || '';
+  const [returnReason, setReturnReason] = useState('');
+  const [returnOpen, setReturnOpen] = useState(false);
+
+  const reviewQuery = useQuery({
+    queryKey: ['employee-package-review', employeeId],
+    queryFn: () => getEmployeePackageReview(employeeId),
+    enabled: open && Boolean(employeeId),
+  });
+
+  const applyReview = (data: EmployeePackageReview) => {
+    queryClient.setQueryData(['employee-package-review', employeeId], data);
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+  };
+
+  const startMutation = useMutation({
+    mutationFn: () => startEmployeePackageReview(employeeId),
+    onSuccess: (data) => {
+      toast.success('Review started');
+      applyReview(data);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: () => approveEmployeePackage(employeeId),
+    onSuccess: (data) => {
+      toast.success('Package approved');
+      applyReview(data);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: () => returnEmployeePackage(employeeId, returnReason.trim()),
+    onSuccess: (data) => {
+      toast.success('Sent back for corrections');
+      setReturnOpen(false);
+      setReturnReason('');
+      applyReview(data);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const review = reviewQuery.data;
+
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+        <DialogTitle>
+          Package review
+          {employee ? ` · ${employee.firstName} ${employee.lastName}` : ''}
+        </DialogTitle>
+        <Divider />
+        <DialogContent>
+          {reviewQuery.isPending && (
+            <Stack alignItems="center" py={4}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+          {reviewQuery.error && (
+            <Alert severity="error">{errorMessage(reviewQuery.error)}</Alert>
+          )}
+          {review && (
+            <Stack spacing={2.5} sx={{ pt: 1 }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip label={review.onboardingStatus} color="info" size="small" />
+                {review.packageSubmittedAt && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`Submitted ${formatDate(review.packageSubmittedAt)}`}
+                  />
+                )}
+              </Stack>
+
+              {review.packageCorrectionReason && (
+                <Alert severity="warning">Last return reason: {review.packageCorrectionReason}</Alert>
+              )}
+
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography fontWeight={700} sx={{ mb: 1 }}>
+                  Form summary
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Phone {review.form.phone || '-'} · Emergency {review.form.emergencyContactName || '-'}{' '}
+                  ({review.form.emergencyContactPhone || '-'})
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Education {review.form.educationCount} ·{' '}
+                  {review.form.isFresher
+                    ? 'Fresher'
+                    : `Work history ${review.form.previousEmploymentCount}`}{' '}
+                  · References {review.form.referencesCount}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Bank {review.form.bankName || '-'} · IFSC {review.form.bankIfsc || '-'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Address: {review.form.currentAddress || '-'}
+                </Typography>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography fontWeight={700} sx={{ mb: 1 }}>
+                  Documents
+                </Typography>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                  {review.documents.approvedCount} of {review.documents.requiredCount} approved ·{' '}
+                  {review.documents.uploadedCount} uploaded
+                </Typography>
+                {!review.documents.allRequiredApproved && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    Approve every required file in Documents before completing the package.
+                  </Typography>
+                )}
+                <Stack spacing={0.75}>
+                  {review.documents.rows.map((row) => (
+                    <Stack
+                      key={row.documentType}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      spacing={1}
+                    >
+                      <Typography variant="body2">{row.label}</Typography>
+                      <Chip size="small" color={statusChipColor(row.status)} label={row.status} />
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography fontWeight={700} sx={{ mb: 1 }}>
+                  Policies
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  {review.policies.acknowledgedCount} of {review.policies.requiredCount} accepted
+                  {review.policies.declarationAccepted
+                    ? ' · Declaration accepted'
+                    : ' · Declaration pending'}
+                </Typography>
+                <Stack spacing={0.75}>
+                  {review.policies.rows.map((row) => (
+                    <Stack
+                      key={row.policyId}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Typography variant="body2">{row.title}</Typography>
+                      <Chip
+                        size="small"
+                        color={row.acknowledged ? 'success' : 'warning'}
+                        label={row.acknowledged ? 'Accepted' : 'Pending'}
+                      />
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Button onClick={onClose}>Close</Button>
+          {review?.canStartReview && (
+            <Button
+              variant="outlined"
+              disabled={startMutation.isPending}
+              onClick={() => startMutation.mutate()}
+            >
+              {startMutation.isPending ? 'Starting…' : 'Start review'}
+            </Button>
+          )}
+          {review?.canReturn && (
+            <Button color="warning" variant="outlined" onClick={() => setReturnOpen(true)}>
+              Send back
+            </Button>
+          )}
+          {review && (review.canApprove || review.onboardingStatus === 'Under Review' || review.onboardingStatus === 'Submitted') && (
+            <Button
+              variant="contained"
+              disabled={!review.canApprove || approveMutation.isPending}
+              onClick={() => approveMutation.mutate()}
+              sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+            >
+              {approveMutation.isPending ? 'Saving…' : 'Approve package'}
+            </Button>
+          )}
+          {review?.onboardingStatus === 'Completed' && (
+            <Chip color="success" label="Package completed" />
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={returnOpen} onClose={() => setReturnOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Send back for corrections</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Reason for the candidate"
+            value={returnReason}
+            onChange={(event) => setReturnReason(event.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReturnOpen(false)}>Cancel</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={returnReason.trim().length < 3 || returnMutation.isPending}
+            onClick={() => returnMutation.mutate()}
+          >
+            {returnMutation.isPending ? 'Sending…' : 'Send back'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
 const Employees: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [reviewEmployee, setReviewEmployee] = useState<EmployeeRecord | null>(null);
+  const [packageEmployee, setPackageEmployee] = useState<EmployeeRecord | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isPending, error, refetch } = useQuery<EmployeeRecord[], Error>({
@@ -459,7 +701,7 @@ const Employees: React.FC = () => {
             Employees
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Create a draft employee record. Review uploaded joining documents from each row.
+            Create a draft employee record. Review documents and the full joining package from each row.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -494,7 +736,7 @@ const Employees: React.FC = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Onboarding</TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: 280, pr: 3 }}
+                  sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: 360, pr: 3 }}
                 >
                   Actions
                 </TableCell>
@@ -522,13 +764,14 @@ const Employees: React.FC = () => {
                     <TableCell>{employee.department}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(employee.joiningDate)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.onboardingStatus}</TableCell>
-                    <TableCell align="right" sx={{ minWidth: 280, pr: 3, py: 1.5 }}>
+                    <TableCell align="right" sx={{ minWidth: 360, pr: 3, py: 1.5 }}>
                       <Stack
                         direction="row"
                         spacing={1.5}
                         justifyContent="flex-end"
                         alignItems="center"
-                        flexWrap="nowrap"
+                        flexWrap="wrap"
+                        useFlexGap
                       >
                         <Button
                           size="small"
@@ -544,6 +787,21 @@ const Employees: React.FC = () => {
                           }}
                         >
                           Documents
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setPackageEmployee(employee)}
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: 1.5,
+                            px: 1.5,
+                          }}
+                        >
+                          Review
                         </Button>
                         <Button
                           size="small"
@@ -610,6 +868,11 @@ const Employees: React.FC = () => {
         employee={reviewEmployee}
         open={Boolean(reviewEmployee)}
         onClose={() => setReviewEmployee(null)}
+      />
+      <PackageReviewDialog
+        employee={packageEmployee}
+        open={Boolean(packageEmployee)}
+        onClose={() => setPackageEmployee(null)}
       />
     </Box>
   );

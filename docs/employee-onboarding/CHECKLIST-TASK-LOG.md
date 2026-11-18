@@ -12,12 +12,12 @@ Start to end. Do these in this order. The current task is the first step that is
 8. **Documents** — Done for first release review loop. Fixed checklist, private storage, candidate upload/preview, HR open/approve/reject with reason, and candidate re-upload. Full historical version archive still light.
 9. **Policies and declaration** — Done for first release. Versioned policy catalog, per-policy acknowledge, joining declaration after all policies, Join Policies step, and audits.
 10. **Submit** — Done for first release. Readiness check, Review step, one-shot package submit, and idempotent second submit.
-11. **HR review** — Current task. Broader package review after policies/submit; document approve/reject is already in place.
-12. **Joining form and audit** — The system keeps the joining-form PDF and a history of the sensitive actions.
+11. **HR review** — Done for first release. Package summary, start review, approve when all required docs are approved, or send back with a reason. Candidate sees the return reason on Review.
+12. **Joining form and audit** — Current task. The system keeps the joining-form PDF and a history of the sensitive actions.
 
 ## Current task
 
-**Title:** HR review
+**Title:** Joining form and audit
 
-- Package-level approve or send back with a reason after submit.
-- Document approve/reject already exists; broaden to the full joining file.
+- Server-generated joining-form PDF for HR and employee copies.
+- Keep the onboarding audit history for sensitive actions (already started; PDF still outstanding).
