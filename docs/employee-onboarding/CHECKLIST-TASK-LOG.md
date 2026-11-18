@@ -11,13 +11,13 @@ Start to end. Do these in this order. The current task is the first step that is
 7. **Candidate form** — Done for draft fields. Personal extras, education, previous employment, and bank save/resume on `/join`. Review-before-submit still outstanding.
 8. **Documents** — Done for first release review loop. Fixed checklist, private storage, candidate upload/preview, HR open/approve/reject with reason, and candidate re-upload. Full historical version archive still light.
 9. **Policies and declaration** — Done for first release. Versioned policy catalog, per-policy acknowledge, joining declaration after all policies, Join Policies step, and audits.
-10. **Submit** — Current task. The candidate reviews and submits once. A second submit does not create a second record.
-11. **HR review** — Broader package review after policies/submit; document approve/reject is already in place.
+10. **Submit** — Done for first release. Readiness check, Review step, one-shot package submit, and idempotent second submit.
+11. **HR review** — Current task. Broader package review after policies/submit; document approve/reject is already in place.
 12. **Joining form and audit** — The system keeps the joining-form PDF and a history of the sensitive actions.
 
 ## Current task
 
-**Title:** Submit
+**Title:** HR review
 
-- Review of form, documents, and policies before one submit.
-- Idempotent submit so a second click does not create a second record.
+- Package-level approve or send back with a reason after submit.
+- Document approve/reject already exists; broaden to the full joining file.

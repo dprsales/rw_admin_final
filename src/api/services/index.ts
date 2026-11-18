@@ -281,6 +281,21 @@ export const getAdminListing = async (id: string) => {
   return response.data;
 };
 
+export const updateAdminListing = async (
+  id: string,
+  data: {
+    city?: string;
+    listingType?: string;
+    details?: Record<string, unknown>;
+    ownerName?: string;
+    email?: string;
+    mobile?: string;
+  },
+) => {
+  const response = await http.patch(`/properties/admin/${id}`, data);
+  return response.data;
+};
+
 export const approveAdminListing = async (id: string) => {
   const response = await http.patch(`/properties/admin/${id}/approve`);
   return response.data;
@@ -736,6 +751,37 @@ export const acceptJoinDeclaration = async (
     { accepted: true },
     joinAuth(accessToken),
   );
+  return response.data;
+};
+
+export type JoinReadinessState = {
+  ready: boolean;
+  alreadySubmitted: boolean;
+  onboardingStatus: string;
+  packageSubmittedAt: string | null;
+  form: { ready: boolean; issues: string[] };
+  documents: {
+    ready: boolean;
+    issues: string[];
+    requiredCount: number;
+    uploadedCount: number;
+  };
+  policies: {
+    ready: boolean;
+    issues: string[];
+    requiredCount: number;
+    acknowledgedCount: number;
+    declarationAccepted: boolean;
+  };
+};
+
+export const getJoinReadiness = async (accessToken: string): Promise<JoinReadinessState> => {
+  const response = await joinHttp.get('/join/readiness', joinAuth(accessToken));
+  return response.data;
+};
+
+export const submitJoinPackage = async (accessToken: string): Promise<JoinReadinessState> => {
+  const response = await joinHttp.post('/join/submit', {}, joinAuth(accessToken));
   return response.data;
 };
 
