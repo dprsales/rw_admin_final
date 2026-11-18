@@ -22,6 +22,7 @@ import {
   isCallableLead,
   isCoachingLead,
   isLeadCallInFlight,
+  leadCallStatusLabel,
   KrisahStatusChip,
   Lead,
   leadSourceLabel,
@@ -545,7 +546,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                       : 'default'
                 }
                 variant="outlined"
-                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus}`}
+                label={`Call: ${leadCallStatusLabel(lead)}`}
               />
             )}
           </Stack>
@@ -709,7 +710,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
           {canOutperoCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
             <Section title="Last Outpero call">
               <FieldRow label="Status">
-                {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus || '-'}
+                {leadCallStatusLabel(lead)}
               </FieldRow>
               {lead.lastCallOutcome && (
                 <>

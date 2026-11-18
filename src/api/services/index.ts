@@ -177,6 +177,14 @@ export const getLeadCalls = async (leadId: string) => {
   return response.data;
 };
 
+/** Clear stuck In progress when Outpero never sent a final status (busy / no answer). */
+export const releaseLeadCall = async (leadId: string) => {
+  const response = await http.post(
+    `/leads/${encodeURIComponent(String(leadId))}/call/release`,
+  );
+  return response.data as { released: boolean };
+};
+
 // Career applications
 export const getApplications = async () => {
   const response = await http.get('/applications');

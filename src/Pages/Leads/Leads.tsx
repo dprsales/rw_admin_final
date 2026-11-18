@@ -10,7 +10,7 @@ import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
-import { deleteLead, getLeads, sendLeadCall } from '../../api/services';
+import { deleteLead, getLeads, releaseLeadCall, sendLeadCall } from '../../api/services';
 
 // ----------------------
 // Type Declarations
@@ -112,7 +112,7 @@ export const CALL_STATUS_LABEL: Record<string, string> = {
 };
 
 /** True only for a live dial. Stale queued/in_progress on old rows must not lock the button. */
-const ACTIVE_CALL_MAX_AGE_MS = 10 * 60 * 1000;
+const ACTIVE_CALL_MAX_AGE_MS = 3 * 60 * 1000;
 export function isLeadCallInFlight(
   lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
 ): boolean {
@@ -123,6 +123,20 @@ export function isLeadCallInFlight(
   const started = new Date(lead.lastCallAt).getTime();
   if (Number.isNaN(started)) return false;
   return Date.now() - started < ACTIVE_CALL_MAX_AGE_MS;
+}
+
+/** Desk label: aged-out In progress (busy / no webhook) reads as No answer, not Calling. */
+export function leadCallStatusLabel(
+  lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
+): string {
+  const raw = lead.lastCallStatus || '';
+  if (
+    (raw === 'queued' || raw === 'in_progress') &&
+    !isLeadCallInFlight(lead)
+  ) {
+    return 'No answer';
+  }
+  return CALL_STATUS_LABEL[raw] || raw || '-';
 }
 
 /** Labels for the guided-finder keys stored on a lead. */
@@ -382,6 +396,36 @@ const AllLeads: React.FC = () => {
     }, 8000);
     return () => window.clearInterval(timer);
   }, [callBusyId, data?.leads, queryClient]);
+
+  // Busy / no webhook often leaves queued/in_progress forever. Ask API to release aged rows.
+  React.useEffect(() => {
+    const stuck =
+      data?.leads?.filter(
+        (row) =>
+          (row.lastCallStatus === 'queued' || row.lastCallStatus === 'in_progress') &&
+          !isLeadCallInFlight(row),
+      ) || [];
+    if (!stuck.length) return;
+    let cancelled = false;
+    (async () => {
+      let releasedAny = false;
+      for (const row of stuck) {
+        try {
+          const result = await releaseLeadCall(row._id);
+          if (result?.released) releasedAny = true;
+        } catch {
+          // Endpoint may not be live yet; desk label still ages out locally.
+        }
+        if (cancelled) return;
+      }
+      if (releasedAny && !cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.leads, queryClient]);
 
   const callMutation = useMutation({
     mutationFn: (leadId: string) => sendLeadCall(leadId),
@@ -955,12 +999,14 @@ const AllLeads: React.FC = () => {
                             ? 'In progress'
                             : 'Call'}
                       </Button>
-                      {lead.lastCallStatus &&
-                        lead.lastCallStatus !== 'queued' &&
-                        lead.lastCallStatus !== 'in_progress' && (
+                      {lead.lastCallStatus && !isLeadCallInFlight(lead) && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                          {CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}
-                          {lead.lastCallOutcome ? ` · ${lead.lastCallOutcome}` : ''}
+                          {leadCallStatusLabel(lead)}
+                          {lead.lastCallOutcome &&
+                          lead.lastCallStatus !== 'queued' &&
+                          lead.lastCallStatus !== 'in_progress'
+                            ? ` · ${lead.lastCallOutcome}`
+                            : ''}
                         </Typography>
                       )}
                       {isLeadCallInFlight(lead) && (
