@@ -247,7 +247,7 @@ const HrDocumentRow = ({
               </Tooltip>
             )}
             {canReview && (
-              <Tooltip title="Accept this document. Needed before the full package can be approved.">
+              <Tooltip title="Accept this document. Needed before onboarding can be approved.">
                 <span>
                   <Button
                     size="small"
@@ -463,7 +463,7 @@ const PackageReviewDialog = ({
   const startMutation = useMutation({
     mutationFn: () => startEmployeePackageReview(employeeId),
     onSuccess: (data) => {
-      toast.success('Review started');
+      toast.success('Onboarding review started');
       applyReview(data);
     },
     onError: (err) => toast.error(errorMessage(err)),
@@ -472,7 +472,7 @@ const PackageReviewDialog = ({
   const approveMutation = useMutation({
     mutationFn: () => approveEmployeePackage(employeeId),
     onSuccess: (data) => {
-      toast.success('Package approved');
+      toast.success('Onboarding approved');
       applyReview(data);
     },
     onError: (err) => toast.error(errorMessage(err)),
@@ -481,7 +481,7 @@ const PackageReviewDialog = ({
   const returnMutation = useMutation({
     mutationFn: () => returnEmployeePackage(employeeId, returnReason.trim()),
     onSuccess: (data) => {
-      toast.success('Sent back for corrections');
+      toast.success('Onboarding sent back for corrections');
       setReturnOpen(false);
       setReturnReason('');
       applyReview(data);
@@ -495,7 +495,7 @@ const PackageReviewDialog = ({
     <>
       <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
         <DialogTitle>
-          Package review
+          Onboarding review
           {employee ? ` · ${employee.firstName} ${employee.lastName}` : ''}
         </DialogTitle>
         <Divider />
@@ -558,7 +558,7 @@ const PackageReviewDialog = ({
                 </Typography>
                 {!review.documents.allRequiredApproved && (
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                    Approve every required file in Documents before completing the package.
+                    Approve every required file in Documents before completing onboarding.
                   </Typography>
                 )}
                 <Stack spacing={0.75}>
@@ -613,7 +613,7 @@ const PackageReviewDialog = ({
             <Button onClick={onClose}>Close</Button>
           </Tooltip>
           {review?.canStartReview && (
-            <Tooltip title="Mark the package as Under Review and email the candidate that HR has started checking it.">
+            <Tooltip title="Mark onboarding as Under Review and email the candidate that HR has started checking it.">
               <span>
                 <Button
                   variant="outlined"
@@ -626,7 +626,7 @@ const PackageReviewDialog = ({
             </Tooltip>
           )}
           {review?.canReturn && (
-            <Tooltip title="Return the whole joining package to the candidate for corrections. You will add a reason, and they can fix and submit again.">
+            <Tooltip title="Return onboarding to the candidate for corrections. You will add a reason, and they can fix and submit again.">
               <Button color="warning" variant="outlined" onClick={() => setReturnOpen(true)}>
                 Send back
               </Button>
@@ -636,8 +636,8 @@ const PackageReviewDialog = ({
             <Tooltip
               title={
                 review.canApprove
-                  ? 'Mark the full joining package as complete after all required documents are approved. The candidate is emailed.'
-                  : 'Approve every required document in Documents first, then you can complete the package.'
+                  ? 'Approve onboarding after all required documents are approved. The candidate is emailed that onboarding is complete.'
+                  : 'Approve every required document in Documents first, then you can approve onboarding.'
               }
             >
               <span>
@@ -647,19 +647,19 @@ const PackageReviewDialog = ({
                   onClick={() => approveMutation.mutate()}
                   sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
                 >
-                  {approveMutation.isPending ? 'Saving…' : 'Approve package'}
+                  {approveMutation.isPending ? 'Saving…' : 'Approve onboarding'}
                 </Button>
               </span>
             </Tooltip>
           )}
           {review?.onboardingStatus === 'Completed' && (
-            <Chip color="success" label="Package completed" />
+            <Chip color="success" label="Onboarding completed" />
           )}
         </DialogActions>
       </Dialog>
 
       <Dialog open={returnOpen} onClose={() => setReturnOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Send back for corrections</DialogTitle>
+        <DialogTitle>Send onboarding back for corrections</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -782,7 +782,7 @@ const Employees: React.FC = () => {
             Employees
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Create a draft employee record. Review documents and the full joining package from each row.
+            Create a draft employee record. Review documents and full onboarding from each row.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -871,7 +871,7 @@ const Employees: React.FC = () => {
                             Documents
                           </Button>
                         </Tooltip>
-                        <Tooltip title="Review the full joining package: form summary, documents, and policies. Start review, send back, or approve.">
+                        <Tooltip title="Review full onboarding: form summary, documents, and policies. Start review, send back, or approve.">
                           <Button
                             size="small"
                             variant="outlined"

@@ -116,7 +116,7 @@ const STEP_HELP: Record<string, string> = {
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
   Policies: 'Read each policy, accept it, then sign the final joining declaration.',
-  Review: 'Check that form, documents, and policies are complete, then submit once.',
+  Review: 'Check that form, documents, and policies are complete, then submit your onboarding once.',
 };
 
 const FORM_ISSUE_LABELS: Record<string, string> = {
@@ -829,7 +829,7 @@ const Join: React.FC = () => {
     mutationFn: () => acceptJoinDeclaration(accessToken),
     onSuccess: (state) => {
       setDeclarationChecked(true);
-      setStatusMessage('Joining declaration accepted. Open Review to submit your package.');
+      setStatusMessage('Joining declaration accepted. Open Review to submit your onboarding.');
       queryClient.setQueryData(['join-policies', accessToken], state);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
@@ -840,8 +840,8 @@ const Join: React.FC = () => {
     onSuccess: (state) => {
       setStatusMessage(
         state.alreadySubmitted
-          ? 'Your joining package is submitted. HR will review it next.'
-          : 'Joining package submitted.',
+          ? 'Your onboarding is submitted. HR will review it next.'
+          : 'Onboarding submitted.',
       );
       queryClient.setQueryData(['join-readiness', accessToken], state);
     },
@@ -1306,7 +1306,7 @@ const Join: React.FC = () => {
       <Stack spacing={2.5}>
         {readiness?.onboardingStatus === 'Corrections Required' && (
           <Alert severity="warning" sx={{ borderRadius: 2 }}>
-            HR asked for corrections
+            HR asked for onboarding corrections
             {readiness.packageCorrectionReason
               ? `: ${readiness.packageCorrectionReason}`
               : '.'}{' '}
@@ -1316,8 +1316,8 @@ const Join: React.FC = () => {
         {readiness?.alreadySubmitted ? (
           <Alert severity="success" sx={{ borderRadius: 2 }}>
             {readiness.onboardingStatus === 'Completed'
-              ? 'HR has completed your joining package review.'
-              : `Package submitted${
+              ? 'Onboarding approved. HR has completed your review.'
+              : `Onboarding submitted${
                   readiness.packageSubmittedAt
                     ? ` on ${new Date(readiness.packageSubmittedAt).toLocaleString()}`
                     : ''
@@ -1325,8 +1325,8 @@ const Join: React.FC = () => {
           </Alert>
         ) : readiness?.onboardingStatus !== 'Corrections Required' ? (
           <Typography variant="body2" color="text.secondary">
-            Confirm each part below is complete, then submit once. You can go back to fix anything
-            that is still pending.
+            Confirm each part below is complete, then submit your onboarding once. You can go back to
+            fix anything that is still pending.
           </Typography>
         ) : null}
 
@@ -1373,7 +1373,7 @@ const Join: React.FC = () => {
             : readiness?.alreadySubmitted
               ? 'Already submitted'
               : readiness?.ready
-                ? 'Submit joining package'
+                ? 'Submit onboarding'
                 : 'Finish pending items first'}
         </Button>
       </Stack>
@@ -1667,7 +1667,7 @@ const Join: React.FC = () => {
                                 sx={{ color: JOIN.muted, alignSelf: { sm: 'center' }, py: 1 }}
                               >
                                 {readinessQuery.data?.alreadySubmitted
-                                  ? 'Package submitted. HR review comes next.'
+                                  ? 'Onboarding submitted. HR review comes next.'
                                   : 'Submit only when form, documents, and policies are ready.'}
                               </Typography>
                             )}
