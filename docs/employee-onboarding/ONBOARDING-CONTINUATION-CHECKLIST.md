@@ -40,7 +40,7 @@ The shared workspace is `C:\Users\sales\OneDrive\Desktop\RW`. The primary source
 | HR review/corrections | Partial | Document approve/reject + package start/approve/return | Queues, reopen polish, email reminders |
 | Joining Form PDF | Not started | No PDF module | Server-generated, versioned HR/employee copies stored privately |
 | Audit log | Not started | No onboarding audit module | Append-only events for all sensitive actions and downloads |
-| Notifications/reminders | Not started | No onboarding delivery history/job flow | Durable, retryable invitation and reminder jobs without duplicates |
+| Notifications/reminders | Partial | Candidate status emails on submit, review start, approve, return, document approve/reject | Durable retry/delivery history and scheduled reminders |
 | Deployment | Not started | `employee.rajivwilliams.com` is target architecture only | Staging and production deployment, SSL, SPA fallback, CORS, backup and restore verified |
 | Acceptance testing | Not started | No end-to-end onboarding test | Dummy employee flow and authorization/recovery tests pass before real data |
 
