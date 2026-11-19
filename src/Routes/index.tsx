@@ -23,6 +23,7 @@ import Blogs from "../Pages/Blogs/Blogs";
 import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
+import { CrmHome, CrmShell, CrmStubPage } from "../crm";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
 const isAuthenticated = () => Boolean(Cookies.get("access_token"));
@@ -81,6 +82,61 @@ const router = createBrowserRouter([
     // Public invitation landing. The candidate has no staff session.
     path: "/join",
     element: <Join />,
+  },
+  {
+    // Sales CRM desk (Tailwind). Own shell — no ops admin sidebar.
+    path: "/crm",
+    element: (
+      <ProtectedRoute allow="/crm" component={<CrmShell />} />
+    ),
+    children: [
+      { index: true, element: <CrmHome /> },
+      {
+        path: "leads",
+        element: (
+          <CrmStubPage
+            title="Leads"
+            blurb="My leads list lands here when the list API is wired into this desk."
+          />
+        ),
+      },
+      {
+        path: "pipeline",
+        element: (
+          <CrmStubPage
+            title="Pipeline"
+            blurb="Stage columns from New Lead to Booked come after the desk shell."
+          />
+        ),
+      },
+      {
+        path: "team",
+        element: (
+          <CrmStubPage
+            title="Team"
+            blurb="Managers and team leads open people here. Hierarchy APIs come later."
+          />
+        ),
+      },
+      {
+        path: "projects",
+        element: (
+          <CrmStubPage
+            title="Projects"
+            blurb="Mandate project hub for leadership. Stub for Day 14 scaffold."
+          />
+        ),
+      },
+      {
+        path: "settings",
+        element: (
+          <CrmStubPage
+            title="Settings"
+            blurb="CRM Admin settings (roles, access, templates). Not ops Users."
+          />
+        ),
+      },
+    ],
   },
   {
     element: <Layout />, // Common layout for all pages

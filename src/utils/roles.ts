@@ -92,14 +92,15 @@ const WORKSPACES: Partial<Record<UserRole, string[]>> = {
   hr: ['/applications', '/employees', '/vendors', '/vendor-partners'],
   account: ['/payments'],
   finance: ['/payments'],
-  sales: ['/leads'],
-  marketing: ['/blogs', '/gallery', '/leads'],
+  sales: ['/crm', '/leads'],
+  marketing: ['/blogs', '/gallery', '/leads', '/crm'],
 };
 
 const ADMIN_ROUTES = [
   '/dashboard',
   '/projects',
   '/leads',
+  '/crm',
   '/applications',
   '/channel-partners',
   '/vendors',

@@ -7,7 +7,10 @@ import { LinearProgress, Typography, Box } from '@mui/material';
 import LeadsTable from './LeadsTable';
 
 const LeadsPage: React.FC = () => {
-  const { data, isPending, isError } = useQuery({ queryKey: ['leads'], queryFn: getLeads });
+  const { data, isPending, isError } = useQuery({
+    queryKey: ['leads'],
+    queryFn: () => getLeads(),
+  });
 
   if (isPending) return <LinearProgress />;
 
@@ -21,7 +24,7 @@ const LeadsPage: React.FC = () => {
     );
   }
 
-  const leads = data?.data || [];
+  const leads = (data as { leads?: unknown[] } | undefined)?.leads || [];
 
   // if (!leads.length) {
   //   return <NoLeads />;
