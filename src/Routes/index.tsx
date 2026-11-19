@@ -20,6 +20,7 @@ import Payments from "../Pages/Payments/Payments";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnboardingDemo";
 import Join from "../Pages/Join/Join";
 import Blogs from "../Pages/Blogs/Blogs";
+import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
@@ -145,6 +146,10 @@ const router = createBrowserRouter([
       {
         path: "/blogs",
         element: <ProtectedRoute allow="/blogs" component={<Blogs />} />,
+      },
+      {
+        path: "/gallery",
+        element: <ProtectedRoute allow="/gallery" component={<GalleryPhotos />} />,
       },
       {
         path: "/listings",

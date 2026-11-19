@@ -26,6 +26,7 @@ const adminTabs: TabPanelProps[] = [
   { icon: TabsIcons.UsersIcon, label: 'Employees', route: '/employees' },
   { icon: TabsIcons.DashboardIcon, label: 'Payments', route: '/payments' },
   { icon: TabsIcons.LeadsIcon, label: 'Blogs', route: '/blogs' },
+  { icon: TabsIcons.ProjectsIcon, label: 'Gallery', route: '/gallery' },
 ];
 
 interface TabsProps {

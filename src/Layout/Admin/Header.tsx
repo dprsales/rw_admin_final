@@ -28,6 +28,7 @@ const Header: React.FC<HeaderProps> = ({ selectedTab }) => {
     '/employees': 'Employees',
     '/payments': 'Payments',
     '/blogs': 'Blogs',
+    '/gallery': 'Gallery',
   };
 
   const currentTabLabel =
