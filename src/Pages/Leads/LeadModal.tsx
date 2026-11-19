@@ -612,9 +612,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
               )}
               {waInfo && !waError && (
                 <Alert severity="success" sx={{ py: 0, mt: callError || callInfo ? 1 : 0 }}>{waInfo}</Alert>
-              )}
-            </Box>
-          )}
+            )}
+          </Box>
+        )}
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
