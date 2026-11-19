@@ -2,11 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Drawer, Box, Typography, Button, Chip, Divider, Stack, Link, IconButton,
   TextField, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
-  DialogActions, FormControl, InputLabel, Select, MenuItem,
+  DialogActions, FormControl, InputLabel, Select, MenuItem, Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+
+/** Flip to true after Meta approves the first templates and Live API campaigns exist. */
+const WHATSAPP_MANUAL_SEND_READY = false;
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -556,21 +559,36 @@ const LeadModal: React.FC<LeadModalProps> = ({
                 </Button>
               )}
               {canSendWhatsapp && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<WhatsAppIcon sx={{ fontSize: 16 }} />}
-                  onClick={() => void openWhatsappDialog()}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: '#25D366',
-                    color: '#128C7E',
-                    '&:hover': { borderColor: '#128C7E', bgcolor: 'rgba(37,211,102,0.06)' },
-                  }}
+                <Tooltip
+                  title={
+                    WHATSAPP_MANUAL_SEND_READY
+                      ? 'Send an approved WhatsApp template'
+                      : 'Waiting for Meta to approve WhatsApp templates'
+                  }
                 >
-                  Send WhatsApp
-                </Button>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<WhatsAppIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => void openWhatsappDialog()}
+                      disabled={!WHATSAPP_MANUAL_SEND_READY}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        borderColor: '#25D366',
+                        color: '#128C7E',
+                        '&:hover': { borderColor: '#128C7E', bgcolor: 'rgba(37,211,102,0.06)' },
+                        '&.Mui-disabled': {
+                          borderColor: 'rgba(37,211,102,0.35)',
+                          color: 'rgba(18,140,126,0.45)',
+                        },
+                      }}
+                    >
+                      Send WhatsApp
+                    </Button>
+                  </span>
+                </Tooltip>
               )}
               {canOutperoCall && onStartCall && (
                 <Typography variant="caption" color="text.secondary">
