@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Drawer, Box, Typography, Button, Chip, Divider, Stack, Link, IconButton,
-  TextField, CircularProgress, Alert,
+  TextField, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
+  DialogActions, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -30,8 +32,17 @@ import {
   addLeadNote,
   deleteLeadNote,
   getLeadActivities,
+  getWhatsappTemplates,
+  sendLeadWhatsapp,
   updateLeadNote,
 } from '../../api/services';
+
+type WhatsappTemplateOption = {
+  key: string;
+  label: string;
+  campaignName: string;
+  ready: boolean;
+};
 
 interface LeadModalProps {
   open: boolean;
@@ -181,9 +192,18 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+  const [waOpen, setWaOpen] = useState(false);
+  const [waTemplates, setWaTemplates] = useState<WhatsappTemplateOption[]>([]);
+  const [waConfigured, setWaConfigured] = useState(false);
+  const [waCampaign, setWaCampaign] = useState('');
+  const [waLoading, setWaLoading] = useState(false);
+  const [waSending, setWaSending] = useState(false);
+  const [waError, setWaError] = useState('');
+  const [waInfo, setWaInfo] = useState('');
 
   const coachingCall = isCoachingLead(lead);
   const canOutperoCall = isCallableLead(lead);
+  const canSendWhatsapp = canOutperoCall && Boolean(String(lead.phoneNumber || '').trim());
   const callInFlight = callBusy || isLeadCallInFlight(lead);
   const showCallStatus =
     Boolean(lead.lastCallStatus) &&
@@ -234,6 +254,71 @@ const LeadModal: React.FC<LeadModalProps> = ({
       if (!opts?.quiet) setNotesLoading(false);
     }
   }, [lead?._id]);
+
+  const openWhatsappDialog = async () => {
+    setWaOpen(true);
+    setWaError('');
+    setWaInfo('');
+    setWaLoading(true);
+    try {
+      const data = await getWhatsappTemplates();
+      const list = (data?.templates || []).filter((t) => t.ready);
+      setWaConfigured(Boolean(data?.configured));
+      setWaTemplates(list);
+      setWaCampaign((prev) => {
+        if (prev && list.some((t) => t.key === prev)) return prev;
+        return list[0]?.key || '';
+      });
+      if (!data?.configured) {
+        setWaError('WhatsApp API key is not configured on the server yet.');
+      } else if (!list.length) {
+        setWaError('No WhatsApp campaigns are named in server settings yet.');
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not load WhatsApp templates.';
+      setWaError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      setWaTemplates([]);
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const handleSendWhatsapp = async () => {
+    const leadId = String(lead?._id || '');
+    if (!leadId || !waCampaign || waSending) return;
+    setWaSending(true);
+    setWaError('');
+    setWaInfo('');
+    try {
+      const result = await sendLeadWhatsapp(leadId, waCampaign);
+      setWaInfo(result?.message || 'WhatsApp sent.');
+      setWaOpen(false);
+      if (result?.activity) {
+        setNotes((prev) => [normalizeNote(result.activity as LeadNoteActivity), ...prev]);
+      } else {
+        void loadNotes({ quiet: true });
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not send WhatsApp. Try again.';
+      setWaError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    } finally {
+      setWaSending(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setWaOpen(false);
+      setWaError('');
+      setWaInfo('');
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !lead?._id) return;
@@ -375,6 +460,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
   };
 
   return (
+    <>
     <Drawer
       anchor="right"
       open={open}
@@ -446,44 +532,71 @@ const LeadModal: React.FC<LeadModalProps> = ({
             )}
           </Stack>
 
-          {canOutperoCall && onStartCall && (
+          {(canOutperoCall || canSendWhatsapp) && (
             <Box sx={{ mt: 1.75, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-              <Button
-                variant="contained"
-                size="small"
-                disableElevation
-                startIcon={
-                  callBusy
-                    ? <CircularProgress size={14} color="inherit" />
-                    : <PhoneInTalkOutlinedIcon sx={{ fontSize: 16 }} />
-                }
-                onClick={onStartCall}
-                disabled={callInFlight}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
-              >
-                {callBusy
-                  ? 'Starting call…'
-                  : callInFlight
-                    ? 'Call in progress'
-                    : callAgentLabel(lead)}
-              </Button>
-              <Typography variant="caption" color="text.secondary">
-                {coachingCall
-                  ? 'Outpero dials this coaching enquiry. Results come back after the call.'
-                  : 'Outpero dials this consulting enquiry. Results come back after the call.'}
-              </Typography>
+              {canOutperoCall && onStartCall && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  disableElevation
+                  startIcon={
+                    callBusy
+                      ? <CircularProgress size={14} color="inherit" />
+                      : <PhoneInTalkOutlinedIcon sx={{ fontSize: 16 }} />
+                  }
+                  onClick={onStartCall}
+                  disabled={callInFlight}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  {callBusy
+                    ? 'Starting call…'
+                    : callInFlight
+                      ? 'Call in progress'
+                      : callAgentLabel(lead)}
+                </Button>
+              )}
+              {canSendWhatsapp && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<WhatsAppIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => void openWhatsappDialog()}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderColor: '#25D366',
+                    color: '#128C7E',
+                    '&:hover': { borderColor: '#128C7E', bgcolor: 'rgba(37,211,102,0.06)' },
+                  }}
+                >
+                  Send WhatsApp
+                </Button>
+              )}
+              {canOutperoCall && onStartCall && (
+                <Typography variant="caption" color="text.secondary">
+                  {coachingCall
+                    ? 'Outpero dials this coaching enquiry. Results come back after the call.'
+                    : 'Outpero dials this consulting enquiry. Results come back after the call.'}
+                </Typography>
+              )}
             </Box>
           )}
-          {(callError || callInfo) && (
+          {(callError || callInfo || waInfo || (waError && !waOpen)) && (
             <Box sx={{ mt: 1 }}>
               {callError && (
                 <Alert severity="error" sx={{ py: 0 }}>{callError}</Alert>
               )}
               {callInfo && !callError && (
                 <Alert severity="success" sx={{ py: 0 }}>{callInfo}</Alert>
-            )}
-          </Box>
-        )}
+              )}
+              {waError && !waOpen && (
+                <Alert severity="error" sx={{ py: 0, mt: callError || callInfo ? 1 : 0 }}>{waError}</Alert>
+              )}
+              {waInfo && !waError && (
+                <Alert severity="success" sx={{ py: 0, mt: callError || callInfo ? 1 : 0 }}>{waInfo}</Alert>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
@@ -920,6 +1033,71 @@ const LeadModal: React.FC<LeadModalProps> = ({
         </Box>
       </Box>
     </Drawer>
+
+    <Dialog open={waOpen} onClose={() => !waSending && setWaOpen(false)} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ fontWeight: 700, pr: 6, position: 'relative' }}>
+        Send WhatsApp
+        <IconButton
+          aria-label="Close WhatsApp send"
+          onClick={() => !waSending && setWaOpen(false)}
+          size="small"
+          sx={{ position: 'absolute', right: 12, top: 12 }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Sends an approved template to {lead.phoneNumber || 'this lead'} via AiSensy.
+          Auto follow-ups stay off until you enable them later.
+        </Typography>
+        {waLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : (
+          <FormControl fullWidth size="small" disabled={!waConfigured || !waTemplates.length}>
+            <InputLabel id="wa-template-label">Template</InputLabel>
+            <Select
+              labelId="wa-template-label"
+              label="Template"
+              value={waCampaign}
+              onChange={(e) => setWaCampaign(String(e.target.value))}
+            >
+              {waTemplates.map((t) => (
+                <MenuItem key={t.key} value={t.key}>
+                  {t.label}
+                  {t.campaignName ? ` (${t.campaignName})` : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        {waError && (
+          <Alert severity="error" sx={{ mt: 2, py: 0 }}>{waError}</Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={() => setWaOpen(false)} disabled={waSending} sx={{ textTransform: 'none' }}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          disableElevation
+          onClick={() => void handleSendWhatsapp()}
+          disabled={waSending || waLoading || !waCampaign || !waConfigured}
+          startIcon={
+            waSending
+              ? <CircularProgress size={14} color="inherit" />
+              : <WhatsAppIcon sx={{ fontSize: 16 }} />
+          }
+          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe57' } }}
+        >
+          {waSending ? 'Sending…' : 'Send message'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 };
 

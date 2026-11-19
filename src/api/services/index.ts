@@ -151,6 +151,35 @@ export const getLeadCalls = async (leadId: string) => {
   return response.data;
 };
 
+/** AiSensy template list for the lead desk Send WhatsApp picker. */
+export const getWhatsappTemplates = async () => {
+  const response = await http.get('/leads/meta/whatsapp-templates');
+  return response.data as {
+    configured: boolean;
+    autoEnabled: boolean;
+    templates: Array<{
+      key: string;
+      label: string;
+      campaignName: string;
+      ready: boolean;
+    }>;
+  };
+};
+
+/** Staff sends one approved WhatsApp template to a coaching/consulting lead. */
+export const sendLeadWhatsapp = async (leadId: string, campaign: string) => {
+  const response = await http.post(`/leads/${encodeURIComponent(String(leadId))}/whatsapp`, {
+    campaign,
+  });
+  return response.data as {
+    message: string;
+    campaign: string;
+    campaignName: string;
+    destination: string;
+    activity?: { _id: string; note?: string; type?: string; createdAt?: string };
+  };
+};
+
 // Career applications
 export const getApplications = async () => {
   const response = await http.get('/applications');
