@@ -984,6 +984,46 @@ export const FileUpload = (folderName: string, file: File) => {
   return http.post(`/bunny/upload/${folderName}`, formData);
 };
 
+export interface GalleryPhotoRecord {
+  _id: string;
+  url: string;
+  filename?: string;
+  title?: string;
+  caption?: string;
+  alt?: string;
+  sortOrder?: number;
+  published?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GalleryPhotoInput {
+  url: string;
+  filename?: string;
+  title?: string;
+  caption?: string;
+  alt?: string;
+  sortOrder?: number;
+  published?: boolean;
+}
+
+export const getAdminGalleryPhotos = async (): Promise<GalleryPhotoRecord[]> => {
+  const response = await http.get('/gallery-photos/admin');
+  return response.data;
+};
+
+export const createGalleryPhoto = (data: GalleryPhotoInput) => {
+  return http.post('/gallery-photos', data);
+};
+
+export const updateGalleryPhoto = (photoId: string, data: Partial<GalleryPhotoInput>) => {
+  return http.patch(`/gallery-photos/${photoId}`, data);
+};
+
+export const deleteGalleryPhoto = (photoId: string) => {
+  return http.delete(`/gallery-photos/${photoId}`);
+};
+
 
 
 
