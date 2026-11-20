@@ -43,6 +43,7 @@ import {
   getEmployees,
   rejectEmployeeDocument,
   returnEmployeePackage,
+  resendEmployeeJoinLink,
   sendEmployeeInvitation,
   startEmployeePackageReview,
   type CreateEmployeeInput,
@@ -712,6 +713,15 @@ const Employees: React.FC = () => {
     onError: (requestError: any) => toast.error(errorMessage(requestError)),
   });
 
+  const resendJoinMutation = useMutation({
+    mutationFn: resendEmployeeJoinLink,
+    onSuccess: (response: any) => {
+      toast.success(response?.data?.message ?? 'Fresh join link sent');
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (requestError: any) => toast.error(errorMessage(requestError)),
+  });
+
   const createMutation = useMutation({
     mutationFn: createEmployee,
     onSuccess: () => {
@@ -918,7 +928,19 @@ const Employees: React.FC = () => {
                     <TableCell>{employee.designation}</TableCell>
                     <TableCell>{employee.department}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(employee.joiningDate)}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.onboardingStatus}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Chip size="small" label={employee.onboardingStatus} />
+                        {employee.invitationExpired && employee.canResendJoinLink ? (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label="Link expired"
+                          />
+                        ) : null}
+                      </Stack>
+                    </TableCell>
                     <TableCell align="right" sx={{ minWidth: 360, pr: 3, py: 1.5 }}>
                       <Stack
                         direction="row"
@@ -962,32 +984,67 @@ const Employees: React.FC = () => {
                             Review
                           </Button>
                         </Tooltip>
-                        <Tooltip title="Email the candidate their personal joining invitation link.">
-                          <span>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              disabled={inviteMutation.isPending}
-                              onClick={() => inviteMutation.mutate(employee._id)}
-                              sx={{
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                                textTransform: 'none',
-                                fontWeight: 600,
-                                borderRadius: 1.5,
-                                px: 1.5,
-                                bgcolor: tokens.gold,
-                                color: tokens.black,
-                                boxShadow: 'none',
-                                '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
-                              }}
-                            >
-                              {inviteMutation.isPending && inviteMutation.variables === employee._id
-                                ? 'Sending…'
-                                : 'Send invitation'}
-                            </Button>
-                          </span>
-                        </Tooltip>
+                        {employee.onboardingStatus === 'Draft' || employee.onboardingStatus === 'Invited' ? (
+                          <Tooltip title="Email the candidate their first personal joining invitation link.">
+                            <span>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                                onClick={() => inviteMutation.mutate(employee._id)}
+                                sx={{
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  borderRadius: 1.5,
+                                  px: 1.5,
+                                  bgcolor: tokens.gold,
+                                  color: tokens.black,
+                                  boxShadow: 'none',
+                                  '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
+                                }}
+                              >
+                                {inviteMutation.isPending && inviteMutation.variables === employee._id
+                                  ? 'Sending…'
+                                  : 'Send invitation'}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : null}
+                        {employee.canResendJoinLink ? (
+                          <Tooltip title="Send a fresh join URL so they can finish incomplete details. Saved answers stay. If email was already verified, no OTP again.">
+                            <span>
+                              <Button
+                                size="small"
+                                variant={employee.invitationExpired ? 'contained' : 'outlined'}
+                                disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                                onClick={() => resendJoinMutation.mutate(employee._id)}
+                                sx={{
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  borderRadius: 1.5,
+                                  px: 1.5,
+                                  ...(employee.invitationExpired
+                                    ? {
+                                        bgcolor: tokens.gold,
+                                        color: tokens.black,
+                                        boxShadow: 'none',
+                                        '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
+                                      }
+                                    : {}),
+                                }}
+                              >
+                                {resendJoinMutation.isPending &&
+                                resendJoinMutation.variables === employee._id
+                                  ? 'Sending…'
+                                  : 'Resend join link'}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : null}
                       </Stack>
                     </TableCell>
                   </TableRow>

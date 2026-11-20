@@ -462,6 +462,10 @@ export interface EmployeeRecord {
   onboardingStatus: string;
   employmentStatus: string;
   createdAt?: string;
+  invitationExpiresAt?: string | null;
+  invitationExpired?: boolean;
+  invitationEmailVerified?: boolean;
+  canResendJoinLink?: boolean;
 }
 
 export interface CreateEmployeeInput {
@@ -485,6 +489,11 @@ export const createEmployee = (data: CreateEmployeeInput) => {
 
 export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
+};
+
+/** Fresh join URL for expired / incomplete forms. Keeps saved details; skips OTP if already verified. */
+export const resendEmployeeJoinLink = (employeeId: string) => {
+  return http.post(`/employees/${employeeId}/invitation/resend`);
 };
 
 export const getEmployeeDocuments = async (
