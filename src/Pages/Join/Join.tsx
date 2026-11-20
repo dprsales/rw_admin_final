@@ -111,8 +111,9 @@ const STEP_HELP: Record<string, string> = {
   Personal: 'Your contact and family details for the joining record.',
   Professional: 'Experience and ID numbers used for onboarding checks.',
   Education: 'Add every relevant qualification, starting with the highest.',
-  'Work history': 'Previous employers, or mark yourself as a fresher.',
-  References: 'People who can confirm your background. Add at least one.',
+  'Work history':
+    'List previous jobs from latest to oldest, or mark yourself as a fresher.',
+  References: 'Add at least one professional reference (manager, HR, or similar).',
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
   Policies: 'Read each policy, accept it, then sign the final joining declaration.',
@@ -125,8 +126,8 @@ const FORM_ISSUE_LABELS: Record<string, string> = {
   emergencyContactName: 'Emergency contact name',
   emergencyContactPhone: 'Emergency contact phone',
   education: 'At least one education row',
-  previousEmployment: 'Work history, or mark fresher',
-  references: 'At least one reference',
+  previousEmployment: 'Work history from latest to oldest, or mark fresher',
+  references: 'At least one professional reference',
   bankAccountHolderName: 'Bank account holder name',
   bankName: 'Bank name',
   bankAccountNumber: 'Bank account number',
@@ -138,13 +139,14 @@ const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Prefer not
 const BLOOD_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'];
 const NATIONALITY_OPTIONS = ['Indian', 'Other'];
 const RELATION_OPTIONS = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Relative', 'Colleague', 'Other'];
+/** Professional references only (no friends or personal contacts). */
 const REFERENCE_RELATION_OPTIONS = [
+  'Reporting manager',
   'Former manager',
-  'Colleague',
+  'HR / People team',
+  'Team lead / supervisor',
+  'Client / business contact',
   'Teacher / professor',
-  'Client',
-  'Friend',
-  'Other',
 ];
 const QUALIFICATION_OPTIONS = [
   '10th',
@@ -987,8 +989,14 @@ const Join: React.FC = () => {
           />
           {!form.isFresher && (
             <>
+              <Typography variant="body2" color="text.secondary">
+                Add jobs from latest to oldest. Put your most recent employer first, then earlier roles.
+              </Typography>
               {form.previousEmployment.map((row, index) => (
-                <RepeatCard key={`emp-${index}`} title={`Employer ${index + 1}`}>
+                <RepeatCard
+                  key={`emp-${index}`}
+                  title={index === 0 ? 'Most recent employer' : `Earlier employer ${index}`}
+                >
                   <Stack spacing={2}>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}><Field label="Company name" value={row.companyName} onChange={(e) => updateEmployment(index, 'companyName', e.target.value)} /></Grid>
@@ -1009,7 +1017,7 @@ const Join: React.FC = () => {
                 </RepeatCard>
               ))}
               <Button variant="outlined" sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, previousEmployment: [...c.previousEmployment, emptyEmployment()] }))}>
-                Add employer
+                Add earlier employer
               </Button>
             </>
           )}
@@ -1021,16 +1029,17 @@ const Join: React.FC = () => {
       return (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            Add at least one person who can confirm your background. You can add more if you want.
+            At least one professional reference is required (manager, HR, team lead, client, or
+            teacher). Friends and personal contacts are not accepted.
           </Typography>
           {form.references.map((row, index) => (
-            <RepeatCard key={`ref-${index}`} title={`Reference ${index + 1}`}>
+            <RepeatCard key={`ref-${index}`} title={`Professional reference ${index + 1}`}>
               <Stack spacing={2}>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}><Field label="Full name" value={row.name} onChange={(e) => updateReference(index, 'name', e.target.value)} /></Grid>
                   <Grid item xs={12} sm={6}>
                     <OptionSelect
-                      label="Relation"
+                      label="Professional relation"
                       value={row.relation}
                       options={REFERENCE_RELATION_OPTIONS}
                       onChange={(v) => updateReference(index, 'relation', v)}
@@ -1052,7 +1061,7 @@ const Join: React.FC = () => {
             </RepeatCard>
           ))}
           <Button variant="outlined" sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, references: [...c.references, emptyReference()] }))}>
-            Add reference
+            Add professional reference
           </Button>
         </Stack>
       );
