@@ -10,7 +10,11 @@ import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
-import { deleteLead, getLeads, sendLeadCall } from '../../api/services';
+import { deleteLead, getLeads, releaseLeadCall, sendLeadCall } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import { TableSkeleton } from '../../Components/LoadingState';
+import { tokens } from '../../Theme/tokens';
 
 // ----------------------
 // Type Declarations
@@ -24,6 +28,7 @@ export interface Lead {
   email: string;
   phoneNumber: string;
   projectName?: string;
+  projectId?: string;
   message?: string;
   company?: string;
   visitorType?: string;
@@ -34,6 +39,20 @@ export interface Lead {
   pageSource?: string;
   lastTouchSource?: string;
   enquiries?: number;
+  ownerId?: string;
+  temperature?: string;
+  stage?: string;
+  status?: string;
+  crmSource?: string;
+  budget?: string;
+  configuration?: string;
+  nextAction?: string;
+  nextFollowUpAt?: string;
+  lostReason?: string;
+  loan?: string;
+  decisionMaker?: string;
+  channelPartnerId?: string;
+  firstCallAt?: string;
   contentDownloadCount?: number;
   contentDownloads?: Array<{
     title?: string;
@@ -96,8 +115,8 @@ export const CALL_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-/** True only for a live dial. Stale queued/in_progress on old rows must not lock the button. */
-const ACTIVE_CALL_MAX_AGE_MS = 10 * 60 * 1000;
+/** True only for a live dial. Must stay above Outpero's 5 min cap + summary delay. */
+const ACTIVE_CALL_MAX_AGE_MS = 12 * 60 * 1000;
 export function isLeadCallInFlight(
   lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
 ): boolean {
@@ -108,6 +127,20 @@ export function isLeadCallInFlight(
   const started = new Date(lead.lastCallAt).getTime();
   if (Number.isNaN(started)) return false;
   return Date.now() - started < ACTIVE_CALL_MAX_AGE_MS;
+}
+
+/** Desk label: aged-out In progress (busy / no webhook) reads as No answer, not Calling. */
+export function leadCallStatusLabel(
+  lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
+): string {
+  const raw = lead.lastCallStatus || '';
+  if (
+    (raw === 'queued' || raw === 'in_progress') &&
+    !isLeadCallInFlight(lead)
+  ) {
+    return 'No answer';
+  }
+  return CALL_STATUS_LABEL[raw] || raw || '-';
 }
 
 /** Labels for the guided-finder keys stored on a lead. */
@@ -185,6 +218,76 @@ export const FORM_ANSWER_LABELS: Record<string, string> = {
   reasonNow: 'Why partner now',
 };
 
+/** Locked funnel — must match merchandising_backend LEAD_STAGES. */
+export const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'attempted_contact', label: 'Attempted Contact' },
+  { value: 'connected', label: 'Connected' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'site_visit_planned', label: 'Site Visit Planned' },
+  { value: 'site_visit_done', label: 'Site Visit Done' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'booking_token', label: 'Booking / Token' },
+  { value: 'won_booked', label: 'Won / Booked' },
+  { value: 'lost', label: 'Lost' },
+  { value: 'nurture', label: 'Nurture' },
+] as const;
+
+export const STAGE_LABEL: Record<string, string> = Object.fromEntries(
+  STAGE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+/** Locked temperatures — separate from stage. */
+export const TEMPERATURE_OPTIONS = [
+  { value: 'hot', label: 'Hot' },
+  { value: 'warm', label: 'Warm' },
+  { value: 'cold', label: 'Cold' },
+] as const;
+
+export const TEMPERATURE_LABEL: Record<string, string> = Object.fromEntries(
+  TEMPERATURE_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+export const LOST_REASON_OPTIONS = [
+  { value: 'budget', label: 'Budget' },
+  { value: 'price', label: 'Price' },
+  { value: 'location', label: 'Location' },
+  { value: 'project_not_suitable', label: 'Project not suitable' },
+  { value: 'bought_elsewhere', label: 'Bought elsewhere' },
+  { value: 'no_response', label: 'No response' },
+  { value: 'not_interested', label: 'Not interested' },
+  { value: 'duplicate', label: 'Duplicate' },
+  { value: 'future_requirement', label: 'Future requirement' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export const CRM_SOURCE_LABEL: Record<string, string> = {
+  meta: 'Meta Ads',
+  google: 'Google Ads',
+  whatsapp: 'WhatsApp',
+  website: 'Website',
+  referral: 'Referral',
+  channel_partner: 'Channel partner',
+  walk_in: 'Walk-in',
+  housing: 'Housing / portal',
+  manual: 'Manual',
+  other: 'Other',
+};
+
+export const NEXT_ACTION_OPTIONS = [
+  { value: 'call', label: 'Call' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'site_visit', label: 'Site visit' },
+  { value: 'send_brochure', label: 'Send brochure' },
+  { value: 'send_cost_sheet', label: 'Send cost sheet' },
+  { value: 'meeting', label: 'Meeting' },
+  { value: 'follow_up', label: 'Follow-up' },
+] as const;
+
+export const NEXT_ACTION_LABEL: Record<string, string> = Object.fromEntries(
+  NEXT_ACTION_OPTIONS.map((o) => [o.value, o.label]),
+);
+
 export function leadSourceLabel(lead: Pick<Lead, 'source' | 'pageSource'>): string {
   if (lead.source === 'assessment' || /assessment/i.test(lead.pageSource || '')) return 'Assessment';
   if (lead.source) return SOURCE_LABEL[lead.source] || lead.source;
@@ -213,15 +316,15 @@ export function krisahStatusLabel(lead: Pick<Lead, 'source' | 'pageSource' | 'kr
 }
 
 const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: string; color: string }> = {
-  completed: { label: 'Completed', bg: '#e8f5e9', color: '#1b5e20' },
-  invite_sent: { label: 'Invite sent', bg: '#e3f2fd', color: '#0d47a1' },
-  not_started: { label: 'Not started', bg: '#fff3e0', color: '#e65100' },
+  completed: { label: 'Completed', bg: tokens.successSoft, color: tokens.success },
+  invite_sent: { label: 'Invite sent', bg: tokens.infoSoft, color: tokens.info },
+  not_started: { label: 'Not started', bg: tokens.warningSoft, color: tokens.warning },
 };
 
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
   const key = krisahStatusKey(lead);
   if (key === 'none') {
-    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>-</Typography>;
+    return <Typography variant="caption" sx={{ color: tokens.textMuted }}>-</Typography>;
   }
   const chip = KRISAH_CHIP[key];
   const label = key === 'completed' && lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : chip.label;
@@ -236,6 +339,10 @@ export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSo
 
 interface LeadsApiResponse {
   leads: Lead[];
+  totalCount?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 }
 
 // ----------------------
@@ -248,6 +355,8 @@ const AllLeads: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [searchText, setSearchText] = useState('');
+  const [phoneFilter, setPhoneFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openModal, setOpenModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -261,10 +370,17 @@ const AllLeads: React.FC = () => {
   const [callError, setCallError] = useState('');
   const [callInfo, setCallInfo] = useState('');
 
-  // ✅ useQuery with proper typing
+  // Day 11 — ask the server for one page (stage + phone filters).
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
-    queryKey: ['leads'],
-    queryFn: getLeads,
+    queryKey: ['leads', currentPage, rowsPerPage, stageFilter, phoneFilter],
+    queryFn: () =>
+      getLeads({
+        page: currentPage,
+        limit: rowsPerPage,
+        ...(stageFilter ? { stage: stageFilter } : {}),
+        ...(phoneFilter ? { phone: phoneFilter } : {}),
+      }),
+    placeholderData: (prev) => prev,
   });
 
   // Keep the open drawer on the freshest lead row after call / list refresh.
@@ -284,6 +400,36 @@ const AllLeads: React.FC = () => {
     }, 8000);
     return () => window.clearInterval(timer);
   }, [callBusyId, data?.leads, queryClient]);
+
+  // Busy / no webhook often leaves queued/in_progress forever. Ask API to release aged rows.
+  React.useEffect(() => {
+    const stuck =
+      data?.leads?.filter(
+        (row) =>
+          (row.lastCallStatus === 'queued' || row.lastCallStatus === 'in_progress') &&
+          !isLeadCallInFlight(row),
+      ) || [];
+    if (!stuck.length) return;
+    let cancelled = false;
+    (async () => {
+      let releasedAny = false;
+      for (const row of stuck) {
+        try {
+          const result = await releaseLeadCall(row._id);
+          if (result?.released) releasedAny = true;
+        } catch {
+          // Endpoint may not be live yet; desk label still ages out locally.
+        }
+        if (cancelled) return;
+      }
+      if (releasedAny && !cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.leads, queryClient]);
 
   const callMutation = useMutation({
     mutationFn: (leadId: string) => sendLeadCall(leadId),
@@ -362,7 +508,12 @@ const AllLeads: React.FC = () => {
   );
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchText(e.target.value);
+    const value = e.target.value;
+    setSearchText(value);
+    // Digits-heavy search goes to the server phone filter; name/email stay on this page.
+    const digits = value.replace(/\D/g, '');
+    const nextPhone = digits.length >= 4 ? digits : '';
+    setPhoneFilter(nextPhone);
     setCurrentPage(1);
   };
 
@@ -390,14 +541,19 @@ const AllLeads: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // ✅ Filter leads
+  // Page-local filters (type / source / service / KRISAH / name) on the server page.
   const filteredLeads = LeadsData.filter((lead) => {
+    const q = searchText.trim().toLowerCase();
+    const digits = searchText.replace(/\D/g, '');
+    const phoneServerActive = digits.length >= 4;
     const matchesSearch =
-      lead.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      lead.email.toLowerCase().includes(searchText.toLowerCase()) ||
+      !q ||
+      phoneServerActive ||
+      lead.name.toLowerCase().includes(q) ||
+      lead.email.toLowerCase().includes(q) ||
       lead.phoneNumber.includes(searchText);
 
-    const matchesType = !  type || lead.type.toLowerCase() === type.toLowerCase();
+    const matchesType = !type || lead.type.toLowerCase() === type.toLowerCase();
     const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source || '');
     const matchesService = selectedServices.length === 0 || selectedServices.includes(lead.recommendedService || '');
     const matchesKrisah = !krisahFilter || krisahStatusKey(lead) === krisahFilter;
@@ -405,8 +561,8 @@ const AllLeads: React.FC = () => {
     return matchesSearch && matchesType && matchesSource && matchesService && matchesKrisah;
   });
 
-  const totalPages = Math.ceil(filteredLeads.length / rowsPerPage);
-  const paginatedRows = filteredLeads.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const totalPages = Math.max(1, data?.totalPages || Math.ceil((data?.totalCount || 0) / rowsPerPage) || 1);
+  const paginatedRows = filteredLeads;
   const pageIds = paginatedRows.map((lead) => lead._id);
   const selectedCount = selectedIds.length;
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
@@ -431,16 +587,29 @@ const AllLeads: React.FC = () => {
   // ----------------------
   // Loading / Error States
   // ---------------------- 
-  if (isPending) return <Typography>Loading...</Typography>;
+  if (isPending) return (
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <PageHeader title="Leads" description="Every enquiry from the website, sorted by source and service." crumbs={[{ label: 'Leads' }]} />
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <TableSkeleton rows={8} columns={6} />
+      </Paper>
+    </Box>
+  );
   if (error) return <Typography color="error">Error fetching leads.</Typography>;
 
   return (
-    <Box>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <PageHeader
+        title="Leads"
+        description="Every enquiry from the website, sorted by source and service."
+        crumbs={[{ label: 'Leads' }]}
+        actions={<Chip label={`${filteredLeads.length} leads`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />}
+      />
       {/* Search & Filters */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <TextField
-            placeholder="Search for Leads..."
+            placeholder="Search name, email, or phone..."
             variant="outlined"
             size="small"
             onChange={handleSearch}
@@ -453,8 +622,8 @@ const AllLeads: React.FC = () => {
             }}
             sx={{ 
               width: { xs: '100%', sm: '350px' },
-              backgroundColor: '#fff',
-              boxShadow: '0px 10px 25px rgba(0, 0, 0, 0.1)',
+              backgroundColor: tokens.input,
+              boxShadow: '0px 10px 25px rgba(0, 0, 0, 0.35)',
               height: '36px',
               borderRadius: '8px', // Added border radius as per the design
               '& .MuiOutlinedInput-notchedOutline': {
@@ -477,7 +646,7 @@ const AllLeads: React.FC = () => {
                 marginRight: '10px',
               },
               '& .MuiSvgIcon-root': {
-                color: '#30779d',
+                color: tokens.goldText,
               },
               '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
                 border: 'none',
@@ -493,27 +662,27 @@ const AllLeads: React.FC = () => {
               sx={{
                 width: '100%',
                 height: "40px",
-                border: "1px solid #1212121A",
+                border: `1px solid ${tokens.border}`,
                 borderRadius: "20px",
                 opacity: 1,
-                boxShadow: "0px 6px 14px #36408D08",
+                boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                 fontSize: "12px",
-                color: "#1D1D1D",
+                color: tokens.text,
                 textAlign: 'left',
               }}
             >
               <MenuItem value="">
-                <Typography variant='caption' sx={{ color: '#1D1D1D', opacity: 0.6, fontWeight: 450 }}>
+                <Typography variant='caption' sx={{ color: tokens.text, opacity: 0.6, fontWeight: 450 }}>
                   Type
                 </Typography>
               </MenuItem>
               <MenuItem value="project">
-                <Typography variant='caption' sx={{  color: '#1D1D1D' , fontWeight: 450 }}>
+                <Typography variant='caption' sx={{  color: tokens.text , fontWeight: 450 }}>
                   Project
                 </Typography>
               </MenuItem>
               <MenuItem value="individual">
-                <Typography variant='caption' sx={{ color: '#1D1D1D' , fontWeight: 450 }}>
+                <Typography variant='caption' sx={{ color: tokens.text , fontWeight: 450 }}>
                   Contact 
                 </Typography>
               </MenuItem>
@@ -532,7 +701,7 @@ const AllLeads: React.FC = () => {
                   <Box display="flex" alignItems="center">
                     {selected.length > 0 ? (
                       <>
-                        <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: 0.6 }}>Sources</Typography>
+                        <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Sources</Typography>
                         <Box
                            component="span"
                           borderRadius="50%"
@@ -545,44 +714,72 @@ const AllLeads: React.FC = () => {
                           justifyContent="center"
 
                           sx={{
-                            backgroundColor: '#30779d',
-                            color: '#FFFFFF',
+                            backgroundColor: tokens.gold,
+                            color: tokens.black,
                           }}
                         >
                           {selected.length}
                         </Box>
                       </>
                     ) : (
-                      <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: 0.6 }}>Select Sources</Typography>
+                      <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Select Sources</Typography>
                     )}
                   </Box>
                 )}
                 sx={{
                   width: '100%',
                   height: "40px",
-                  border: "1px solid #1212121A",
+                  border: `1px solid ${tokens.border}`,
                   borderRadius: "20px",
                   opacity: 1,
-                  boxShadow: "0px 6px 14px #36408D08",
+                  boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                   fontSize: "12px",
-                  color: "#1D1D1D",
+                  color: tokens.text,
                   textAlign: 'left',
                 }}
               >
                 <ListSubheader sx={{ background: 'transparent' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>
                     Sources
                   </Typography>
                 </ListSubheader>
                 {sourceOptions.map((source) => (
                   <MenuItem key={source} value={source}>
-                    <Checkbox checked={selectedSources.indexOf(source) > -1} size="small"   sx={{ color: '#1D1D1D', fontSize: "10px" }}/>
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>{source}</Typography>
+                    <Checkbox checked={selectedSources.indexOf(source) > -1} size="small"   sx={{ color: tokens.text, fontSize: "10px" }}/>
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{source}</Typography>
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           )}
+
+          <FormControl sx={{ minWidth: 150 }}>
+            <Select
+              value={stageFilter}
+              onChange={(event) => {
+                setStageFilter(String(event.target.value || ''));
+                setCurrentPage(1);
+              }}
+              displayEmpty
+              sx={{
+                height: '40px',
+                border: `1px solid ${tokens.border}`,
+                borderRadius: '20px',
+                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
+                fontSize: '12px',
+                color: tokens.text,
+              }}
+            >
+              <MenuItem value="">
+                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>CRM stage</Typography>
+              </MenuItem>
+              {STAGE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Typography variant="caption">{opt.label}</Typography>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControl sx={{ minWidth: 140 }}>
             <Select
@@ -594,15 +791,15 @@ const AllLeads: React.FC = () => {
               displayEmpty
               sx={{
                 height: '40px',
-                border: '1px solid #1212121A',
+                border: `1px solid ${tokens.border}`,
                 borderRadius: '20px',
-                boxShadow: '0px 6px 14px #36408D08',
+                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
                 fontSize: '12px',
-                color: '#1D1D1D',
+                color: tokens.text,
               }}
             >
               <MenuItem value="">
-                <Typography variant="caption" sx={{ color: '#1D1D1D', opacity: 0.6 }}>KRISAH status</Typography>
+                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>KRISAH status</Typography>
               </MenuItem>
               <MenuItem value="not_started">
                 <Typography variant="caption">Not started</Typography>
@@ -625,16 +822,16 @@ const AllLeads: React.FC = () => {
                 IconComponent={ArrowDropDownIcon}
                 displayEmpty
                 renderValue={(selected) => (
-                  <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: selected.length ? 1 : 0.6 }}>
+                  <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: selected.length ? 1 : 0.6 }}>
                     {selected.length ? `Recommended (${selected.length})` : 'Recommended service'}
                   </Typography>
                 )}
-                sx={{ height: "40px", border: "1px solid #1212121A", borderRadius: "20px", boxShadow: "0px 6px 14px #36408D08", fontSize: "12px", color: "#1D1D1D" }}
+                sx={{ height: "40px", border: `1px solid ${tokens.border}`, borderRadius: "20px", boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)", fontSize: "12px", color: tokens.text }}
               >
                 {serviceOptions.map((key) => (
                   <MenuItem key={key} value={key}>
-                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: '#1D1D1D' }} />
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>{SERVICE_LABEL[key] || key}</Typography>
+                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: tokens.text }} />
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{SERVICE_LABEL[key] || key}</Typography>
                   </MenuItem>
                 ))}
               </Select>
@@ -648,10 +845,10 @@ const AllLeads: React.FC = () => {
           sx={{
             height: '40px',
             borderRadius: '20px',
-            borderColor: '#1212121A',
-            boxShadow: '0px 6px 14px #36408D08',
+            borderColor: tokens.border,
+            boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
             fontSize: '12px',
-            color: '#1D1D1D',
+            color: tokens.text,
             textTransform: 'none',
             px: 2,
           }}
@@ -666,7 +863,7 @@ const AllLeads: React.FC = () => {
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
           <MenuItem disabled>
-            <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D', opacity: 0.5 }}>Export CSV</Typography>
+            <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text, opacity: 0.5 }}>Export CSV</Typography>
           </MenuItem>
           <MenuItem
             disabled={!selectedCount || deleteMutation.isPending}
@@ -676,7 +873,7 @@ const AllLeads: React.FC = () => {
               setConfirmDelete(true);
             }}
           >
-            <Typography variant="caption" sx={{ fontWeight: 500, color: selectedCount ? '#c62828' : '#1D1D1D' }}>
+            <Typography variant="caption" sx={{ fontWeight: 500, color: selectedCount ? tokens.danger : tokens.text }}>
               Delete{selectedCount ? ` (${selectedCount})` : ''}
             </Typography>
           </MenuItem>
@@ -710,7 +907,7 @@ const AllLeads: React.FC = () => {
         )}
 
         <Table sx={{ minWidth: 1040 }} stickyHeader={false}>
-          <TableHead sx={{ backgroundColor: '#30779d40' }}>
+          <TableHead sx={{ backgroundColor: tokens.panelAlt }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
                 <Checkbox
@@ -729,6 +926,18 @@ const AllLeads: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
+            {paginatedRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10}>
+                  <EmptyState
+                    title="No leads found"
+                    description={searchText.trim() || stageFilter || selectedSources.length || selectedServices.length || krisahFilter
+                      ? 'Try changing or clearing the filters.'
+                      : 'New website enquiries will appear here.'}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : null}
             {paginatedRows.map((lead, index) => (
               <TableRow
                 key={lead._id}
@@ -819,12 +1028,14 @@ const AllLeads: React.FC = () => {
                             ? 'In progress'
                             : 'Call'}
                       </Button>
-                      {lead.lastCallStatus &&
-                        lead.lastCallStatus !== 'queued' &&
-                        lead.lastCallStatus !== 'in_progress' && (
+                      {lead.lastCallStatus && !isLeadCallInFlight(lead) && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                          {CALL_STATUS_LABEL[lead.lastCallStatus] || lead.lastCallStatus}
-                          {lead.lastCallOutcome ? ` · ${lead.lastCallOutcome}` : ''}
+                          {leadCallStatusLabel(lead)}
+                          {lead.lastCallOutcome &&
+                          lead.lastCallStatus !== 'queued' &&
+                          lead.lastCallStatus !== 'in_progress'
+                            ? ` · ${lead.lastCallOutcome}`
+                            : ''}
                         </Typography>
                       )}
                       {isLeadCallInFlight(lead) && (
@@ -848,27 +1059,34 @@ const AllLeads: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* Pagination */}
-      <Box display="flex" justifyContent="center" mt={3}>
-        <Pagination
-          count={totalPages}
-          page={currentPage}
-          onChange={handleChangePage}
-          shape="rounded"
-          sx={{
-            "& .MuiPaginationItem-root": {
-              height: "22px",
-              minWidth: "22px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              backgroundColor: "#EFEFEF",
-            },
-            "& .Mui-selected": {
-              backgroundColor: theme.palette.primary.main,
-              color: "#fff",
-            },
-          }}
-        />
+      {/* Pagination — server pages (Day 11) */}
+      <Box display="flex" justifyContent="center" alignItems="center" flexWrap="wrap" gap={2} mt={3}>
+        <Typography variant="caption" color="text.secondary">
+          {data?.totalCount != null
+            ? `${data.totalCount} lead${data.totalCount === 1 ? '' : 's'} · page ${currentPage} of ${totalPages}`
+            : null}
+        </Typography>
+        {totalPages > 1 && (
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={handleChangePage}
+            shape="rounded"
+            sx={{
+              "& .MuiPaginationItem-root": {
+                height: "22px",
+                minWidth: "22px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                backgroundColor: tokens.panelAlt,
+              },
+              "& .Mui-selected": {
+                backgroundColor: theme.palette.primary.main,
+                color: tokens.black,
+              },
+            }}
+          />
+        )}
       </Box>
 
       {/* Modal */}

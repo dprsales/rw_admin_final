@@ -9,6 +9,10 @@ import house2 from './images/house2.png';
 import house3 from './images/house3.png';
 import map from './images/map.png';
 import rwlogo from './images/rwlogoblue.png'
+import rwGoldLogo from './brand/rw-gold.png'
+import staffLoginBg from './brand/staff-login-bg.jpg'
+// Optimised sidebar artwork: 760px wide JPEG derived from the 1.7 MB source PNG.
+import sidebarSkyline from './images/golden-skyline.jpg'
 import adminbanner from './images/adminbanner.jpg';
 
 //tabs
@@ -73,7 +77,7 @@ import dprwhite from './images/dpr_white.png';
 export { logo, image, logo1 , temp , section2 , house1 , house2 , house3 , map , Aboutus1, home1, logo2, person , galleryimage, More};
 
 
-export {adminbanner, dprlogo, dprwhite, rwlogo};
+export {adminbanner, dprlogo, dprwhite, rwlogo, rwGoldLogo, staffLoginBg, sidebarSkyline};
 
 export const AminitiesImages = {
     bedking,

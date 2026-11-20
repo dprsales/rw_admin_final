@@ -1,23 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Drawer, Box, Typography, Button, Chip, Divider, Stack, Link, IconButton,
-  TextField, CircularProgress, Alert, Dialog, DialogTitle, DialogContent,
-  DialogActions, FormControl, InputLabel, Select, MenuItem, Tooltip,
+  FormControl, InputLabel, Select, MenuItem, TextField, Alert, Grid, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions, Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-
-/** Flip to true after Meta approves the first templates and Live API campaigns exist. */
-const WHATSAPP_MANUAL_SEND_READY = false;
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckIcon from '@mui/icons-material/Check';
 import Cookies from 'js-cookie';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
+import ConfirmDialog from '../../Components/ConfirmDialog';
 import {
   CALL_STATUS_LABEL,
+  CRM_SOURCE_LABEL,
   FORM_ANSWER_LABELS,
   FORM_TRACK_LABEL,
   INTENT_LABEL,
@@ -25,10 +26,16 @@ import {
   isCallableLead,
   isCoachingLead,
   isLeadCallInFlight,
+  leadCallStatusLabel,
   KrisahStatusChip,
   Lead,
   leadSourceLabel,
+  LOST_REASON_OPTIONS,
+  NEXT_ACTION_OPTIONS,
   SERVICE_LABEL,
+  STAGE_LABEL,
+  STAGE_OPTIONS,
+  TEMPERATURE_OPTIONS,
   VISITOR_LABEL,
 } from './Leads';
 import {
@@ -37,8 +44,13 @@ import {
   getLeadActivities,
   getWhatsappTemplates,
   sendLeadWhatsapp,
+  updateLead,
   updateLeadNote,
 } from '../../api/services';
+import { tokens } from '../../Theme/tokens';
+
+/** Flip to true after Meta approves the first templates and Live API campaigns exist. */
+const WHATSAPP_MANUAL_SEND_READY = false;
 
 type WhatsappTemplateOption = {
   key: string;
@@ -139,16 +151,34 @@ function authorLabel(item: LeadNoteActivity): string {
   return 'Team';
 }
 
+
+type LeadActivityRow = {
+  _id: string;
+  type: 'note' | 'stage_change' | string;
+  note?: string;
+  fromStage?: string;
+  toStage?: string;
+  createdAt?: string;
+  authorName?: string;
+  authorEmail?: string;
+  createdBy?: { name?: string; email?: string } | string | null;
+};
+
+/** Convert ISO / Date string to datetime-local value (local wall clock). */
+function toLocalInput(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const FieldRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 1.5, py: 0.85, alignItems: 'start' }}>
     <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: 0.02, pt: 0.2 }}>
       {label}
     </Typography>
-    <Typography
-      component="div"
-      variant="body2"
-      sx={{ color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-    >
+    <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
       {children || '-'}
     </Typography>
   </Box>
@@ -169,7 +199,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
         borderRadius: 2,
         px: 2,
         py: 0.5,
-        bgcolor: '#fafbfc',
+        bgcolor: tokens.panelAlt,
       }}
     >
       {children}
@@ -186,15 +216,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
   callError = '',
   callInfo = '',
 }) => {
-  const [notes, setNotes] = useState<LeadNoteActivity[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState('');
-  const [draft, setDraft] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState('');
-  const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [waOpen, setWaOpen] = useState(false);
   const [waTemplates, setWaTemplates] = useState<WhatsappTemplateOption[]>([]);
   const [waConfigured, setWaConfigured] = useState(false);
@@ -228,6 +250,83 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const trackLabel = lead.formTrack
     ? (FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack)
     : null;
+
+  const [stage, setStage] = useState(lead.stage || 'new_lead');
+  const [temperature, setTemperature] = useState(lead.temperature || 'cold');
+  const [lostReason, setLostReason] = useState(lead.lostReason || '');
+  const [nextAction, setNextAction] = useState(lead.nextAction || '');
+  const [nextFollowUpAt, setNextFollowUpAt] = useState(toLocalInput(lead.nextFollowUpAt));
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setStage(lead.stage || 'new_lead');
+    setTemperature(lead.temperature || 'cold');
+    setLostReason(lead.lostReason || '');
+    setNextAction(lead.nextAction || '');
+    setNextFollowUpAt(toLocalInput(lead.nextFollowUpAt));
+    setError('');
+  }, [open, lead]);
+
+  const activitiesQuery = useQuery({
+    queryKey: ['lead-activities', lead._id],
+    queryFn: () => getLeadActivities(lead._id),
+    enabled: open && Boolean(lead._id),
+  });
+
+  const activities: LeadActivityRow[] = activitiesQuery.data?.activities || [];
+  const stageChanges = activities.filter((row) => row.type === 'stage_change');
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const followUpIso = nextFollowUpAt
+        ? new Date(nextFollowUpAt).toISOString()
+        : undefined;
+      return updateLead(lead._id, {
+        stage,
+        temperature,
+        ...(stage === 'lost' ? { lostReason, status: 'lost' } : {}),
+        ...(stage === 'won_booked' ? { status: 'won' } : {}),
+        ...(stage === 'nurture' ? { status: 'nurture' } : {}),
+        ...(nextAction ? { nextAction } : {}),
+        ...(followUpIso ? { nextFollowUpAt: followUpIso } : {}),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
+      handleClose();
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : null) ||
+        'Could not save CRM fields.';
+      setError(typeof msg === 'string' ? msg : 'Could not save CRM fields.');
+    },
+  });
+
+  const dirty =
+    stage !== (lead.stage || 'new_lead') ||
+    temperature !== (lead.temperature || 'cold') ||
+    (stage === 'lost' && lostReason !== (lead.lostReason || '')) ||
+    nextAction !== (lead.nextAction || '') ||
+    nextFollowUpAt !== toLocalInput(lead.nextFollowUpAt);
+
+  const canSave = dirty && (stage !== 'lost' || Boolean(lostReason));
+
+  const [notes, setNotes] = useState<LeadNoteActivity[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
   const normalizeNote = (a: LeadNoteActivity): LeadNoteActivity => ({
     ...a,
@@ -297,7 +396,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setWaInfo('');
     try {
       const result = await sendLeadWhatsapp(leadId, waCampaign);
-      setWaInfo(result?.message || 'WhatsApp sent.');
+      const message = result?.message || 'WhatsApp sent.';
+      setWaInfo(message);
+      toast.success(message);
       setWaOpen(false);
       if (result?.activity) {
         setNotes((prev) => [normalizeNote(result.activity as LeadNoteActivity), ...prev]);
@@ -309,7 +410,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
         err?.response?.data?.message ||
         err?.message ||
         'Could not send WhatsApp. Try again.';
-      setWaError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setWaError(message);
+      toast.error(message);
     } finally {
       setWaSending(false);
     }
@@ -330,6 +433,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setEditingId(null);
     setEditDraft('');
     setNoteBusyId(null);
+    setDeleteNoteId(null);
     setNotes([]);
     void loadNotes();
   }, [open, lead?._id, loadNotes]);
@@ -369,11 +473,14 @@ const LeadModal: React.FC<LeadModalProps> = ({
       }
       const normalized = normalizeNote({ ...saved, note: saved.note || text, authorName: saved.authorName || me });
       setNotes((prev) => [normalized, ...prev.filter((n) => n._id !== tempId && n._id !== normalized._id)]);
+      toast.success('Note saved');
     } catch (err: any) {
       setNotes((prev) => prev.filter((n) => n._id !== tempId));
       setDraft(text);
       const msg = err?.response?.data?.message || err?.message || 'Could not save the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -426,23 +533,32 @@ const LeadModal: React.FC<LeadModalProps> = ({
       }
       setEditingId(null);
       setEditDraft('');
+      toast.success('Note updated');
     } catch (err: any) {
       setNotes((prev) => prev.map((n) => (n._id === id ? { ...n, note: previous } : n)));
       const msg =
         err?.response?.data?.message ||
         err?.message ||
         'Could not update the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setNoteBusyId(null);
     }
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    const leadId = String(lead?._id || '');
+  const handleDeleteNote = (noteId: string) => {
     const id = String(noteId || '');
-    if (!leadId || !id || noteBusyId || id.startsWith('temp-')) return;
-    if (!window.confirm('Delete this note? This cannot be undone.')) return;
+    if (!lead?._id || !id || noteBusyId || id.startsWith('temp-')) return;
+    setDeleteNoteId(id);
+  };
+
+  const confirmDeleteNote = async () => {
+    const leadId = String(lead?._id || '');
+    const id = deleteNoteId;
+    if (!leadId || !id) return;
+    setDeleteNoteId(null);
     const previous = notes;
     setNoteBusyId(id);
     setSaveError('');
@@ -450,16 +566,29 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setNotes((prev) => prev.filter((n) => n._id !== id));
     try {
       await deleteLeadNote(leadId, id);
+      toast.success('Note deleted');
     } catch (err: any) {
       setNotes(previous);
       const msg =
         err?.response?.data?.message ||
         err?.message ||
         'Could not delete the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setNoteBusyId(null);
     }
+  };
+
+
+  const activityLabel = (row: LeadActivityRow) => {
+    if (row.type === 'stage_change') {
+      const from = STAGE_LABEL[row.fromStage || ''] || row.fromStage || '-';
+      const to = STAGE_LABEL[row.toStage || ''] || row.toStage || '-';
+      return `Stage: ${from} → ${to}`;
+    }
+    return 'Note';
   };
 
   return (
@@ -530,7 +659,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                       : 'default'
                 }
                 variant="outlined"
-                label={`Call: ${CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus}`}
+                label={`Call: ${leadCallStatusLabel(lead)}`}
               />
             )}
           </Stack>
@@ -576,12 +705,12 @@ const LeadModal: React.FC<LeadModalProps> = ({
                       sx={{
                         textTransform: 'none',
                         fontWeight: 600,
-                        borderColor: '#25D366',
-                        color: '#128C7E',
-                        '&:hover': { borderColor: '#128C7E', bgcolor: 'rgba(37,211,102,0.06)' },
+                        borderColor: tokens.success,
+                        color: tokens.success,
+                        '&:hover': { borderColor: tokens.success, bgcolor: tokens.successSoft },
                         '&.Mui-disabled': {
-                          borderColor: 'rgba(37,211,102,0.35)',
-                          color: 'rgba(18,140,126,0.45)',
+                          borderColor: tokens.successSoft,
+                          color: tokens.textMuted,
                         },
                       }}
                     >
@@ -618,34 +747,125 @@ const LeadModal: React.FC<LeadModalProps> = ({
         </Box>
 
         <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
-          <Section title="Contact">
-            <FieldRow label="Name">{lead.name}</FieldRow>
-            <Divider />
-            <FieldRow label="Email">
-              <Link href={`mailto:${lead.email}`} underline="hover">{lead.email}</Link>
-            </FieldRow>
-            <Divider />
-            <FieldRow label="Phone">
-              <Link href={`tel:${lead.phoneNumber}`} underline="hover">{lead.phoneNumber}</Link>
-            </FieldRow>
-            {lead.company && (
-              <>
-                <Divider />
-                <FieldRow label="Company">{lead.company}</FieldRow>
-              </>
-            )}
-            {lead.projectName && (
-              <>
-                <Divider />
-                <FieldRow label="Project">{lead.projectName}</FieldRow>
-              </>
-            )}
+          <Section title="CRM">
+            <Box sx={{ py: 1.5 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="lead-stage-label">Stage</InputLabel>
+                    <Select
+                      labelId="lead-stage-label"
+                      label="Stage"
+                      value={stage}
+                      onChange={(e) => setStage(e.target.value)}
+                    >
+                      {STAGE_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="lead-temp-label">Temperature</InputLabel>
+                    <Select
+                      labelId="lead-temp-label"
+                      label="Temperature"
+                      value={temperature}
+                      onChange={(e) => setTemperature(e.target.value)}
+                    >
+                      {TEMPERATURE_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                {stage === 'lost' && (
+                  <Grid item xs={12}>
+                    <FormControl fullWidth size="small" required>
+                      <InputLabel id="lead-lost-label">Lost reason</InputLabel>
+                      <Select
+                        labelId="lead-lost-label"
+                        label="Lost reason"
+                        value={lostReason}
+                        onChange={(e) => setLostReason(e.target.value)}
+                      >
+                        {LOST_REASON_OPTIONS.map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                )}
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="lead-next-action-label">Next action</InputLabel>
+                    <Select
+                      labelId="lead-next-action-label"
+                      label="Next action"
+                      value={nextAction}
+                      onChange={(e) => setNextAction(e.target.value)}
+                    >
+                      <MenuItem value="">
+                        <em>None</em>
+                      </MenuItem>
+                      {NEXT_ACTION_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Follow-up due"
+                    type="datetime-local"
+                    value={nextFollowUpAt}
+                    onChange={(e) => setNextFollowUpAt(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+              <Typography variant="body2" sx={{ mt: 1.5, color: 'text.secondary' }}>
+                Status: {lead.status || 'open'}
+                {' · '}
+                CRM source: {CRM_SOURCE_LABEL[lead.crmSource || ''] || lead.crmSource || '-'}
+              </Typography>
+            </Box>
+          </Section>
+
+          <Section title="Stage history">
+            <Box sx={{ py: 1.25 }}>
+              {activitiesQuery.isLoading && (
+                <Typography variant="body2" color="text.secondary">Loading activity…</Typography>
+              )}
+              {!activitiesQuery.isLoading && stageChanges.length === 0 && (
+                <Typography variant="body2" color="text.secondary">No stage changes yet.</Typography>
+              )}
+              {stageChanges.map((row) => (
+                <Box key={row._id} sx={{ mb: 1.25 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {activityLabel(row)}
+                  </Typography>
+                  {row.note && (
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {row.note}
+                    </Typography>
+                  )}
+                  <Divider sx={{ mt: 1 }} />
+                </Box>
+              ))}
+            </Box>
           </Section>
 
           {canOutperoCall && (lead.lastCallStatus || lead.lastCallSummary || lead.lastCallOutcome) && (
             <Section title="Last Outpero call">
               <FieldRow label="Status">
-                {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || lead.lastCallStatus || '-'}
+                {leadCallStatusLabel(lead)}
               </FieldRow>
               {lead.lastCallOutcome && (
                 <>
@@ -690,7 +910,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
             </Section>
           )}
 
-          <Box sx={{ mb: 3 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+<Box sx={{ mb: 3 }}>
             <Typography
               variant="overline"
               sx={{ display: 'block', color: 'text.secondary', fontWeight: 700, letterSpacing: 0.08, mb: 1 }}
@@ -703,10 +925,10 @@ const LeadModal: React.FC<LeadModalProps> = ({
                 borderColor: 'divider',
                 borderRadius: 2,
                 overflow: 'hidden',
-                bgcolor: '#fff',
+                bgcolor: tokens.input,
               }}
             >
-              <Box sx={{ px: 2, pt: 2, pb: 1.5, bgcolor: '#fafbfc', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ px: 2, pt: 2, pb: 1.5, bgcolor: tokens.panelAlt, borderBottom: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                   Log a call, summary, or follow-up
                 </Typography>
@@ -723,7 +945,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                   inputProps={{ maxLength: 4000 }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      bgcolor: '#fff',
+                      bgcolor: tokens.input,
                       fontSize: '0.9rem',
                       lineHeight: 1.55,
                     },
@@ -820,7 +1042,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                 borderRadius: '50%',
                                 bgcolor: 'primary.main',
                                 mt: 0.55,
-                                boxShadow: '0 0 0 3px rgba(25, 118, 210, 0.12)',
+                                boxShadow: `0 0 0 3px ${tokens.goldSoft}`,
                                 zIndex: 1,
                               }}
                             />
@@ -856,7 +1078,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                   <IconButton
                                     size="small"
                                     aria-label="Delete note"
-                                    onClick={() => void handleDeleteNote(item._id)}
+                                    onClick={() => handleDeleteNote(item._id)}
                                     disabled={Boolean(noteBusyId)}
                                     sx={{ color: 'text.secondary' }}
                                   >
@@ -872,7 +1094,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                 borderRadius: 1.5,
                                 px: 1.5,
                                 py: 1.15,
-                                bgcolor: '#fafbfc',
+                                bgcolor: tokens.panelAlt,
                               }}
                             >
                               {isEditing ? (
@@ -888,7 +1110,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                     inputProps={{ maxLength: 4000 }}
                                     sx={{
                                       '& .MuiOutlinedInput-root': {
-                                        bgcolor: '#fff',
+                                        bgcolor: tokens.input,
                                         fontSize: '0.9rem',
                                       },
                                     }}
@@ -933,6 +1155,32 @@ const LeadModal: React.FC<LeadModalProps> = ({
               </Box>
             </Box>
           </Box>
+
+
+
+          <Section title="Contact">
+            <FieldRow label="Name">{lead.name}</FieldRow>
+            <Divider />
+            <FieldRow label="Email">
+              <Link href={`mailto:${lead.email}`} underline="hover">{lead.email}</Link>
+            </FieldRow>
+            <Divider />
+            <FieldRow label="Phone">
+              <Link href={`tel:${lead.phoneNumber}`} underline="hover">{lead.phoneNumber}</Link>
+            </FieldRow>
+            {lead.company && (
+              <>
+                <Divider />
+                <FieldRow label="Company">{lead.company}</FieldRow>
+              </>
+            )}
+            {lead.projectName && (
+              <>
+                <Divider />
+                <FieldRow label="Project">{lead.projectName}</FieldRow>
+              </>
+            )}
+          </Section>
 
           <Section title="Capture">
             <FieldRow label="Source">
@@ -1031,7 +1279,6 @@ const LeadModal: React.FC<LeadModalProps> = ({
               ))}
             </Section>
           )}
-
         </Box>
 
         <Box
@@ -1042,11 +1289,19 @@ const LeadModal: React.FC<LeadModalProps> = ({
             borderColor: 'divider',
             display: 'flex',
             justifyContent: 'flex-end',
+            gap: 1,
             bgcolor: 'background.paper',
           }}
         >
-          <Button onClick={handleClose} variant="contained">
+          <Button onClick={handleClose} variant="outlined">
             Close
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            variant="contained"
+            disabled={!canSave || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save CRM'}
           </Button>
         </Box>
       </Box>
@@ -1109,12 +1364,23 @@ const LeadModal: React.FC<LeadModalProps> = ({
               ? <CircularProgress size={14} color="inherit" />
               : <WhatsAppIcon sx={{ fontSize: 16 }} />
           }
-          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe57' } }}
+          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: tokens.success, '&:hover': { bgcolor: tokens.successSoft } }}
         >
           {waSending ? 'Sending…' : 'Send message'}
         </Button>
       </DialogActions>
     </Dialog>
+
+    <ConfirmDialog
+      open={Boolean(deleteNoteId)}
+      title="Delete this note?"
+      description="This cannot be undone."
+      confirmLabel="Delete"
+      tone="danger"
+      loading={Boolean(deleteNoteId) && noteBusyId === deleteNoteId}
+      onConfirm={() => void confirmDeleteNote()}
+      onClose={() => setDeleteNoteId(null)}
+    />
     </>
   );
 };

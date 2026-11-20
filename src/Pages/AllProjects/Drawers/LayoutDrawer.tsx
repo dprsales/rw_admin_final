@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import { layoutSection,updateProjectSection } from '../../../api/services';
+import { tokens } from '../../../Theme/tokens';
 
 export interface Layout {
   d1: string;
@@ -131,8 +132,8 @@ useEffect(() => {
           bgcolor: 'primary.main',
         }}
       >
-        <Typography color="white" fontWeight={600}>Edit Layout Section</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+        <Typography color={tokens.text} fontWeight={600}>Edit Layout Section</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -203,8 +204,8 @@ useEffect(() => {
 
           <Box>
           {/* Submit */}
-          <Button variant="contained" color="primary" type="submit" fullWidth sx={{ mt: 3 }}>
-            Save Layout Section
+          <Button variant="contained" color="primary" type="submit" fullWidth sx={{ mt: 3 }} disabled={mutation.isPending}>
+            {mutation.isPending ? 'Saving…' : 'Save Layout Section'}
           </Button>
 
           </Box>

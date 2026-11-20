@@ -13,6 +13,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "axios": "^1.7.7",
+    "gsap": "^3.15.1",
     "js-cookie": "^3.0.5",
     "otp-input-react": "^0.3.0",
     "react": "^18.3.1",
@@ -21,6 +22,7 @@
     "react-hook-form": "^7.53.0",
     "react-router-dom": "^6.26.1",
     "react-toastify": "^10.0.5",
+    "recharts": "^3.11.0",
     "vanilla-tilt": "^1.8.1",
     "yup": "^1.4.0"
   },
@@ -28,6 +30,9 @@
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^22.10.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.6.2",
+    "postcss": "^8.5.33",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3",
     "vite": "^6.0.3"
   },

@@ -121,7 +121,7 @@
 //         sx: {
 //           width: '100%',
 //           maxWidth: '360px',
-//           background: '#FFFFFF',
+//           background: tokens.panel,
 //           borderRadius: '0px',
 //           border: 'none',
 //         },
@@ -135,14 +135,14 @@
 //           display: 'flex',
 //           alignItems: 'center',
 //           justifyContent: 'space-between',
-//           color: 'white',
+//           color: tokens.text,
 //           padding: '0 16px',
 //         }}
 //       >
-//         <Typography variant="h6" sx={{ color: 'white', fontWeight: '600' }}>
+//         <Typography variant="h6" sx={{ color: tokens.text, fontWeight: '600' }}>
 //           {initialValues ? 'Edit Lead' : 'Add Lead'}
 //         </Typography>
-//         <IconButton onClick={onClose} sx={{ color: 'white', mr: 2 }}>
+//         <IconButton onClick={onClose} sx={{ color: tokens.text, mr: 2 }}>
 //           <CloseIcon />
 //         </IconButton>
 //       </Box>

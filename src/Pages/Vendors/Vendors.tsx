@@ -4,11 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -26,12 +21,17 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Add, ArrowBack, DeleteOutline, EditOutlined, PauseCircleOutline, PlayCircleOutline, Search, StorefrontOutlined } from '@mui/icons-material';
+import { Add, DeleteOutline, EditOutlined, PauseCircleOutline, PlayCircleOutline, Search, StorefrontOutlined } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createVendor, deleteVendor, getVendors, removeVendorDocument, updateVendor } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { TableSkeleton, PageSkeleton } from '../../Components/LoadingState';
+import { tokens } from '../../Theme/tokens';
 
 type VendorStatus = 'active' | 'paused';
 
@@ -238,7 +238,18 @@ const Vendors: React.FC = () => {
   const resetPage = () => setCurrentPage(1);
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageHeader
+          title="Vendor List"
+          description="Companies Team RW already works with. The GST number, PAN number, and documents stay on the row."
+          crumbs={[{ label: 'Vendor List' }]}
+        />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableSkeleton rows={8} columns={7} />
+        </Paper>
+      </Box>
+    );
   }
 
   if (error) {
@@ -247,25 +258,21 @@ const Vendors: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Vendor List</Typography>
-          <Typography variant="body2" color="text.secondary">Companies Team RW already works with. The GST number, PAN number, and documents stay on the row.</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Chip icon={<StorefrontOutlined />} label={`${vendors.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => navigate('/vendors/new')}
-            sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0c5288' } }}
-          >
-            Add vendor
-          </Button>
-        </Box>
-      </Box>
+      <PageHeader
+        title="Vendor List"
+        description="Companies Team RW already works with. The GST number, PAN number, and documents stay on the row."
+        crumbs={[{ label: 'Vendor List' }]}
+        actions={
+          <>
+            <Chip icon={<StorefrontOutlined />} label={`${vendors.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+            <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/vendors/new')}>
+              Add vendor
+            </Button>
+          </>
+        }
+      />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
             <TextField
@@ -311,20 +318,20 @@ const Vendors: React.FC = () => {
         <Divider />
 
         {visible.length === 0 ? (
-          <Box sx={{ py: 10, px: 3, textAlign: 'center' }}>
-            <StorefrontOutlined sx={{ fontSize: 42, color: '#9bb9ca', mb: 1 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>{vendors.length === 0 ? 'No companies yet' : 'No companies match'}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {vendors.length === 0 ? 'Add the first company to start the vendor list.' : 'Try another industry or clear the search.'}
-            </Typography>
-          </Box>
+          <EmptyState
+            icon={StorefrontOutlined}
+            title={vendors.length === 0 ? 'No companies yet' : 'No companies match'}
+            description={vendors.length === 0 ? 'Add the first company to start the vendor list.' : 'Try another industry or clear the search.'}
+            actionLabel={vendors.length === 0 ? 'Add vendor' : undefined}
+            onAction={vendors.length === 0 ? () => navigate('/vendors/new') : undefined}
+          />
         ) : (
           <TableContainer>
             <Table sx={{ minWidth: 1080 }}>
-              <TableHead sx={{ bgcolor: '#f3f8fb' }}>
+              <TableHead sx={{ bgcolor: tokens.surfaceAlt }}>
                 <TableRow>
                   {['Company', 'Contact', 'GST / PAN', 'Industry', 'Documents', 'Status', 'Actions'].map((heading) => (
-                    <TableCell key={heading} sx={{ fontWeight: 700, color: '#355466' }}>{heading}</TableCell>
+                    <TableCell key={heading} sx={{ fontWeight: 700, color: tokens.text }}>{heading}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>
@@ -340,7 +347,7 @@ const Vendors: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           variant="caption"
-                          sx={{ color: '#0f63a5', display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                          sx={{ color: tokens.goldText, display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                         >
                           Website / portfolio
                         </Typography>
@@ -437,32 +444,19 @@ const Vendors: React.FC = () => {
         </Box>
       )}
 
-      <Dialog open={pendingDelete !== null} onClose={() => { if (!confirmBusy) { setPendingDelete(null); setConfirmError(''); } }} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete this vendor?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {pendingDelete ? `${pendingDelete.companyName} will be removed from the sheet. Saved files are removed from storage too.` : ''}
-          </Typography>
-          {confirmError && <Typography color="error" variant="body2" sx={{ mt: 1.5 }}>{confirmError}</Typography>}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            onClick={() => { setPendingDelete(null); setConfirmError(''); }}
-            disabled={confirmBusy}
-            sx={{ bgcolor: '#fff', color: '#355466', border: '1px solid #d5e0e6', '&:hover': { bgcolor: '#f4f8fb', color: '#355466', border: '1px solid #d5e0e6' } }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={confirmBusy || !pendingDelete}
-            onClick={() => { if (pendingDelete) deleteMutation.mutate(pendingDelete._id); }}
-            sx={{ bgcolor: '#b42318', color: '#fff', '&:hover': { bgcolor: '#912018', color: '#fff', border: '1px solid #912018' } }}
-          >
-            {confirmBusy ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete this vendor?"
+        description={
+          `${pendingDelete?.companyName ?? 'This vendor'} will be removed from the sheet. Saved files are removed from storage too.` +
+          (confirmError ? ` ${confirmError}` : '')
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        loading={confirmBusy}
+        onConfirm={() => { if (pendingDelete) deleteMutation.mutate(pendingDelete._id); }}
+        onClose={() => { setPendingDelete(null); setConfirmError(''); }}
+      />
     </Box>
   );
 };
@@ -482,11 +476,11 @@ const DocumentLinks: React.FC<{ vendor: Vendor }> = ({ vendor }) => {
       {links.map((item) => (
         <Box key={item.label} component="a" href={item.url} target="_blank" rel="noreferrer" sx={{ textDecoration: 'none', color: 'inherit' }}>
           {isPdfUrl(item.url) ? (
-            <Box sx={{ width: 56, height: 56, borderRadius: 1, border: '1px solid #d5e0e6', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f4f8fb', color: '#0f63a5', fontSize: 12, fontWeight: 700 }}>PDF</Box>
+            <Box sx={{ width: 56, height: 56, borderRadius: 1, border: `1px solid ${tokens.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: tokens.surfaceAlt, color: tokens.goldText, fontSize: 12, fontWeight: 700 }}>PDF</Box>
           ) : (
-            <Box component="img" src={item.url} alt={item.label} sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, border: '1px solid #d5e0e6', display: 'block' }} />
+            <Box component="img" src={item.url} alt={item.label} sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, border: `1px solid ${tokens.line}`, display: 'block' }} />
           )}
-          <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: '#355466' }}>{item.label}</Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: tokens.textMuted }}>{item.label}</Typography>
         </Box>
       ))}
     </Stack>
@@ -540,9 +534,9 @@ const DocumentDrop: React.FC<{
         {...getRootProps()}
         sx={{
           border: '2px dashed',
-          borderColor: isDragActive ? '#0f63a5' : '#b7c9d4',
+          borderColor: isDragActive ? tokens.gold : tokens.lineStrong,
           borderRadius: 2,
-          bgcolor: isDragActive ? '#e7f1f7' : '#f7fbfd',
+          bgcolor: isDragActive ? tokens.goldSoft : tokens.surfaceAlt,
           px: 2,
           py: 2.5,
           textAlign: 'center',
@@ -558,23 +552,23 @@ const DocumentDrop: React.FC<{
       {preview && (
         <Box sx={{ mt: 1.25 }}>
           {previewIsPdf ? (
-            <Box component="iframe" title={`${label} preview`} src={preview} sx={{ width: '100%', height: 220, border: '1px solid #d5e0e6', borderRadius: 1, bgcolor: '#fff' }} />
+            <Box component="iframe" title={`${label} preview`} src={preview} sx={{ width: '100%', height: 220, border: `1px solid ${tokens.line}`, borderRadius: 1, bgcolor: tokens.surfaceRaised }} />
           ) : (
-            <Box component="img" src={preview} alt={`${label} preview`} sx={{ display: 'block', maxWidth: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 1, border: '1px solid #d5e0e6', bgcolor: '#fff' }} />
+            <Box component="img" src={preview} alt={`${label} preview`} sx={{ display: 'block', maxWidth: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 1, border: `1px solid ${tokens.line}`, bgcolor: tokens.surfaceRaised }} />
           )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
             {currentUrl && (
-              <Typography component="a" href={currentUrl} target="_blank" rel="noreferrer" variant="caption" sx={{ color: '#0f63a5', fontWeight: 600 }}>
+              <Typography component="a" href={currentUrl} target="_blank" rel="noreferrer" variant="caption" sx={{ color: tokens.goldText, fontWeight: 600 }}>
                 Open saved file
               </Typography>
             )}
             {file && (
-              <Button size="small" onClick={onClear} disabled={removing} sx={{ bgcolor: '#fff', color: '#355466', border: '1px solid #d5e0e6', '&:hover': { bgcolor: '#f4f8fb', color: '#355466', border: '1px solid #d5e0e6' } }}>
+              <Button size="small" onClick={onClear} disabled={removing} sx={{ bgcolor: tokens.surfaceAlt, color: tokens.text, border: `1px solid ${tokens.line}`, '&:hover': { bgcolor: tokens.surfaceRaised, color: tokens.text, border: `1px solid ${tokens.lineStrong}` } }}>
                 Clear
               </Button>
             )}
             {currentUrl && onRemove && (
-              <Button size="small" onClick={onRemove} disabled={removing} sx={{ bgcolor: '#fff', color: '#b42318', border: '1px solid #f0c9c6', '&:hover': { bgcolor: '#fdf2f2', color: '#912018', border: '1px solid #f0c9c6' } }}>
+              <Button size="small" onClick={onRemove} disabled={removing} sx={{ bgcolor: tokens.surfaceAlt, color: tokens.dangerText, border: `1px solid ${tokens.line}`, '&:hover': { bgcolor: tokens.surfaceRaised, color: tokens.dangerText, border: `1px solid ${tokens.lineStrong}` } }}>
                 {removing ? 'Removing...' : 'Remove'}
               </Button>
             )}
@@ -586,17 +580,17 @@ const DocumentDrop: React.FC<{
 };
 
 const quietButton = {
-  bgcolor: '#fff',
-  color: '#355466',
-  border: '1px solid #d5e0e6',
-  '&:hover': { bgcolor: '#f4f8fb', color: '#355466', border: '1px solid #d5e0e6' },
+  bgcolor: tokens.surfaceAlt,
+  color: tokens.text,
+  border: `1px solid ${tokens.line}`,
+  '&:hover': { bgcolor: tokens.surfaceRaised, color: tokens.text, border: `1px solid ${tokens.lineStrong}` },
 };
 
 const saveButton = {
-  bgcolor: '#0f63a5',
-  color: '#fff',
+  bgcolor: tokens.gold,
+  color: tokens.black,
   fontWeight: 600,
-  '&:hover': { bgcolor: '#0c5288', color: '#fff', border: '1px solid #0c5288' },
+  '&:hover': { bgcolor: tokens.goldDark, color: tokens.black, border: `1px solid ${tokens.gold}` },
 };
 
 export const VendorFormPage: React.FC = () => {
@@ -685,50 +679,58 @@ export const VendorFormPage: React.FC = () => {
   };
 
   if (vendorId && isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
+    return (
+      <Box>
+        <PageHeader
+          title="Edit vendor"
+          description="Company details, GST/PAN and documents for the vendor list."
+          crumbs={[{ label: 'Vendor List', to: '/vendors' }, { label: 'Edit vendor' }]}
+        />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <PageSkeleton />
+        </Paper>
+      </Box>
+    );
   }
 
   if (vendorId && (error || !vendor)) {
     return (
-      <Paper sx={{ p: 4, borderRadius: 3 }}>
-        <Typography color="error" sx={{ mb: 2 }}>This vendor is not on the vendor list.</Typography>
-        <Button onClick={() => navigate('/vendors')} sx={quietButton}>Back to vendor list</Button>
-      </Paper>
+      <Box>
+        <PageHeader
+          title="Edit vendor"
+          description="Company details, GST/PAN and documents for the vendor list."
+          crumbs={[{ label: 'Vendor List', to: '/vendors' }, { label: 'Edit vendor' }]}
+        />
+        <Paper sx={{ borderRadius: 3 }}>
+          <EmptyState
+            icon={StorefrontOutlined}
+            title="Vendor not found"
+            description="This vendor is not on the vendor list."
+            actionLabel="Back to vendor list"
+            onAction={() => navigate('/vendors')}
+          />
+        </Paper>
+      </Box>
     );
   }
 
   return (
     <Box>
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-          py: 1.5,
-          mb: 2,
-          bgcolor: '#f2f2f7',
-        }}
-      >
-        <Box>
-          <Button
-            startIcon={<ArrowBack />}
-            onClick={() => navigate('/vendors')}
-            sx={{ bgcolor: 'transparent', color: '#0f63a5', px: 0, '&:hover': { bgcolor: 'transparent', color: '#0c5288', border: 'none' } }}
-          >
-            Vendor List
+      <PageHeader
+        title={vendor ? 'Edit vendor' : 'Add vendor'}
+        description="Company details, GST/PAN and documents for the vendor list."
+        crumbs={[
+          { label: 'Vendor List', to: '/vendors' },
+          { label: vendor ? 'Edit vendor' : 'Add vendor' },
+        ]}
+        actions={
+          <Button onClick={submit} disabled={saveMutation.isPending} sx={saveButton}>
+            {saveMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>{vendor ? 'Edit vendor' : 'Add vendor'}</Typography>
-        </Box>
-        <Button onClick={submit} disabled={saveMutation.isPending} sx={saveButton}>
-          {saveMutation.isPending ? 'Saving...' : 'Save'}
-        </Button>
-      </Box>
+        }
+      />
 
-      <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, boxShadow: tokens.shadowSoft }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           {vendor?.replacedNote && (
             <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1' }}>
@@ -786,23 +788,19 @@ export const VendorFormPage: React.FC = () => {
         </Box>
       </Paper>
 
-      <Dialog open={pendingRemove !== null} onClose={() => { if (!removeMutation.isPending) { setPendingRemove(null); setConfirmError(''); } }} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Remove this document?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">The {pendingRemove?.label || 'document'} will be removed from this vendor and from storage.</Typography>
-          {confirmError && <Typography color="error" variant="body2" sx={{ mt: 1.5 }}>{confirmError}</Typography>}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => { setPendingRemove(null); setConfirmError(''); }} disabled={removeMutation.isPending} sx={quietButton}>Cancel</Button>
-          <Button
-            disabled={removeMutation.isPending || !pendingRemove || !vendor}
-            onClick={() => { if (pendingRemove && vendor) removeMutation.mutate({ id: vendor._id, kind: pendingRemove.kind }); }}
-            sx={{ bgcolor: '#b42318', color: '#fff', '&:hover': { bgcolor: '#912018', color: '#fff', border: '1px solid #912018' } }}
-          >
-            {removeMutation.isPending ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        title="Remove this document?"
+        description={`The ${pendingRemove?.label || 'document'} will be removed from this vendor and from storage.`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={removeMutation.isPending}
+        confirmDisabled={!pendingRemove || !vendor}
+        onConfirm={() => { if (pendingRemove && vendor) removeMutation.mutate({ id: vendor._id, kind: pendingRemove.kind }); }}
+        onClose={() => { if (!removeMutation.isPending) { setPendingRemove(null); setConfirmError(''); } }}
+      >
+        {confirmError && <Typography color="error" variant="body2" sx={{ mt: 1.5 }}>{confirmError}</Typography>}
+      </ConfirmDialog>
     </Box>
   );
 };

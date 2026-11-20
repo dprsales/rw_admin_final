@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -11,6 +11,8 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  InputAdornment,
+  Pagination,
   Paper,
   Stack,
   Switch,
@@ -23,7 +25,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Add, DeleteOutline, EditOutlined } from '@mui/icons-material';
+import { Add, ArticleOutlined, DeleteOutline, EditOutlined, Search } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
@@ -39,6 +41,21 @@ import {
   type BlogSection,
 } from '../../api/services';
 import { roleSatisfies } from '../../utils/roles';
+import PageHeader from '../../Components/PageHeader';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import EmptyState from '../../Components/EmptyState';
+import { useTableSort, SortableHeadCell, type SortAccessors } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
+
+type BlogStatusFilter = 'all' | 'published' | 'draft';
+
+const BLOG_SORT: SortAccessors<BlogRecord> = {
+  title: (blog) => blog.title || '',
+  status: (blog) => (blog.published === false ? 'draft' : 'published'),
+  date: (blog) => blog.updatedAt || blog.createdAt || '',
+};
+
+const ROWS_PER_PAGE = 10;
 
 const EMPTY_SECTION: BlogSection = { title: '', description: '', type: 'h6' };
 
@@ -89,6 +106,10 @@ const Blogs: React.FC = () => {
   const [editing, setEditing] = useState<BlogRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<BlogStatusFilter>('all');
+  const [titleError, setTitleError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data, isPending, error, refetch } = useQuery<BlogRecord[], Error>({
     queryKey: ['blogs'],
@@ -128,21 +149,40 @@ const Blogs: React.FC = () => {
   });
 
   const rows = data ?? [];
+  const filteredRows = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    return rows.filter((blog) => {
+      if (statusFilter === 'published' && blog.published === false) return false;
+      if (statusFilter === 'draft' && blog.published !== false) return false;
+      if (!query) return true;
+      return [blog.title, blog.slug]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [rows, searchText, statusFilter]);
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filteredRows, BLOG_SORT);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
+  const visibleRows = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setTitleError('');
     setOpen(true);
   };
 
   const openEdit = (blog: BlogRecord) => {
     setEditing(blog);
     setForm(toForm(blog));
+    setTitleError('');
     setOpen(true);
   };
 
   const updateField = <K extends keyof BlogInput>(field: K, value: BlogInput[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === 'title') setTitleError('');
   };
 
   const updateSection = (index: number, field: keyof BlogSection, value: string) => {
@@ -156,9 +196,11 @@ const Blogs: React.FC = () => {
 
   const submit = () => {
     if (!form.title.trim()) {
+      setTitleError('Title is required');
       toast.error('Title is required');
       return;
     }
+    setTitleError('');
     saveMutation.mutate({
       ...form,
       title: form.title.trim(),
@@ -192,71 +234,95 @@ const Blogs: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 3,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Blogs
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Write and publish articles for www.rajivwilliams.com. Drafts stay off the public site.
+      <PageHeader
+        title="Blogs"
+        description="Write and publish articles for www.rajivwilliams.com. Drafts stay off the public site."
+        crumbs={[{ label: 'Blogs' }]}
+        actions={
+          <>
+            <Chip label={`${rows.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+            {canImport && (
+              <Button variant="outlined" disabled={importMutation.isPending} onClick={() => importMutation.mutate()}>
+                {importMutation.isPending ? 'Importing…' : 'Import old feed'}
+              </Button>
+            )}
+            <Button onClick={openCreate} startIcon={<Add />} variant="contained">
+              Add post
+            </Button>
+          </>
+        }
+      />
+
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
+        <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField
+            value={searchText}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search title or slug"
+            size="small"
+            sx={{ width: { xs: '100%', sm: 300 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" sx={{ color: tokens.textMuted }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {(['all', 'published', 'draft'] as BlogStatusFilter[]).map((value) => (
+              <Chip
+                key={value}
+                label={value === 'all' ? 'All' : value === 'published' ? 'Published' : 'Draft'}
+                color={value === 'published' ? 'success' : 'default'}
+                variant={statusFilter === value ? 'filled' : 'outlined'}
+                onClick={() => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              />
+            ))}
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+            {filteredRows.length} of {rows.length} posts
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Chip label={`${rows.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
-          {canImport && (
-            <Button
-              variant="outlined"
-              disabled={importMutation.isPending}
-              onClick={() => importMutation.mutate()}
-            >
-              {importMutation.isPending ? 'Importing…' : 'Import old feed'}
-            </Button>
-          )}
-          <Button
-            onClick={openCreate}
-            startIcon={<Add />}
-            variant="contained"
-            sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0b4f83' } }}
-          >
-            Add post
-          </Button>
-        </Stack>
-      </Box>
-
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+        <Divider />
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
+                <SortableHeadCell label="Title" sortKey="title" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
                 <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Updated</TableCell>
+                <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Updated" sortKey="date" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
                 <TableCell sx={{ fontWeight: 700 }} align="right">
                   Actions
                 </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5}>
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                      No posts yet. Add the first one, or import the old feed.
-                    </Typography>
+                    <EmptyState
+                      icon={ArticleOutlined}
+                      title={rows.length === 0 ? 'No posts yet' : 'No posts found'}
+                      description={
+                        rows.length === 0
+                          ? 'Add the first post, or import the old feed.'
+                          : 'Try a different search or status filter.'
+                      }
+                      actionLabel={rows.length === 0 ? 'Add post' : undefined}
+                      onAction={rows.length === 0 ? openCreate : undefined}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((blog) => (
+                visibleRows.map((blog) => (
                   <TableRow key={blog._id} hover>
                     <TableCell>{blog.title}</TableCell>
                     <TableCell>{blog.slug}</TableCell>
@@ -286,6 +352,18 @@ const Blogs: React.FC = () => {
         </TableContainer>
       </Paper>
 
+      {sorted.length > ROWS_PER_PAGE && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={totalPages}
+            page={Math.min(currentPage, totalPages)}
+            onChange={(_, page) => setCurrentPage(page)}
+            color="primary"
+            shape="rounded"
+          />
+        </Box>
+      )}
+
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>{editing ? 'Edit post' : 'Add post'}</DialogTitle>
         <Divider />
@@ -295,6 +373,8 @@ const Blogs: React.FC = () => {
               label="Title"
               value={form.title}
               onChange={(event) => updateField('title', event.target.value)}
+              error={Boolean(titleError)}
+              helperText={titleError || ' '}
               fullWidth
               required
             />
@@ -397,22 +477,16 @@ const Blogs: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(confirmId)} onClose={() => setConfirmId(null)}>
-        <DialogTitle>Delete this post?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">This cannot be undone. Unpublish instead if you only want it off the site.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmId(null)}>Cancel</Button>
-          <Button
-            color="error"
-            disabled={deleteMutation.isPending}
-            onClick={() => confirmId && deleteMutation.mutate(confirmId)}
-          >
-            {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(confirmId)}
+        title="Delete this post?"
+        description="This cannot be undone. Unpublish instead if you only want it off the site."
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmId && deleteMutation.mutate(confirmId)}
+        onClose={() => setConfirmId(null)}
+      />
     </Box>
   );
 };

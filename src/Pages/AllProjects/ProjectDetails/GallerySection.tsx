@@ -112,7 +112,7 @@ const resolveImageUrl = (path: string) => {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={600}>Gallery Section</Typography>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+        <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit gallery section" sx={{ color: 'primary.main' }}>
           <EditIcon />
         </IconButton>
       </Box>

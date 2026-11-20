@@ -84,10 +84,29 @@ export const getConnectedLiving   = (slug: string, connectedlivings: any) => {
 //   return http.get("/leads");
 // };
 
-export const getLeads = async () => {
-  const response = await http.get('/leads');
-  return response.data; // { leads: [...] }
-}
+export type GetLeadsParams = {
+  page?: number;
+  limit?: number;
+  ownerId?: string;
+  projectId?: string;
+  stage?: string;
+  phone?: string;
+};
+
+/** Day 11 — paged list; optional owner / project / stage / phone filters. */
+export const getLeads = async (params: GetLeadsParams = {}) => {
+  const response = await http.get('/leads', {
+    params: {
+      page: params.page ?? 1,
+      limit: params.limit ?? 25,
+      ...(params.ownerId ? { ownerId: params.ownerId } : {}),
+      ...(params.projectId ? { projectId: params.projectId } : {}),
+      ...(params.stage ? { stage: params.stage } : {}),
+      ...(params.phone ? { phone: params.phone } : {}),
+    },
+  });
+  return response.data; // { totalCount, page, limit, totalPages, leads }
+};
 
 export const getLeadDetails = (leadId: string) => {
   return http.get(`/leads/${leadId}`);
@@ -121,6 +140,13 @@ export const deleteLeadNote = async (leadId: string, noteId: string) => {
   return response.data; // { ok, id }
 };
 
+export const assignLeadOwner = async (leadId: string, ownerId: string | null) => {
+  const response = await http.patch(`/leads/${encodeURIComponent(String(leadId))}/assign`, {
+    ownerId,
+  });
+  return response.data;
+};
+
 export const getLeadActivities = async (leadId: string) => {
   // Cache-bust with query only. Do not send Cache-Control request headers
   // (they trigger CORS preflight and our API allowlist blocks them).
@@ -149,6 +175,14 @@ export const sendLeadCall = async (leadId: string) => {
 export const getLeadCalls = async (leadId: string) => {
   const response = await http.get(`/leads/${encodeURIComponent(String(leadId))}/calls`);
   return response.data;
+};
+
+/** Clear stuck In progress when Outpero never sent a final status (busy / no answer). */
+export const releaseLeadCall = async (leadId: string) => {
+  const response = await http.post(
+    `/leads/${encodeURIComponent(String(leadId))}/call/release`,
+  );
+  return response.data as { released: boolean };
 };
 
 /** AiSensy template list for the lead desk Send WhatsApp picker. */

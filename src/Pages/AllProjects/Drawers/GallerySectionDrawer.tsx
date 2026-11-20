@@ -8,6 +8,7 @@ import FileUploadContainer from '../../../Components/FileUploadContainer';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { gallerySection ,updateProjectSection} from '../../../api/services';
+import { tokens } from '../../../Theme/tokens';
 
 export interface GalleryGrid {
   c0r0?: string[];
@@ -127,8 +128,8 @@ const renderGridUploader = (
         height: '60px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', px: 2, bgcolor: 'primary.main'
       }}>
-        <Typography color="white" fontWeight={600}>Edit Gallery Section</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+        <Typography color={tokens.text} fontWeight={600}>Edit Gallery Section</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -150,8 +151,9 @@ const renderGridUploader = (
             type="submit"
             fullWidth
             sx={{ mt: 3 }}
+            disabled={mutation.isPending}
           >
-            Save Gallery Section
+            {mutation.isPending ? 'Saving…' : 'Save Gallery Section'}
           </Button>
         </form>
       </Box>

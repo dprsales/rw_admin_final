@@ -33,6 +33,11 @@ import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
 import { changeUserRole, createUser, deleteUser, getUsers, resetUserPassword, setUserAccess } from '../../api/services';
 import { ROLE_LABELS, USER_ROLES, roleSatisfies, type UserRole } from '../../utils/roles';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
 
 export interface AdminUser {
   _id: string;
@@ -98,6 +103,14 @@ const signedInUserId = (): string | null => {
 
 const hasAccess = (user: AdminUser) => user.accessEnabled !== false;
 
+/** Only columns backed by real user fields are sortable. "Last active" is not stored. */
+const USER_SORT = {
+  name: (row: AdminUser) => row.name,
+  email: (row: AdminUser) => row.email,
+  role: (row: AdminUser) => row.usertype,
+  status: (row: AdminUser) => (hasAccess(row) ? 'Can sign in' : 'Access removed'),
+};
+
 const isValidForm = (form: typeof EMPTY_FORM) =>
   form.name.trim().length > 0 &&
   /^\S+@\S+\.\S+$/.test(form.email.trim()) &&
@@ -106,6 +119,7 @@ const isValidForm = (form: typeof EMPTY_FORM) =>
 
 const Users: React.FC = () => {
   const [searchText, setSearchText] = useState('');
+  const [accessFilter, setAccessFilter] = useState<'all' | 'active' | 'removed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -149,7 +163,10 @@ const Users: React.FC = () => {
       toast.success(variables.enabled ? 'Access restored' : 'Access removed');
       refreshUsers();
     },
-    onError: (error: any) => toast.error(errorMessage(error)),
+    onError: (error: any) => {
+      setConfirm(null);
+      toast.error(errorMessage(error));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -158,7 +175,10 @@ const Users: React.FC = () => {
       toast.success('Account deleted');
       refreshUsers();
     },
-    onError: (error: any) => toast.error(errorMessage(error)),
+    onError: (error: any) => {
+      setConfirm(null);
+      toast.error(errorMessage(error));
+    },
   });
 
   const passwordMutation = useMutation({
@@ -215,20 +235,26 @@ const Users: React.FC = () => {
   const updateField = (field: keyof typeof EMPTY_FORM, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const nameInvalid = form.name.length > 0 && form.name.trim().length === 0;
+  const emailInvalid = form.email.length > 0 && !/^\S+@\S+\.\S+$/.test(form.email.trim());
+
   const users = data ?? EMPTY_USERS;
 
   const filteredUsers = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    if (!query) return users;
-    return users.filter((user) =>
-      [user.name, user.email, user.phone, user.usertype].some((value) =>
+    return users.filter((user) => {
+      if (accessFilter === 'active' && !hasAccess(user)) return false;
+      if (accessFilter === 'removed' && hasAccess(user)) return false;
+      if (!query) return true;
+      return [user.name, user.email, user.phone, user.usertype].some((value) =>
         value?.toLowerCase().includes(query),
-      ),
-    );
-  }, [users, searchText]);
+      );
+    });
+  }, [users, searchText, accessFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / rowsPerPage));
-  const visibleUsers = filteredUsers.slice(
+  const { sorted: sortedUsers, order, orderBy, toggle: toggleSort } = useTableSort(filteredUsers, USER_SORT);
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / rowsPerPage));
+  const visibleUsers = sortedUsers.slice(
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage,
   );
@@ -286,42 +312,25 @@ const Users: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 3,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            People and access
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Give each person one seat, a username, and a password. Removing access keeps the account and stops sign-in. Deleting removes the account.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Chip
-            icon={<GroupOutlined />}
-            label={`${users.length} total`}
-            sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }}
-          />
-          <Button
-            onClick={openCreate}
-            startIcon={<PersonAddAlt1 />}
-            variant="contained"
-            sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0b4f83' } }}
-          >
-            Add user
-          </Button>
-        </Stack>
-      </Box>
+      <PageHeader
+        title="People and access"
+        description="Give each person one seat, an email address, and a password. Removing access keeps the account and stops sign-in. Deleting removes the account."
+        crumbs={[{ label: 'Users' }]}
+        actions={
+          <>
+            <Chip
+              icon={<GroupOutlined />}
+              label={`${users.length} total`}
+              sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
+            />
+            <Button onClick={openCreate} startIcon={<PersonAddAlt1 />} variant="contained">
+              Add user
+            </Button>
+          </>
+        }
+      />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={searchText}
@@ -331,13 +340,31 @@ const Users: React.FC = () => {
             sx={{ width: { xs: '100%', sm: 380 }, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             InputProps={{ startAdornment: <Search fontSize="small" /> }}
           />
-          <Typography variant="caption" color="text.secondary">
-            {filteredUsers.length} matching users
-          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="access-filter-label">Access</InputLabel>
+              <Select
+                labelId="access-filter-label"
+                label="Access"
+                value={accessFilter}
+                onChange={(event) => {
+                  setAccessFilter(event.target.value as 'all' | 'active' | 'removed');
+                  setCurrentPage(1);
+                }}
+              >
+                <MenuItem value="all">All access</MenuItem>
+                <MenuItem value="active">Can sign in</MenuItem>
+                <MenuItem value="removed">Access removed</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="caption" color="text.secondary">
+              {filteredUsers.length} matching users
+            </Typography>
+          </Stack>
         </Box>
         <Divider />
         {selected.length > 0 && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 1.5, bgcolor: '#f4f8fb' }} flexWrap="wrap" useFlexGap>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 1.5, bgcolor: tokens.surfaceAlt }} flexWrap="wrap" useFlexGap>
             <Typography variant="body2" sx={{ fontWeight: 600, mr: 1 }}>
               {selected.length} selected
             </Typography>
@@ -353,38 +380,36 @@ const Users: React.FC = () => {
           </Stack>
         )}
 
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    size="small"
-                    checked={allVisibleSelected}
-                    indeterminate={selected.length > 0 && !allVisibleSelected}
-                    onChange={toggleVisible}
-                    inputProps={{ 'aria-label': 'Select everyone on this page' }}
-                  />
-                </TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Access</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visibleUsers.length === 0 ? (
+        {visibleUsers.length === 0 ? (
+          <EmptyState
+            icon={GroupOutlined}
+            title="No users found"
+            description="Try a different search or access filter."
+          />
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={7}>
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                      No users match that search.
-                    </Typography>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      size="small"
+                      checked={allVisibleSelected}
+                      indeterminate={selected.length > 0 && !allVisibleSelected}
+                      onChange={toggleVisible}
+                      inputProps={{ 'aria-label': 'Select everyone on this page' }}
+                    />
                   </TableCell>
+                  <SortableHeadCell label="Name" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Email" sortKey="email" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
+                  <SortableHeadCell label="Role" sortKey="role" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Access" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                 </TableRow>
-              ) : (
-                visibleUsers.map((user) => {
+              </TableHead>
+              <TableBody>
+                {visibleUsers.map((user) => {
                   const isSelf = user._id === selfId;
                   const active = hasAccess(user);
                   return (
@@ -474,11 +499,11 @@ const Users: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
@@ -501,6 +526,8 @@ const Users: React.FC = () => {
               required
               fullWidth
               size="small"
+              error={nameInvalid}
+              helperText={nameInvalid ? 'Enter a full name' : undefined}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -511,6 +538,8 @@ const Users: React.FC = () => {
               required
               fullWidth
               size="small"
+              error={emailInvalid}
+              helperText={emailInvalid ? 'Enter a valid email address' : undefined}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <TextField
@@ -574,7 +603,7 @@ const Users: React.FC = () => {
             onClick={submitCreate}
             disabled={!isValidForm(form) || createMutation.isPending}
             variant="contained"
-            sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0b4f83' } }}
+            sx={{ borderRadius: 1.5, bgcolor: tokens.gold, color: tokens.black, fontWeight: 600, '&:hover': { bgcolor: tokens.goldDark } }}
           >
             {createMutation.isPending ? 'Creating...' : 'Create user'}
           </Button>
@@ -604,38 +633,27 @@ const Users: React.FC = () => {
             variant="contained"
             disabled={nextPassword.length < 6 || passwordMutation.isPending || !passwordFor}
             onClick={() => passwordFor && passwordMutation.mutate({ userId: passwordFor._id, password: nextPassword })}
-            sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+            sx={{ bgcolor: tokens.gold, color: tokens.black, '&:hover': { bgcolor: tokens.goldDark } }}
           >
             {passwordMutation.isPending ? 'Saving...' : 'Save password'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
-        <DialogTitle>
-          {confirm?.kind === 'delete' ? 'Delete accounts' : confirm?.kind === 'restore' ? 'Restore access' : 'Remove access'}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            {confirm?.kind === 'delete'
-              ? `${confirm.ids.length} account${confirm.ids.length === 1 ? '' : 's'} will be deleted. This cannot be undone.`
-              : confirm?.kind === 'restore'
-                ? `${confirm.ids.length} ${confirm.ids.length === 1 ? 'person' : 'people'} will be able to sign in with their username and password.`
-                : `${confirm?.ids.length ?? 0} ${confirm?.ids.length === 1 ? 'person' : 'people'} will stay on file, but their username and password will stop working.`}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setConfirm(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            color={confirm?.kind === 'delete' ? 'error' : 'primary'}
-            disabled={busy}
-            onClick={runConfirm}
-          >
-            {busy ? 'Working...' : 'Confirm'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.kind === 'delete' ? 'Delete accounts' : confirm?.kind === 'restore' ? 'Restore access' : 'Remove access'}
+        description={confirm?.kind === 'delete'
+          ? `${confirm?.ids.length ?? 0} account${confirm?.ids.length === 1 ? '' : 's'} will be deleted. This cannot be undone.`
+          : confirm?.kind === 'restore'
+            ? `${confirm?.ids.length ?? 0} ${confirm?.ids.length === 1 ? 'person' : 'people'} will be able to sign in with their email address and password.`
+            : `${confirm?.ids.length ?? 0} ${confirm?.ids.length === 1 ? 'person' : 'people'} will stay on file, but their email address and password will stop working.`}
+        confirmLabel={confirm?.kind === 'delete' ? 'Delete' : 'Confirm'}
+        tone={confirm?.kind === 'delete' ? 'danger' : 'primary'}
+        loading={busy}
+        onClose={() => setConfirm(null)}
+        onConfirm={runConfirm}
+      />
     </Box>
   );
 };

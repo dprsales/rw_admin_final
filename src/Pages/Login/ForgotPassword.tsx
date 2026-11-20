@@ -4,6 +4,7 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import OTPInput from "otp-input-react";
+import { tokens } from "../../Theme/tokens";
 
 interface ForgotPasswordProps {
   setShowForgotPassword: (show: boolean) => void;
@@ -70,21 +71,14 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                   />
                 )}
               />
-              <Typography
-                variant="body2"
-                color="primary"
-                textAlign={"right"}
-                sx={{
-                  cursor: "pointer",
-                  mb: 4,
-                  "&:hover": {
-                    textDecoration: "underline",
-                  }
-                }}
+              <Button
+                type="button"
+                variant="text"
                 onClick={() => setShowForgotPassword(false)}
+                sx={{ textTransform: "none", mb: 4 }}
               >
                 Back to Login
-              </Typography>
+              </Button>
               <Button type="submit" variant="contained" color="primary">
                 Send OTP
               </Button>
@@ -115,13 +109,15 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                         margin: '0 0.5rem',
                         fontSize: '1.5rem',
                         textAlign: 'center',
-                        border: '1px solid #ccc',
+                        border: `1px solid ${tokens.border}`,
                         borderRadius: '4px',
+                        backgroundColor: tokens.input,
+                        color: tokens.text,
                       }}
                       containerStyle={{ justifyContent: 'center' }}
                     />
                     {errors.otp && (
-                      <Typography color="error" variant="body2">
+                      <Typography color="error" variant="body2" role="alert">
                         {errors.otp.message}
                       </Typography>
                     )}
@@ -131,21 +127,14 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
               <Button type="submit" variant="contained" color="primary">
                 Verify OTP
               </Button>
-              <Typography
-                variant="body2"
-                color="primary"
-                textAlign={"right"}
-                sx={{
-                  cursor: "pointer",
-                  mb: 2,
-                  "&:hover": {
-                    textDecoration: "underline",
-                  }
-                }}
+              <Button
+                type="button"
+                variant="text"
                 onClick={() => setShowForgotPassword(false)}
+                sx={{ textTransform: "none", mb: 2 }}
               >
                 Back to Login
-              </Typography>
+              </Button>
             </form>
           </>
         )}
@@ -192,21 +181,14 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ setShowForgotPassword, 
                   />
                 )}
               />
-              <Typography
-                variant="body2"
-                color="primary"
-                textAlign={"right"}
-                sx={{
-                  cursor: "pointer",
-                  mb: 4,
-                  "&:hover": {
-                    textDecoration: "underline",
-                  }
-                }}
+              <Button
+                type="button"
+                variant="text"
                 onClick={() => setShowForgotPassword(false)}
+                sx={{ textTransform: "none", mb: 4 }}
               >
                 Back to Login
-              </Typography>
+              </Button>
               <Button type="submit" variant="contained" color="primary">
                 Reset Password
               </Button>

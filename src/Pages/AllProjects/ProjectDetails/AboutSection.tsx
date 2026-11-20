@@ -57,7 +57,7 @@ const AboutSectionDetails: React.FC<Props> = ({ slug, refetch, data }) => {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={600}>About Section</Typography>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+        <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit About section" sx={{ color: 'primary.main' }}>
           <EditIcon />
         </IconButton>
       </Box>

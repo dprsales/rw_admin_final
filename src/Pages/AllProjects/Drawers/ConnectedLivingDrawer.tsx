@@ -10,6 +10,7 @@ import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import { ConnectedLiving } from '../ProjectInterface';
 import { getConnectedLiving, updateProjectSection } from '../../../api/services';
+import { tokens } from '../../../Theme/tokens';
 
 interface Props {
   open: boolean;
@@ -71,10 +72,10 @@ const ConnectedLivingDrawer: FC<Props> = ({ open, onClose, slug, refetch, existi
   const groups = watch('data');
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 400 } }}>
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: '100%', maxWidth: 400 } }}>
       <Box sx={{ px: 2, py: 1.5, bgcolor: 'primary.main', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography color="white" fontWeight={600}>Edit Connected Living</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}><CloseIcon /></IconButton>
+        <Typography color={tokens.text} fontWeight={600}>Edit Connected Living</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}><CloseIcon /></IconButton>
       </Box>
 
       <Box sx={{ p: 3 }}>
@@ -97,7 +98,7 @@ const ConnectedLivingDrawer: FC<Props> = ({ open, onClose, slug, refetch, existi
           {/* Location Groups */}
           <Typography variant="h6" mt={3} mb={2}>Location Groups</Typography>
           {groupFields.map((group, groupIdx) => (
-            <Box key={group.id} sx={{ border: '1px solid #ccc', p: 2, mb: 3, borderRadius: 2 }}>
+            <Box key={group.id} sx={{ border: `1px solid ${tokens.border}`, p: 2, mb: 3, borderRadius: 2 }}>
               {/* Group Title */}
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <Typography fontWeight={600}>Group Title</Typography>
@@ -182,8 +183,8 @@ const ConnectedLivingDrawer: FC<Props> = ({ open, onClose, slug, refetch, existi
             Add Group
           </Button>
           <Box>
-            <Button type="submit" variant="contained" fullWidth sx={{ mt: 3 }}>
-                Save
+            <Button type="submit" variant="contained" fullWidth sx={{ mt: 3 }} disabled={mutation.isPending}>
+                {mutation.isPending ? 'Saving…' : 'Save'}
             </Button>
           </Box>
         </form>

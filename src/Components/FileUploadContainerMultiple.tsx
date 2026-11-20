@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useDropzone } from 'react-dropzone';
 import { UploadIcon } from '../assets';
+import { tokens } from '../Theme/tokens';
 
 interface Image {
   file: File;
@@ -64,7 +65,8 @@ const FileUploadContainerMultiple: React.FC<
     <Box
       {...getRootProps()}
       sx={{
-        border: '2px dashed #24272C',
+        border: `2px dashed ${tokens.border}`,
+        backgroundColor: tokens.surfaceAlt,
         borderRadius: '10px',
         padding: '16px',
       }}
@@ -73,7 +75,7 @@ const FileUploadContainerMultiple: React.FC<
       {actualImages.length === 0 ? (
         <Box sx={{ textAlign: 'center', mt: 2 }}>
           <img src={UploadIcon} alt="Upload Icon" style={{ height: '40px' }} />
-          <Typography variant="caption" sx={{ color: '#6563FF' }}>
+          <Typography variant="caption" sx={{ color: tokens.gold }}>
             Drag and Drop files here or <u>Choose Files</u>
           </Typography>
         </Box>
@@ -98,7 +100,7 @@ const FileUploadContainerMultiple: React.FC<
                 }}
                 onClick={() => handleRemoveImage(index)}
               >
-                <CloseIcon sx={{ color: 'white', fontSize: '16px' }} />
+                <CloseIcon sx={{ color: tokens.text, fontSize: '16px' }} />
               </Box>
             </Box>
           ))}

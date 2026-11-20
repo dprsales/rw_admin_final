@@ -3,13 +3,30 @@ import { useQuery } from '@tanstack/react-query';
 import { getLeads } from '../../api/services';
 import Leads from './Leads';
 import NoLeads from './NoLeads';
-import { LinearProgress, Typography, Box } from '@mui/material';
-import LeadsTable from './LeadsTable';
+import { Typography, Box, Paper } from '@mui/material';
+import PageHeader from '../../Components/PageHeader';
+import { TableSkeleton } from '../../Components/LoadingState';
 
 const LeadsPage: React.FC = () => {
-  const { data, isPending, isError } = useQuery({ queryKey: ['leads'], queryFn: getLeads });
+  const { data, isPending, isError } = useQuery({
+    queryKey: ['leads'],
+    queryFn: () => getLeads(),
+  });
 
-  if (isPending) return <LinearProgress />;
+  if (isPending) {
+    return (
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageHeader
+          title="Leads"
+          description="Every enquiry from the website, sorted by source and service."
+          crumbs={[{ label: 'Leads' }]}
+        />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableSkeleton rows={8} columns={6} />
+        </Paper>
+      </Box>
+    );
+  }
 
   if (isError) {
     return (
@@ -21,7 +38,7 @@ const LeadsPage: React.FC = () => {
     );
   }
 
-  const leads = data?.data || [];
+  const leads = (data as { leads?: unknown[] } | undefined)?.leads || [];
 
   // if (!leads.length) {
   //   return <NoLeads />;

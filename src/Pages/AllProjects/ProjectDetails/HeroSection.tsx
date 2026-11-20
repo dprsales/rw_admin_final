@@ -57,7 +57,7 @@ const HeroSection: React.FC<Props> = ({ slug, refetch, data }) => {
       {/* Always show header and edit icon */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={550}>Hero Section</Typography>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+        <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit hero section" sx={{ color: 'primary.main' }}>
           <EditIcon />
         </IconButton>
       </Box>

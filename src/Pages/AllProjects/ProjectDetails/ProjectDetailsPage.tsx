@@ -2,8 +2,11 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProjectDetails } from '../../../api/services';
-import { LinearProgress, Box, Typography, Button } from '@mui/material';
+import { Box, Button, Paper } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PageHeader from '../../../Components/PageHeader';
+import { PageSkeleton } from '../../../Components/LoadingState';
+import EmptyState from '../../../Components/EmptyState';
 import ProjectDetailsSection from './ProjectDetailsSection';
 import HeroSection from './HeroSection';
 import AboutSection from './AboutSection';
@@ -32,13 +35,28 @@ const ProjectDetailsPage = () => {
     queryFn: () => getProjectDetails(slug!),
     enabled: !!slug,
   });
-console.log("data from query:", data);
   // ✅ Render loading state
-  if (isPending) return <LinearProgress />;
+  if (isPending) return <PageSkeleton />;
 
   // ✅ Render error or missing data
   if (error || !data?.data) {
-    return <Typography>Something went wrong or no data found</Typography>;
+    return (
+      <Box>
+        <PageHeader
+          title="Project details"
+          description="Manage the content blocks that appear on this project's public page."
+          crumbs={[{ label: 'Projects', to: '/projects' }, { label: 'Project details' }]}
+        />
+        <Paper sx={{ borderRadius: 3 }}>
+          <EmptyState
+            title="Project not found"
+            description="This project may have been removed or the link is out of date."
+            actionLabel="Back to projects"
+            onAction={() => navigate('/projects')}
+          />
+        </Paper>
+      </Box>
+    );
   }
 
   const project = data.data;
@@ -46,13 +64,16 @@ console.log("data from query:", data);
 
   return (
     <Box>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate('/projects')}
-        sx={{ mb: 2 }}
-      >
-        Back to Projects
-      </Button>
+      <PageHeader
+        title={project.projectdetails?.title || 'Project details'}
+        description="Manage the content blocks that appear on this project's public page."
+        crumbs={[{ label: 'Projects', to: '/projects' }, { label: 'Project details' }]}
+        actions={
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/projects')}>
+            Back to Projects
+          </Button>
+        }
+      />
 
      {project.projectdetails && (
         <ProjectDetailsSection

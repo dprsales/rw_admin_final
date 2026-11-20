@@ -77,7 +77,7 @@ const FloorPlansSection: React.FC<Props> = ({ slug, refetch, data }) => {
         <Paper sx={{ p: 2, mb: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h5" fontWeight={550}>Floor Plans</Typography>
-                <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+                <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit floor plans section" sx={{ color: 'primary.main' }}>
                     <EditIcon />
                 </IconButton>
             </Box>

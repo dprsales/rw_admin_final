@@ -81,7 +81,7 @@ const LayoutSectionDetails: React.FC<Props> = ({ slug, refetch, data }) => {
     <Paper sx={{ p: 2, mb: 3 }}>
       <Box display="flex" alignItems="center" justifyContent="space-between">
         <Typography variant="h5" fontWeight={600}>Layout Section</Typography>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+        <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit layout section" sx={{ color: 'primary.main' }}>
           <EditIcon />
         </IconButton>
       </Box>
