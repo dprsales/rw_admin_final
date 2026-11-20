@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { tokens } from '../../Theme/tokens';
 
 const steps = ['HR creates candidate', 'Candidate completes details', 'Documents and declaration', 'HR reviews'];
 
@@ -26,11 +27,11 @@ const EmployeeOnboardingDemo: React.FC = () => {
   const previous = () => setActiveStep((current) => Math.max(current - 1, 0));
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f4f7fb', px: { xs: 2, md: 5 }, py: { xs: 3, md: 6 } }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: tokens.black, px: { xs: 2, md: 5 }, py: { xs: 3, md: 6 } }}>
       <Box sx={{ maxWidth: 980, mx: 'auto' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
-            <Typography variant="h4" fontWeight={700} sx={{ color: '#0f63a5' }}>
+            <Typography variant="h4" fontWeight={700} sx={{ color: tokens.goldText }}>
               Rajiv Williams
             </Typography>
             <Typography variant="body2" color="text.secondary">Employee self-onboarding</Typography>
@@ -67,7 +68,7 @@ const EmployeeOnboardingDemo: React.FC = () => {
                   <TextField fullWidth label="Department" value="Operations" InputProps={{ readOnly: true }} />
                   <TextField fullWidth label="Joining date" value="01 October 2026" InputProps={{ readOnly: true }} />
                 </Stack>
-                <Paper variant="outlined" sx={{ p: 2, mt: 3, bgcolor: '#fafcff' }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 3, bgcolor: tokens.surfaceAlt }}>
                   <Typography variant="body2"><strong>Generated Employee ID:</strong> RW-2026-0001</Typography>
                   <Typography variant="body2" color="text.secondary" mt={0.5}>Next step: send the candidate a secure invitation link.</Typography>
                 </Paper>

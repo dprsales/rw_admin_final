@@ -27,9 +27,6 @@ const AllProjectsDetails: React.FC<Props> = ({ data }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [details, setDetails] = useState<Projects>(data);
 
-  // ✅ Debug log
-  console.log('📦 AllProjectsDetails received:', details);
-
   // ✅ Show fallback if data is incomplete
   if (!details || !details.title) {
     return <Typography color="error">Project details not found.</Typography>;
@@ -54,7 +51,7 @@ const AllProjectsDetails: React.FC<Props> = ({ data }) => {
       <Card sx={{ p: 3, mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6" fontWeight={600}>Main Details</Typography>
-          <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+          <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit project details" sx={{ color: 'primary.main' }}>
             <EditIcon />
           </IconButton>
         </Box>

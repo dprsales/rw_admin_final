@@ -1,228 +1,262 @@
-import React, { useState } from "react";
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Typography,
-  IconButton,
-  InputAdornment,
-  FormControl,
-  FormHelperText,
-  InputLabel,
-  LinearProgress,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { useForm, Controller } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import * as Yup from "yup";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
-import ForgotPassword from "./ForgotPassword"; // Modal for forgot password
-import { authLogin } from "../../api/services"; // API call function for login
-import { dprlogo, loginbackground, rwlogo } from "../../assets"; // Logo and background assets
-import CustomInput from "../../Components/Inputs/CustomInput"; // Custom input component
-import { canEnterApp, homeRoute } from "../../utils/roles";
-
-// Validation schema for login form
-const validationSchema = Yup.object().shape({
-  email: Yup.string().email("Invalid email format").required("Login ID is required"),
-  password: Yup.string().required("Password is required"),
-});
+import gsap from "gsap";
+import ForgotPassword from "./ForgotPassword";
+import { authLogin } from "../../api/services";
+import { rwGoldLogo, staffLoginBg } from "../../assets";
+import { canEnterApp, canOpenRoute, homeRoute } from "../../utils/roles";
+import {
+  crmHomeRoute,
+  stubCrmRoleFromUserType,
+} from "../../crm/crmRoles";
+import "./staff-auth.css";
 
 const Login: React.FC = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false); // Toggle password visibility
-  const [showForgotPassword, setShowForgotPassword] = useState(false); // Show forgot password modal
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serviceParam = searchParams.get("service");
+  const wantsCrm =
+    serviceParam === "crm" ||
+    (!serviceParam && Cookies.get("rw_service") === "crm");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [error, setError] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    resolver: yupResolver(validationSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
+  useEffect(() => {
+    if (!serviceParam) {
+      setSearchParams(
+        { service: Cookies.get("rw_service") === "crm" ? "crm" : "admin" },
+        { replace: true },
+      );
+    }
+  }, [serviceParam, setSearchParams]);
 
-  // Mutation to handle login via API
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        bgRef.current,
+        { scale: 1.12, opacity: 0.55 },
+        { scale: 1.04, opacity: 1, duration: 1.4, ease: "power2.out" },
+      );
+      gsap.fromTo(
+        cardRef.current,
+        { y: 36, opacity: 0, filter: "blur(8px)" },
+        { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.85, ease: "power3.out", delay: 0.15 },
+      );
+    }, rootRef);
+    return () => ctx.revert();
+  }, []);
+
   const { mutate: loginUser, isPending } = useMutation({
     mutationFn: authLogin,
     onSuccess: (response) => {
       try {
         const { access_token, user_profile } = response.data;
+        const userType = user_profile.usertype;
 
-        if (canEnterApp(user_profile.usertype)) {
-          Cookies.set("access_token", access_token);
-          Cookies.set("user_type", user_profile.usertype);
-          Cookies.set("user_name", user_profile.name);
-          toast.success("Login successful!");
-          navigate(homeRoute(user_profile.usertype));
-        } else {
+        if (!canEnterApp(userType)) {
+          setError("This account does not have access to the staff app.");
           toast.error("This account does not have access to the staff app.");
+          return;
         }
-      } catch (error) {
-        console.error("Error processing login response:", error);
+
+        const crmRole = stubCrmRoleFromUserType(userType);
+        Cookies.set("access_token", access_token);
+        Cookies.set("user_type", userType);
+        Cookies.set("user_name", user_profile.name);
+        Cookies.set("crm_role", crmRole);
+
+        const canCrm = canOpenRoute(userType, "/crm");
+        const openCrm = userType === "sales" || (wantsCrm && canCrm);
+
+        if (wantsCrm && !canCrm && userType !== "sales") {
+          setError("This account cannot open the sales CRM desk.");
+          toast.error("This account cannot open the sales CRM desk.");
+          Cookies.set("rw_service", "admin", { expires: 30 });
+          navigate(homeRoute(userType));
+          return;
+        }
+
+        if (openCrm) {
+          Cookies.set("rw_service", "crm", { expires: 30 });
+          toast.success("Welcome to the sales desk");
+          navigate(crmHomeRoute(crmRole));
+          return;
+        }
+
+        Cookies.set("rw_service", "admin", { expires: 30 });
+        toast.success("Login successful!");
+        const opsHome = homeRoute(userType);
+        navigate(opsHome === "/crm" ? "/dashboard" : opsHome);
+      } catch (err) {
+        console.error(err);
+        setError("Could not finish login. Try again.");
         toast.error("An unexpected error occurred. Please try again.");
       }
     },
-    onError: (error) => {
-      console.error("Login error:", error);
+    onError: () => {
+      setError("Invalid login details. Check email and password.");
       toast.error("Invalid login credentials. Please try again.");
     },
   });
 
-  // Handle password visibility toggle
-  const handleClickShowPassword = () => setShowPassword(!showPassword);
-  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) =>
+  const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-
-  // Form submit handler
-  const onSubmit = (data: any) => {
-    loginUser({ email: data.email, password: data.password });
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Enter email and password.");
+      return;
+    }
+    loginUser({ email: email.trim(), password });
   };
 
-  // Handle Forgot Password modal display
-  const handleShowForgotPassword = () => setShowForgotPassword(true);
-  const handleShowLogin = () => setShowForgotPassword(false);
+  const setService = (service: "admin" | "crm") => {
+    Cookies.set("rw_service", service, { expires: 30 });
+    setSearchParams({ service }, { replace: true });
+  };
 
-  console.log("Login Page");
+  if (showForgotPassword) {
+    return (
+      <div className="rw-auth" ref={rootRef}>
+        <div
+          className="rw-auth__bg"
+          style={{ backgroundImage: `url(${staffLoginBg})` }}
+        />
+        <div className="rw-auth__veil" />
+        <div className="rw-auth__grid" />
+        <div className="rw-auth__stage">
+          <ForgotPassword
+            setShowForgotPassword={setShowForgotPassword}
+            setShowLogin={() => setShowForgotPassword(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Box
-      sx={{
-        height: "100vh",
-        backgroundImage: `url(${loginbackground})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: { xs: "center", sm: "flex-end" },
-        paddingRight: { xs: 0, sm: "15%", md: "15%", lg: "15%" },
-        backdropFilter: "blur(10px)",
-        backgroundColor: "rgba(255, 255, 255, 0.7)",
-      }}
-    >
-      {showForgotPassword ? (
-        <ForgotPassword
-          setShowForgotPassword={setShowForgotPassword}
-          setShowLogin={handleShowLogin}
-        />
-      ) : (
-        <Card
-          sx={{
-            width: "100%",
-            maxWidth: 270,
-            padding: theme.spacing(3),
-            boxShadow: "0 8px 16px rgba(0, 0, 0, 0.25)",
-            borderRadius: "10px",
-            backgroundColor: "#ffffffc7",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <CardContent sx={{ width: "100%" }}>
-            
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginBottom: theme.spacing(2),
-              }}
-            >
-              <img height="40px" src={rwlogo} alt="Logo" style={{ transform: "scale(1.5)" }} />
+    <div className="rw-auth" ref={rootRef}>
+      <div
+        ref={bgRef}
+        className="rw-auth__bg"
+        style={{ backgroundImage: `url(${staffLoginBg})` }}
+      />
+      <div className="rw-auth__veil" />
+      <div className="rw-auth__grid" />
 
-            </Box>
-            <Typography variant="h6" sx={{ mt: 1, mb: 0, fontWeight: "700", textAlign: "left" }}>
-              Welcome Back
-            </Typography>
-            <Typography
-              variant="caption"
-              paragraph
-              sx={{ fontWeight: "400", mb: 2, color: "#555555", textAlign: "left" }}
+      <div className="rw-auth__stage" ref={cardRef}>
+        <div className="rw-auth__card">
+          <div className="rw-auth__brand">
+            <img src={rwGoldLogo} alt="Rajiv Williams" className="rw-auth__logo" />
+            <p className="rw-auth__kicker">Team RW · Staff</p>
+          </div>
+
+          <div className="rw-auth__tabs" role="tablist" aria-label="Workspace">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!wantsCrm}
+              className={`rw-auth__tab${!wantsCrm ? " is-on" : ""}`}
+              onClick={() => setService("admin")}
             >
-              Please enter your login details to continue
-            </Typography>
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              style={{ width: "100%", display: "flex", flexDirection: "column" }}
+              Ops Admin
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={wantsCrm}
+              className={`rw-auth__tab${wantsCrm ? " is-on" : ""}`}
+              onClick={() => setService("crm")}
             >
-              <FormControl error={!!errors.email} sx={{ mb: 2 }}>
-                <InputLabel shrink htmlFor="login-email" sx={{ left: "-12px !important" }}>
-                  Email
-                </InputLabel>
-                <Controller
-                  name="email"
-                  control={control}
-                  render={({ field }) => (
-                    <CustomInput
-                      id="login-email"
-                      autoComplete="email"
-                      {...field}
-                      placeholder="Login ID"
-                      sx={{ width: "100%" }}
-                    />
-                  )}
+              Sales CRM
+            </button>
+          </div>
+
+          <h1 className="rw-auth__title">{wantsCrm ? "Sales CRM" : "Ops Admin"}</h1>
+          <p className="rw-auth__lede">
+            {wantsCrm
+              ? "Sign in to your sales desk. My Day, leads, and Team."
+              : "Sign in to company systems. Projects, people, and tools."}
+          </p>
+
+          <form onSubmit={onSubmit}>
+            <div className="rw-auth__field">
+              <label className="rw-auth__label" htmlFor="login-email">
+                Email
+              </label>
+              <input
+                id="login-email"
+                className="rw-auth__input"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@rajivwilliams.com"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "login-error" : undefined}
+              />
+            </div>
+
+            <div className="rw-auth__field">
+              <label className="rw-auth__label" htmlFor="login-password">
+                Password
+              </label>
+              <div className="rw-auth__input-wrap">
+                <input
+                  id="login-password"
+                  className="rw-auth__input rw-auth__input--password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? "login-error" : undefined}
                 />
-                {errors.email && <FormHelperText>{errors.email.message}</FormHelperText>}
-              </FormControl>
-              <FormControl error={!!errors.password} sx={{ mb: 2 }}>
-                <InputLabel shrink htmlFor="login-password" sx={{ left: "-12px !important" }}>
-                  Password
-                </InputLabel>
-                <Controller
-                  name="password"
-                  control={control}
-                  render={({ field }) => (
-                    <CustomInput
-                      id="login-password"
-                      autoComplete="current-password"
-                      {...field}
-                      placeholder="Password"
-                      type={showPassword ? "text" : "password"}
-                      sx={{ width: "100%" }}
-                      endAdornment={
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle password visibility"
-                            onClick={handleClickShowPassword}
-                            onMouseDown={handleMouseDownPassword}
-                          >
-                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      }
-                    />
-                  )}
-                />
-                {errors.password && <FormHelperText>{errors.password.message}</FormHelperText>}
-              </FormControl>
-              <Typography
-                variant="caption"
-                color="primary"
-                textAlign="right"
-                sx={{ cursor: "pointer", mb: 2, "&:hover": { textDecoration: "underline" } }}
-                onClick={handleShowForgotPassword}
+                <button
+                  type="button"
+                  className="rw-auth__eye"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="rw-auth__row">
+              <button
+                type="button"
+                className="rw-auth__link"
+                onClick={() => setShowForgotPassword(true)}
               >
                 Forgot password?
-              </Typography>
-              <Button type="submit" variant="contained" color="primary" sx={{ mb: 2 }} disabled={isPending}>
-                {isPending ? <LinearProgress /> : "Login"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-    </Box>
+              </button>
+            </div>
+
+            {error ? <p className="rw-auth__error" id="login-error" role="alert">{error}</p> : null}
+
+            <button className="rw-auth__submit" type="submit" disabled={isPending}>
+              {isPending ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+
+          <p className="rw-auth__foot">
+            Prefer the full chooser? <Link to="/">Open workspace gate</Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 };
 

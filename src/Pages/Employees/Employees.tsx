@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -10,7 +10,13 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControl,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Pagination,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -22,7 +28,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { PersonAddAlt1 } from '@mui/icons-material';
+import { PersonAddAlt1, Search } from '@mui/icons-material';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
@@ -45,6 +51,11 @@ import {
   type JoinDocumentItem,
   type JoinDocumentsChecklist,
 } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import EmptyState from '../../Components/EmptyState';
+import { useTableSort, SortableHeadCell, type SortAccessors } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
 
 const EMPTY_FORM: CreateEmployeeInput = {
   firstName: '',
@@ -59,6 +70,19 @@ const EMPTY_FORM: CreateEmployeeInput = {
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
 type FormErrors = Partial<Record<keyof CreateEmployeeInput, string>>;
+
+const EMPLOYEE_SORT: SortAccessors<EmployeeRecord> = {
+  employeeId: (employee) => employee.employeeCode || '',
+  name: (employee) => `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+  email: (employee) => employee.personalEmail || '',
+  phone: (employee) => employee.phone || '',
+  designation: (employee) => employee.designation || '',
+  department: (employee) => employee.department || '',
+  joiningDate: (employee) => employee.joiningDate || '',
+  onboarding: (employee) => employee.onboardingStatus || '',
+};
+
+const ROWS_PER_PAGE = 10;
 
 const validate = (form: CreateEmployeeInput): FormErrors => {
   const errors: FormErrors = {};
@@ -197,13 +221,13 @@ const HrDocumentRow = ({
             minHeight: 96,
             borderRadius: 1.5,
             border: '1px dashed',
-            borderColor: 'divider',
+            borderColor: tokens.border,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             overflow: 'hidden',
             flexShrink: 0,
-            bgcolor: 'grey.50',
+            bgcolor: tokens.surfaceAlt,
           }}
         >
           {!hasFile && (
@@ -314,61 +338,42 @@ const HrDocumentRow = ({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Reject {doc.label}?</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            The current file will be deleted from storage. The candidate must upload a new one.
-          </Alert>
-          <TextField
-            autoFocus
-            fullWidth
-            multiline
-            minRows={3}
-            label="Reason for the candidate"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            helperText="Explain what to fix. The candidate will see this on the joining form."
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectOpen(false)} disabled={rejectMutation.isPending}>
-            Cancel
-          </Button>
-          <Button
-            color="warning"
-            variant="contained"
-            disabled={rejectMutation.isPending || reason.trim().length < 3}
-            onClick={() => rejectMutation.mutate()}
-          >
-            {rejectMutation.isPending ? 'Saving…' : 'Confirm reject and delete file'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={rejectOpen}
+        title={`Reject ${doc.label}?`}
+        confirmLabel="Confirm reject and delete file"
+        tone="danger"
+        loading={rejectMutation.isPending}
+        confirmDisabled={reason.trim().length < 3}
+        onConfirm={() => rejectMutation.mutate()}
+        onClose={() => setRejectOpen(false)}
+      >
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          The current file will be deleted from storage. The candidate must upload a new one.
+        </Alert>
+        <TextField
+          autoFocus
+          fullWidth
+          multiline
+          minRows={3}
+          label="Reason for the candidate"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          helperText="Explain what to fix. The candidate will see this on the joining form."
+          sx={{ mt: 1 }}
+        />
+      </ConfirmDialog>
 
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Delete {doc.label}?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            This removes the file from the joining record and deletes it from storage. This cannot
-            be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>
-            Cancel
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            disabled={deleteMutation.isPending}
-            onClick={() => deleteMutation.mutate()}
-          >
-            {deleteMutation.isPending ? 'Deleting…' : 'Delete file'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`Delete ${doc.label}?`}
+        description="This removes the file from the joining record and deletes it from storage. This cannot be undone."
+        confirmLabel="Delete file"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        onClose={() => setDeleteOpen(false)}
+      />
     </Paper>
   );
 };
@@ -645,7 +650,7 @@ const PackageReviewDialog = ({
                   variant="contained"
                   disabled={!review.canApprove || approveMutation.isPending}
                   onClick={() => approveMutation.mutate()}
-                  sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+                  sx={{ bgcolor: tokens.gold, color: tokens.black, '&:hover': { bgcolor: tokens.goldDark } }}
                 >
                   {approveMutation.isPending ? 'Saving…' : 'Approve onboarding'}
                 </Button>
@@ -658,32 +663,26 @@ const PackageReviewDialog = ({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={returnOpen} onClose={() => setReturnOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Send onboarding back for corrections</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            multiline
-            minRows={3}
-            label="Reason for the candidate"
-            value={returnReason}
-            onChange={(event) => setReturnReason(event.target.value)}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReturnOpen(false)}>Cancel</Button>
-          <Button
-            color="warning"
-            variant="contained"
-            disabled={returnReason.trim().length < 3 || returnMutation.isPending}
-            onClick={() => returnMutation.mutate()}
-          >
-            {returnMutation.isPending ? 'Sending…' : 'Send back'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={returnOpen}
+        title="Send onboarding back for corrections"
+        confirmLabel="Send back"
+        loading={returnMutation.isPending}
+        confirmDisabled={returnReason.trim().length < 3}
+        onConfirm={() => returnMutation.mutate()}
+        onClose={() => setReturnOpen(false)}
+      >
+        <TextField
+          autoFocus
+          fullWidth
+          multiline
+          minRows={3}
+          label="Reason for the candidate"
+          value={returnReason}
+          onChange={(event) => setReturnReason(event.target.value)}
+          sx={{ mt: 1 }}
+        />
+      </ConfirmDialog>
     </>
   );
 };
@@ -694,6 +693,9 @@ const Employees: React.FC = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [reviewEmployee, setReviewEmployee] = useState<EmployeeRecord | null>(null);
   const [packageEmployee, setPackageEmployee] = useState<EmployeeRecord | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [onboardingFilter, setOnboardingFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data, isPending, error, refetch } = useQuery<EmployeeRecord[], Error>({
@@ -723,6 +725,33 @@ const Employees: React.FC = () => {
   });
 
   const rows = data ?? [];
+  const onboardingOptions = useMemo(
+    () => Array.from(new Set(rows.map((employee) => employee.onboardingStatus).filter(Boolean))),
+    [rows],
+  );
+  const filteredRows = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    return rows.filter((employee) => {
+      if (onboardingFilter !== 'all' && employee.onboardingStatus !== onboardingFilter) return false;
+      if (!query) return true;
+      return [
+        employee.employeeCode,
+        employee.firstName,
+        employee.lastName,
+        employee.personalEmail,
+        employee.phone,
+        employee.designation,
+        employee.department,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [rows, searchText, onboardingFilter]);
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filteredRows, EMPLOYEE_SORT);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
+  const visibleRows = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
   const updateField = (field: keyof CreateEmployeeInput, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -767,54 +796,83 @@ const Employees: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 3,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Employees
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create a draft employee record. Review documents and full onboarding from each row.
+      <PageHeader
+        title="Employees"
+        description="Create a draft employee record. Review documents and full onboarding from each row."
+        crumbs={[{ label: 'Employees' }]}
+        actions={
+          <>
+            <Chip label={`${rows.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+            <Button
+              onClick={() => {
+                setForm(EMPTY_FORM);
+                setFormErrors({});
+                setCreateOpen(true);
+              }}
+              startIcon={<PersonAddAlt1 />}
+              variant="contained"
+            >
+              Add employee
+            </Button>
+          </>
+        }
+      />
+
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
+        <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField
+            value={searchText}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search name, email, code, or designation"
+            size="small"
+            sx={{ width: { xs: '100%', sm: 340 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" sx={{ color: tokens.textMuted }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="employees-onboarding-filter">Onboarding status</InputLabel>
+            <Select
+              labelId="employees-onboarding-filter"
+              label="Onboarding status"
+              value={onboardingFilter}
+              onChange={(event) => {
+                setOnboardingFilter(event.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <MenuItem value="all">All statuses</MenuItem>
+              {onboardingOptions.map((status) => (
+                <MenuItem key={status} value={status}>
+                  {status}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+            {filteredRows.length} of {rows.length} employees
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Chip label={`${rows.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
-          <Button
-            onClick={() => {
-              setForm(EMPTY_FORM);
-              setFormErrors({});
-              setCreateOpen(true);
-            }}
-            startIcon={<PersonAddAlt1 />}
-            variant="contained"
-            sx={{ borderRadius: 1.5, bgcolor: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#0b4f83' } }}
-          >
-            Add employee
-          </Button>
-        </Stack>
-      </Box>
-
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+        <Divider />
         <TableContainer sx={{ overflowX: 'auto' }}>
           <Table size="small" sx={{ minWidth: 1100 }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Employee ID</TableCell>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Designation</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
-                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Joining date</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Onboarding</TableCell>
+                <SortableHeadCell label="Employee ID" sortKey="employeeId" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
+                <SortableHeadCell label="Name" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
+                <SortableHeadCell label="Email" sortKey="email" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Phone" sortKey="phone" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
+                <SortableHeadCell label="Designation" sortKey="designation" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Department" sortKey="department" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Joining date" sortKey="joiningDate" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
+                <SortableHeadCell label="Onboarding" sortKey="onboarding" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
                 <TableCell
                   align="right"
                   sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: 360, pr: 3 }}
@@ -824,16 +882,32 @@ const Employees: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.length === 0 ? (
+              {visibleRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9}>
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                      No employees yet. Add the first record.
-                    </Typography>
+                    <EmptyState
+                      icon={PersonAddAlt1}
+                      title={rows.length === 0 ? 'No employees yet' : 'No employees found'}
+                      description={
+                        rows.length === 0
+                          ? 'Add the first employee record.'
+                          : 'Try a different search or onboarding status.'
+                      }
+                      actionLabel={rows.length === 0 ? 'Add employee' : undefined}
+                      onAction={
+                        rows.length === 0
+                          ? () => {
+                              setForm(EMPTY_FORM);
+                              setFormErrors({});
+                              setCreateOpen(true);
+                            }
+                          : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((employee) => (
+                visibleRows.map((employee) => (
                   <TableRow key={employee._id} hover>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{employee.employeeCode}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap', minWidth: 140 }}>
@@ -902,9 +976,10 @@ const Employees: React.FC = () => {
                                 fontWeight: 600,
                                 borderRadius: 1.5,
                                 px: 1.5,
-                                bgcolor: '#0f63a5',
+                                bgcolor: tokens.gold,
+                                color: tokens.black,
                                 boxShadow: 'none',
-                                '&:hover': { bgcolor: '#0b4f83', boxShadow: 'none' },
+                                '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
                               }}
                             >
                               {inviteMutation.isPending && inviteMutation.variables === employee._id
@@ -922,6 +997,18 @@ const Employees: React.FC = () => {
           </Table>
         </TableContainer>
       </Paper>
+
+      {sorted.length > ROWS_PER_PAGE && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={totalPages}
+            page={Math.min(currentPage, totalPages)}
+            onChange={(_, page) => setCurrentPage(page)}
+            color="primary"
+            shape="rounded"
+          />
+        </Box>
+      )}
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Add employee</DialogTitle>

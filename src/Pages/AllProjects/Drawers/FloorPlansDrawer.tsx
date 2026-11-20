@@ -10,6 +10,7 @@ import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import { floorPlans, updateProjectSection } from '../../../api/services';
 import { FloorPlans } from '../ProjectInterface';
+import { tokens } from '../../../Theme/tokens';
 
 
 interface FloorPlansDrawerProps {
@@ -103,8 +104,8 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
     >
       {/* Header */}
       <Box sx={{ height: 60, px: 2, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography color="white" fontWeight={600}>Edit Floor Plans</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+        <Typography color={tokens.text} fontWeight={600}>Edit Floor Plans</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -134,7 +135,7 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
           {/* Floor Plan Entries */}
           <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Floor Plan Entries</Typography>
           {fields.map((item, index) => (
-            <Box key={item.id} sx={{ border: '1px solid #ccc', borderRadius: 2, p: 2, mb: 3 }}>
+            <Box key={item.id} sx={{ border: `1px solid ${tokens.border}`, borderRadius: 2, p: 2, mb: 3 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Controller
@@ -289,8 +290,9 @@ const FloorPlansDrawer: FC<FloorPlansDrawerProps> = ({
             variant="contained"
             color="primary"
             fullWidth
+            disabled={mutation.isPending}
           >
-            Save Floor Plans
+            {mutation.isPending ? 'Saving…' : 'Save Floor Plans'}
           </Button>
         </form>
       </Box>

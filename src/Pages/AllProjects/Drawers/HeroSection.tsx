@@ -10,6 +10,7 @@ import FileUploadContainer from '../../../Components/FileUploadContainer';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import { HeroSection } from '../ProjectInterface';
 import { heroSection, updateProjectSection } from '../../../api/services';
+import { tokens } from '../../../Theme/tokens';
 
 interface HeroSectionDrawerProps {
   open: boolean;
@@ -77,8 +78,8 @@ const mutation = useMutation({
         height: '60px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', px: 2, bgcolor: 'primary.main'
       }}>
-        <Typography color="white" fontWeight={600}>Edit Hero Section</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+        <Typography color={tokens.text} fontWeight={600}>Edit Hero Section</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -148,8 +149,8 @@ const mutation = useMutation({
           </FormControl>
 
           {/* Submit */}
-          <Button type="submit" variant="contained" color="primary" fullWidth>
-            Save
+          <Button type="submit" variant="contained" color="primary" fullWidth disabled={mutation.isPending}>
+            {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </form>
       </Box>

@@ -5,6 +5,7 @@ import { Box, Typography, IconButton, CircularProgress } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import { toast } from 'react-toastify';
+import { tokens } from '../Theme/tokens';
 import { FileUpload } from '../api/services'; // Adjust the import path
 
 interface MultiFileUploadContainerProps {
@@ -81,8 +82,9 @@ const MultiFileUploadContainer: React.FC<MultiFileUploadContainerProps> = ({
       <Box
         {...getRootProps()}
         sx={{
-          border: '2px dashed #24272C90',
+          border: `2px dashed ${tokens.border}`,
           borderRadius: '10px',
+          bgcolor: tokens.surfaceAlt,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -92,8 +94,8 @@ const MultiFileUploadContainer: React.FC<MultiFileUploadContainerProps> = ({
         }}
       >
         <input {...getInputProps()} />
-        <AddPhotoAlternateIcon sx={{ fontSize: '40px', color: "#6563FF" }} />
-        <Typography variant="body2" sx={{ color: "#6563FF" }}>
+        <AddPhotoAlternateIcon sx={{ fontSize: '40px', color: tokens.gold }} />
+        <Typography variant="body2" sx={{ color: tokens.gold }}>
           Drag & drop images here, or click to select up to 10
         </Typography>
       </Box>
@@ -110,7 +112,8 @@ const MultiFileUploadContainer: React.FC<MultiFileUploadContainerProps> = ({
             />
             <IconButton
               onClick={() => handleRemoveImage(index)}
-              sx={{ position: 'absolute', top: -8, right: -8, color: 'red' }}
+              aria-label={`Remove image ${index + 1}`}
+              sx={{ position: 'absolute', top: -8, right: -8, color: tokens.dangerText }}
             >
               <RemoveCircleOutlineIcon />
             </IconButton>

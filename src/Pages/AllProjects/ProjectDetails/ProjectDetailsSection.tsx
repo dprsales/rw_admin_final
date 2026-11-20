@@ -56,7 +56,7 @@ const ProjectDetailsSection: React.FC<Props> = ({ data }) => {
                     </Typography>
                     <IconButton
                         onClick={() => setDrawerOpen(true)}
-                        aria-label="edit"
+                        aria-label="Edit project details section"
                         sx={{ color: 'primary.main' }}
                     >
                         <EditIcon />

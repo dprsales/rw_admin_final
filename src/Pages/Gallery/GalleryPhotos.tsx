@@ -14,9 +14,16 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { DeleteOutline, EditOutlined, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import {
+  DeleteOutline,
+  EditOutlined,
+  ImageOutlined,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
+} from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-toastify';
@@ -28,6 +35,11 @@ import {
   updateGalleryPhoto,
   type GalleryPhotoRecord,
 } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import EmptyState from '../../Components/EmptyState';
+import { CardGridSkeleton } from '../../Components/LoadingState';
+import { tokens } from '../../Theme/tokens';
 
 const FOLDER = 'gallery';
 
@@ -137,6 +149,11 @@ const GalleryPhotos: React.FC = () => {
     onDrop: (accepted) => {
       void uploadFiles(accepted);
     },
+    onDropRejected: (rejections) => {
+      toast.error(
+        `${rejections.length} file${rejections.length === 1 ? '' : 's'} skipped. Use JPG, PNG, WebP, or AVIF images.`,
+      );
+    },
   });
 
   const move = (photo: GalleryPhotoRecord, direction: -1 | 1) => {
@@ -151,16 +168,11 @@ const GalleryPhotos: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={2} mb={3}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Gallery · Team RW
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Photos for the website Gallery page. Stored in Bunny under gallery/.
-          </Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        title="Gallery · Team RW"
+        description="Photos for the website Gallery page. Stored in Bunny under gallery/."
+        crumbs={[{ label: 'Gallery' }]}
+      />
 
       <Paper
         {...getRootProps()}
@@ -169,8 +181,8 @@ const GalleryPhotos: React.FC = () => {
           mb: 3,
           p: 3,
           border: '1px dashed',
-          borderColor: isDragActive ? 'primary.main' : 'divider',
-          bgcolor: isDragActive ? 'action.hover' : 'background.paper',
+          borderColor: isDragActive ? tokens.gold : tokens.border,
+          bgcolor: isDragActive ? tokens.surfaceHover : tokens.panel,
           cursor: uploading ? 'wait' : 'pointer',
           textAlign: 'center',
         }}
@@ -191,11 +203,7 @@ const GalleryPhotos: React.FC = () => {
         )}
       </Paper>
 
-      {isPending && (
-        <Box py={6} textAlign="center">
-          <CircularProgress />
-        </Box>
-      )}
+      {isPending && <CardGridSkeleton cards={4} height={220} />}
 
       {error && (
         <Paper sx={{ p: 3 }}>
@@ -207,8 +215,12 @@ const GalleryPhotos: React.FC = () => {
       )}
 
       {!isPending && !error && photos.length === 0 && (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">No photos yet. Upload the first Team RW still above.</Typography>
+        <Paper sx={{ borderRadius: 3 }}>
+          <EmptyState
+            icon={ImageOutlined}
+            title="No photos yet"
+            description="Upload the first Team RW still above."
+          />
         </Paper>
       )}
 
@@ -225,7 +237,7 @@ const GalleryPhotos: React.FC = () => {
               component="img"
               src={resolveUrl(photo.url)}
               alt={photo.alt || photo.title || 'Gallery photo'}
-              sx={{ width: '100%', maxHeight: 280, objectFit: 'contain', display: 'block', bgcolor: '#111' }}
+              sx={{ width: '100%', maxHeight: 280, objectFit: 'contain', display: 'block', bgcolor: tokens.surfaceRaised }}
             />
             <Box sx={{ p: 1.5 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
@@ -243,35 +255,59 @@ const GalleryPhotos: React.FC = () => {
               </Typography>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1}>
                 <Stack direction="row" spacing={0.5}>
-                  <IconButton size="small" disabled={index === 0 || updateMutation.isPending} onClick={() => move(photo, -1)}>
-                    <KeyboardArrowUp fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={index === photos.length - 1 || updateMutation.isPending}
-                    onClick={() => move(photo, 1)}
-                  >
-                    <KeyboardArrowDown fontSize="small" />
-                  </IconButton>
+                  <Tooltip title="Move up">
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label="Move up"
+                        disabled={index === 0 || updateMutation.isPending}
+                        onClick={() => move(photo, -1)}
+                      >
+                        <KeyboardArrowUp fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Move down">
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label="Move down"
+                        disabled={index === photos.length - 1 || updateMutation.isPending}
+                        onClick={() => move(photo, 1)}
+                      >
+                        <KeyboardArrowDown fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Stack>
                 <Stack direction="row" spacing={0.5}>
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      setEdit({
-                        id: photo._id,
-                        title: photo.title || '',
-                        caption: photo.caption || '',
-                        alt: photo.alt || '',
-                        published: photo.published !== false,
-                      })
-                    }
-                  >
-                    <EditOutlined fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" color="error" onClick={() => setConfirmId(photo._id)}>
-                    <DeleteOutline fontSize="small" />
-                  </IconButton>
+                  <Tooltip title="Edit">
+                    <IconButton
+                      size="small"
+                      aria-label="Edit"
+                      onClick={() =>
+                        setEdit({
+                          id: photo._id,
+                          title: photo.title || '',
+                          caption: photo.caption || '',
+                          alt: photo.alt || '',
+                          published: photo.published !== false,
+                        })
+                      }
+                    >
+                      <EditOutlined fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton
+                      size="small"
+                      aria-label="Delete"
+                      color="error"
+                      onClick={() => setConfirmId(photo._id)}
+                    >
+                      <DeleteOutline fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
               </Stack>
             </Box>
@@ -338,25 +374,16 @@ const GalleryPhotos: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!confirmId} onClose={() => setConfirmId(null)}>
-        <DialogTitle>Delete this photo?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            Removes it from the website and deletes the file from Bunny storage.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmId(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            disabled={!confirmId || deleteMutation.isPending}
-            onClick={() => confirmId && deleteMutation.mutate(confirmId)}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(confirmId)}
+        title="Delete this photo?"
+        description="Removes it from the website and deletes the file from Bunny storage."
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmId && deleteMutation.mutate(confirmId)}
+        onClose={() => setConfirmId(null)}
+      />
     </Box>
   );
 };

@@ -6,6 +6,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import CustomInput from '../../../Components/Inputs/CustomInput';
 import { ProjectDetails } from '../ProjectInterface';
+import { tokens } from '../../../Theme/tokens';
 
 interface ProjectDetailsDrawerProps {
   open: boolean;
@@ -22,7 +23,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
  const {
     control,
     handleSubmit,
-    formState: { errors }
+    formState: { errors, isSubmitting }
   } = useForm<any>({
     defaultValues: {
       ...initialData,
@@ -60,7 +61,7 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
         sx: {
           width: '100%',
           maxWidth: '400px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: tokens.panel,
           overflowX: 'hidden',
         },
       }}
@@ -74,10 +75,10 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
         justifyContent: 'space-between',
         padding: '0 20px',
       }}>
-        <Typography variant="body1" sx={{ color: '#fff', fontWeight: 550 }}>
+        <Typography variant="body1" sx={{ color: tokens.textWhite, fontWeight: 550 }}>
           Edit Project Details
         </Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white', marginRight: 3 }}>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text, marginRight: 3 }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -174,12 +175,12 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
                 <Controller
                   name="slug"
                   control={control}
-                  rules={{ required: 'Title is required' }}
+                  rules={{ required: 'Slug is required' }}
                   render={({ field }) => (
                     <CustomInput
-                      placeholder="Enter title..."
+                      placeholder="Enter slug..."
                       {...field}
-                      error={!!errors.title}
+                      error={!!errors.slug}
                     />
                   )}
                 />
@@ -479,8 +480,9 @@ const ProjectDetailsDrawer: FC<ProjectDetailsDrawerProps> = ({ open, onClose, in
             type="submit"
             fullWidth
             sx={{ marginTop: 2 }}
+            disabled={isSubmitting}
           >
-            Save
+            {isSubmitting ? 'Saving…' : 'Save'}
           </Button>
         </form>
       </Box>

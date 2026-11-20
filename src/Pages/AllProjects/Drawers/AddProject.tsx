@@ -12,6 +12,7 @@ import FileUploadContainer from '../../../Components/FileUploadContainer';
 import { toast } from 'react-toastify';
 import { addProject } from '../../../api/services';
 import { ArrowDropDown } from '@mui/icons-material';
+import { tokens } from '../../../Theme/tokens';
 
 interface AddProjectProps {
   open: boolean;
@@ -157,7 +158,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
         sx: {
           width: '100%',
           maxWidth: '360px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: tokens.panel,
           borderRadius: '0px',
           border: 'none',
           overflowX: 'hidden',
@@ -173,11 +174,11 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
         justifyContent: 'space-between',
         padding: '0 20px',
       }}>
-        <Typography variant="body1" sx={{ color: '#fff', fontWeight: '550' }}>
+        <Typography variant="body1" sx={{ color: tokens.textWhite, fontWeight: '550' }}>
           Add Project
         </Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white', mr: 2 }}>
-          <CloseIcon sx={{ color: "white" }} />
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text, mr: 2 }}>
+          <CloseIcon sx={{ color: tokens.text }} />
         </IconButton>
       </Box>
       <Box sx={{ p: 2 }}>
@@ -311,12 +312,12 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
                   style={{
                     width: "100%",
                     height: "45px",
-                    border: "1px solid #1212121A",
+                    border: `1px solid ${tokens.border}`,
                     borderRadius: "10px",
                     opacity: 0.6,
-                    boxShadow: "0px 6px 14px #36408D08",
+                    boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                     fontSize: "14px",
-                    color: "#1D1D1D",
+                    color: tokens.text,
                     textAlign: 'left',
                   }}
                 >
@@ -403,12 +404,12 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
                   style={{
                     width: "100%",
                     height: "45px",
-                    border: "1px solid #1212121A",
+                    border: `1px solid ${tokens.border}`,
                     borderRadius: "10px",
                     opacity: 0.6,
-                    boxShadow: "0px 6px 14px #36408D08",
+                    boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                     fontSize: "14px",
-                    color: "#1D1D1D",
+                    color: tokens.text,
                     textAlign: 'left',
 
                   }}
@@ -470,7 +471,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
 
           <Typography variant="h6" sx={{ mb: 1 }}>Bank Offers</Typography>
           {bankFields.map((item, index) => (
-            <Box key={item.id} sx={{ border: '1px solid #ccc', borderRadius: 2, p: 2, mb: 2 }}>
+            <Box key={item.id} sx={{ border: `1px solid ${tokens.border}`, borderRadius: 2, p: 2, mb: 2 }}>
               <FormControl fullWidth sx={{ mb: 1 }}>
                 <Typography variant="body2" fontWeight={500} mb={1}>Bank Icon</Typography>
                 <Controller
@@ -515,7 +516,7 @@ const AddProject: FC<AddProjectProps> = ({ open, onClose }) => {
           </Button>
           <Box>
             <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isPending}>
-              Add Project
+              {mutation.isPending ? 'Saving…' : 'Add Project'}
             </Button>
           </Box>
         </form>

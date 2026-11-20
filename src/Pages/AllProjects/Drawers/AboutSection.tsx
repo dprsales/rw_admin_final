@@ -9,6 +9,7 @@ import CustomInput from '../../../Components/Inputs/CustomInput';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { aboutSection ,updateProjectSection} from '../../../api/services';
+import { tokens } from '../../../Theme/tokens';
 
 export interface AboutSection {
   des: string;
@@ -82,14 +83,14 @@ const AboutSectionDrawer: FC<AboutSectionDrawerProps> = ({ open, onClose, slug, 
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: '100%', maxWidth: '500px', backgroundColor: '#fff' } }}
+      PaperProps={{ sx: { width: '100%', maxWidth: '500px', backgroundColor: tokens.panel } }}
     >
       <Box sx={{
         height: '60px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', px: 2, bgcolor: 'primary.main'
       }}>
-        <Typography variant="body1" color="white" fontWeight={600}>Edit About Section</Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white' }}>
+        <Typography variant="body1" color={tokens.text} fontWeight={600}>Edit About Section</Typography>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -114,7 +115,7 @@ const AboutSectionDrawer: FC<AboutSectionDrawerProps> = ({ open, onClose, slug, 
           {/* Images */}
           <Typography variant="h6" sx={{ mb: 1 }}>Images</Typography>
           {imageFields.map((item, index) => (
-            <Box key={item.id} sx={{ mb: 2, border: '1px solid #ccc', p: 2, borderRadius: 1 }}>
+            <Box key={item.id} sx={{ mb: 2, border: `1px solid ${tokens.border}`, p: 2, borderRadius: 1 }}>
               <Typography fontWeight={500}>Image {index + 1}</Typography>
               <FormControl fullWidth sx={{ mb: 1 }}>
                 <Controller
@@ -152,7 +153,7 @@ const AboutSectionDrawer: FC<AboutSectionDrawerProps> = ({ open, onClose, slug, 
           {/* Highlights */}
           <Typography variant="h6" sx={{ mb: 1 }}>Highlights</Typography>
           {highlightFields.map((item, index) => (
-            <Box key={item.id} sx={{ mb: 2, border: '1px solid #ccc', p: 2, borderRadius: 1 }}>
+            <Box key={item.id} sx={{ mb: 2, border: `1px solid ${tokens.border}`, p: 2, borderRadius: 1 }}>
               <Typography fontWeight={500}>Highlight {index + 1}</Typography>
               <FormControl fullWidth sx={{ mb: 1 }}>
                 <Controller
@@ -185,8 +186,8 @@ const AboutSectionDrawer: FC<AboutSectionDrawerProps> = ({ open, onClose, slug, 
           <Box>
 
             {/* Submit */}
-            <Button variant="contained" color="primary" type="submit" fullWidth>
-              Save About Section
+            <Button variant="contained" color="primary" type="submit" fullWidth disabled={mutation.isPending}>
+              {mutation.isPending ? 'Saving…' : 'Save About Section'}
             </Button>
           </Box>
 

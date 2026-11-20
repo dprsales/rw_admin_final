@@ -27,6 +27,7 @@ import { Form } from 'react-router-dom';
 import { ArrowDropDown } from '@mui/icons-material';
 import CloseIcon from '@mui/icons-material/Close';
 import HeroSectionDrawer from './HeroSection';
+import { tokens } from '../../../Theme/tokens';
 
 interface EditProjectProps {
   open: boolean;
@@ -329,7 +330,7 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
         sx: {
           width: '100%',
           maxWidth: '360px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: tokens.panel,
           overflowX: 'hidden',
         },
       }}
@@ -344,10 +345,10 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
         justifyContent: 'space-between',
         padding: '0 20px',
       }}>
-        <Typography variant="body1" sx={{ color: '#fff', fontWeight: 550 }}>
+        <Typography variant="body1" sx={{ color: tokens.textWhite, fontWeight: 550 }}>
           Edit {editType.charAt(0).toUpperCase() + editType.slice(1)}
         </Typography>
-        <IconButton onClick={onClose} sx={{ color: 'white', marginRight: 3 }}>
+        <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text, marginRight: 3 }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -366,8 +367,9 @@ const EditProject: React.FC<EditProjectProps> = ({ open, onClose, selectedItem, 
               onClick={handleUpdate}
               sx={{ mt: 3 }}
               fullWidth
+              disabled={loading}
             >
-              Update
+              {loading ? 'Updating…' : 'Update'}
             </Button>
           </>
         )}

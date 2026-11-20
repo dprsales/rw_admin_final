@@ -3,12 +3,11 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { Link } from 'react-router-dom';
-import { useTheme } from '@mui/material/styles';
 import VanillaTilt from 'vanilla-tilt';
 import notFoundImage from '../../assets/images/notfound.svg';
+import { tokens } from '../../Theme/tokens';
 
 function NotFound() {
-  const theme = useTheme();
   const tiltRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -39,7 +38,7 @@ function NotFound() {
         minHeight: '100vh',
         textAlign: { xs: 'center', md: 'left' },
         gap: { xs: 3, md: 6 },
-        backgroundColor: theme.palette.background.default,
+        backgroundColor: tokens.bg,
       }}
     >
       <Box
@@ -71,9 +70,9 @@ function NotFound() {
           alignItems: { xs: 'center', md: 'flex-start' },
         }}
       >
-        <Typography color="inherit" gutterBottom sx={{ fontWeight: 700 }}>
-          <span style={{ color: theme.palette.primary.main, fontSize: '150px' }}>40</span>
-          <span style={{ color: '#000000', fontSize: '150px' }}>4</span>
+        <Typography color="inherit" gutterBottom sx={{ fontWeight: 700, lineHeight: 1 }}>
+          <span style={{ color: tokens.gold, fontSize: 'clamp(84px, 18vw, 150px)' }}>40</span>
+          <span style={{ color: tokens.text, fontSize: 'clamp(84px, 18vw, 150px)' }}>4</span>
         </Typography>
 
         <Typography
@@ -87,9 +86,9 @@ function NotFound() {
 
         <Typography
           variant="body1"
-          color="textSecondary"
           sx={{
-            maxWidth: '80%',
+            color: tokens.textMuted,
+            maxWidth: '32rem',
             textAlign: { xs: 'center', md: 'left' },
             mb: 2,
           }}

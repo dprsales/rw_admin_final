@@ -134,8 +134,15 @@ export const canEnterApp = (role: unknown): boolean => {
 
 export function homeRoute(role: unknown): string {
   const routes = allowedRoutes(role);
+  // Sales land on the CRM desk (Day 15). Ops admin keeps the classic dashboard.
+  if (typeof role === 'string' && role === 'sales' && routes?.includes('/crm')) {
+    return '/crm';
+  }
   if (routes === null || routes.includes('/dashboard')) {
     return '/dashboard';
+  }
+  if (routes.includes('/crm')) {
+    return '/crm';
   }
   return routes[0] ?? '/login';
 }

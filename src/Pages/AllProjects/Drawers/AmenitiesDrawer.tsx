@@ -10,6 +10,7 @@ import CustomInput from '../../../Components/Inputs/CustomInput';
 import FileUploadContainer from '../../../Components/FileUploadContainer';
 import { Amenities } from '../ProjectInterface';
 import { amenity, updateProjectSection } from '../../../api/services'; // replace with correct API call
+import { tokens } from '../../../Theme/tokens';
 
 interface Props {
     open: boolean;
@@ -56,10 +57,10 @@ const AmenitiesDrawer: FC<Props> = ({ open, onClose, slug, refetch, existingData
     const onSubmit = (data: Amenities) => mutation.mutate(data);
 
     return (
-        <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 400 } }}>
+        <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: '100%', maxWidth: 400 } }}>
             <Box sx={{ px: 2, height: 60, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography color="white" fontWeight={600}>Edit Amenities</Typography>
-                <IconButton onClick={onClose} sx={{ color: 'white' }}><CloseIcon /></IconButton>
+                <Typography color={tokens.text} fontWeight={600}>Edit Amenities</Typography>
+                <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text }}><CloseIcon /></IconButton>
             </Box>
 
             <Box sx={{ p: 3 }}>
@@ -79,7 +80,7 @@ const AmenitiesDrawer: FC<Props> = ({ open, onClose, slug, refetch, existingData
 
                     <Typography variant="h6" sx={{ mb: 2 }}>Amenity Items</Typography>
                     {fields.map((item, index) => (
-                        <Box key={item.id} sx={{ border: '1px solid #ccc', p: 2, borderRadius: 2, mb: 2 }}>
+                        <Box key={item.id} sx={{ border: `1px solid ${tokens.border}`, p: 2, borderRadius: 2, mb: 2 }}>
                             <FormControl fullWidth sx={{ mb: 1 }}>
                                 <Typography fontWeight={500}>Icon</Typography>
                                 <Controller
@@ -116,8 +117,8 @@ const AmenitiesDrawer: FC<Props> = ({ open, onClose, slug, refetch, existingData
                     </Button>
                     <Box>
 
-                        <Button variant="contained" type="submit" color="primary" fullWidth>
-                            Save Amenities
+                        <Button variant="contained" type="submit" color="primary" fullWidth disabled={mutation.isPending}>
+                            {mutation.isPending ? 'Saving…' : 'Save Amenities'}
                         </Button>
                     </Box>
                 </form>

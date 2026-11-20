@@ -2,6 +2,86 @@
   text-align: left;
 }
 
+/* ── global scrollbars ─────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(195, 155, 83, 0.28) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(195, 155, 83, 0.24);
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(214, 182, 111, 0.45);
+}
+
+/* ── toasts: charcoal surface, light text, semantic accents ── */
+.Toastify__toast {
+  background: var(--rw-panel);
+  color: var(--rw-text);
+  border: 1px solid var(--rw-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  font-family: "Gilroy", "Poppins", sans-serif;
+  font-size: 13px;
+}
+
+.Toastify__toast--success {
+  border-left: 3px solid var(--rw-success);
+}
+
+.Toastify__toast--error {
+  border-left: 3px solid var(--rw-danger);
+}
+
+.Toastify__toast--info {
+  border-left: 3px solid var(--rw-info);
+}
+
+.Toastify__toast--warning {
+  border-left: 3px solid var(--rw-warning);
+}
+
+.Toastify__close-button {
+  color: var(--rw-text-muted);
+  opacity: 0.9;
+}
+
+.Toastify__progress-bar {
+  background: var(--rw-gold);
+}
+
+.Toastify__toast-icon svg {
+  fill: var(--rw-gold);
+}
+
+.Toastify__toast--success .Toastify__toast-icon svg {
+  fill: var(--rw-success-text);
+}
+
+.Toastify__toast--warning .Toastify__toast-icon svg {
+  fill: var(--rw-warning-text);
+}
+
+.Toastify__toast--error .Toastify__toast-icon svg {
+  fill: var(--rw-danger-text);
+}
+
+.Toastify__toast--info .Toastify__toast-icon svg {
+  fill: var(--rw-info-text);
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
@@ -14,18 +94,18 @@
 }
 
 .App-header {
-  background-color: #282c34;
+  background-color: var(--rw-bg);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: calc(10px + 2vmin);
-  color: white;
+  color: var(--rw-text);
 }
 
 .App-link {
-  color: #61dafb;
+  color: var(--rw-gold-hover);
 }
 
 @keyframes App-logo-spin {

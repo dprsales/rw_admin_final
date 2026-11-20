@@ -6,6 +6,7 @@ import Projects1 from './Projects1';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { LinearProgress, Box } from '@mui/material';
 import { getProjects } from '../../api/services';
+import { PageSkeleton } from '../../Components/LoadingState';
 
 const LIMIT = 10;
 
@@ -67,7 +68,7 @@ const ProjectsPage: React.FC = () => {
 
   // Only the initial load (no data yet) gets the full-page bar; searches/pagination
   // keep the previous table visible instead.
-  if (isPending) return <LinearProgress />;
+  if (isPending) return <PageSkeleton />;
   if (error) return <div>Something went wrong</div>;
 
   return (
@@ -78,6 +79,7 @@ const ProjectsPage: React.FC = () => {
         page={page}
         rowsPerPage={LIMIT}
         totalPages={pagination?.totalPages || 1}
+        totalCount={pagination?.total}
         onPageChange={handlePageChange}
         search={search}
         onSearchChange={handleSearchChange}

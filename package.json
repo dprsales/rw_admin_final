@@ -13,6 +13,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "axios": "^1.7.7",
+    "gsap": "^3.15.1",
     "js-cookie": "^3.0.5",
     "otp-input-react": "^0.3.0",
     "react": "^18.3.1",
@@ -21,6 +22,7 @@
     "react-hook-form": "^7.53.0",
     "react-router-dom": "^6.26.1",
     "react-toastify": "^10.0.5",
+    "recharts": "^3.11.0",
     "vanilla-tilt": "^1.8.1",
     "yup": "^1.4.0"
   },

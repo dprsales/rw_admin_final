@@ -1,4 +1,31 @@
 /* src/index.css */
+
+/* ── design tokens as CSS custom properties ─────────────────── */
+:root {
+  --rw-bg: #0B0A09;
+  --rw-sidebar: #090909;
+  --rw-topbar: #090909;
+  --rw-panel: #141310;
+  --rw-panel-alt: #181611;
+  --rw-input: #1B1915;
+  --rw-hover: #211D16;
+  --rw-border: #30291D;
+  --rw-gold: #C39B53;
+  --rw-gold-hover: #D6B66F;
+  --rw-text: #F5F2EC;
+  --rw-text-muted: #A49B90;
+  --rw-overlay: rgba(245,242,236,0.06);
+  --rw-success: #2E7D52;
+  --rw-warning: #D6A03C;
+  --rw-danger: #C6452A;
+  --rw-info: #4C8FC7;
+  --rw-success-text: #6FC39A;
+  --rw-warning-text: #E7BD6E;
+  --rw-danger-text: #E58C77;
+  --rw-info-text: #8CBEE6;
+  color-scheme: dark;
+}
+
 body, html, #root {
   margin: 0;
   padding: 0;
@@ -6,7 +33,33 @@ body, html, #root {
   height: 100%;
   box-sizing: border-box;
   font-family: 'Gilroy', sans-serif;
+  background-color: var(--rw-bg);
+  color: var(--rw-text);
+}
 
+/* Native controls must never fall back to white */
+input, select, textarea, button {
+  color-scheme: dark;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--rw-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--rw-input) inset;
+  box-shadow: 0 0 0 1000px var(--rw-input) inset;
+}
+
+/* ── visible keyboard focus (brand gold) ─────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--rw-gold);
+  outline-offset: 2px;
+}
+
+@supports not selector(:focus-visible) {
+  *:focus {
+    outline: 2px solid var(--rw-gold);
+    outline-offset: 2px;
+  }
 }
 
 @font-face {
@@ -137,11 +190,11 @@ body, html, #root {
 
 
 ::selection {
-  background-color: #30779d;
-  color: #ffffff; 
+  background-color: rgba(195,155,83,0.30);
+  color: var(--rw-text);
 }
 
 ::-moz-selection {
-  background-color:  #30779d;
-  color: #ffffff; 
+  background-color: rgba(195,155,83,0.30);
+  color: var(--rw-text);
 }

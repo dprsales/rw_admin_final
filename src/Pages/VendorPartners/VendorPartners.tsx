@@ -2,13 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Avatar,
   Box,
-  Button,
   Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -37,6 +31,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { deleteVendorPartner, getVendorPartners, updateVendorPartner } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { TableSkeleton } from '../../Components/LoadingState';
+import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
 
 type PartnerStatus = 'new' | 'approved' | 'rejected' | 'resubmit';
 type Decision = 'approved' | 'rejected' | 'resubmit';
@@ -64,6 +64,14 @@ interface VendorPartner {
 
 const rowsPerPage = 12;
 const EMPTY: VendorPartner[] = [];
+
+const PARTNER_SORT = {
+  business: (row: VendorPartner) => row.companyName,
+  contact: (row: VendorPartner) => row.contactName,
+  industry: (row: VendorPartner) => row.industry,
+  status: (row: VendorPartner) => row.status,
+  applied: (row: VendorPartner) => row.createdAt,
+};
 
 const STATUS_COLORS: Record<PartnerStatus, 'info' | 'success' | 'error' | 'warning'> = {
   new: 'info',
@@ -151,11 +159,19 @@ const VendorPartners: React.FC = () => {
     });
   }, [rows, searchText, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const visible = filtered.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filtered, PARTNER_SORT);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / rowsPerPage));
+  const visible = sorted.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageHeader title="Listed Vendors" description="People who listed themselves on rajivwilliams.com/vendorpartner." crumbs={[{ label: 'Listed Vendors' }]} />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableSkeleton rows={7} columns={5} />
+        </Paper>
+      </Box>
+    );
   }
 
   if (error) {
@@ -164,14 +180,13 @@ const VendorPartners: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Listed Vendors</Typography>
-        <Typography variant="body2" color="text.secondary">
-          People who listed themselves on rajivwilliams.com/vendorpartner. Approve moves them to the vendor list.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Listed Vendors"
+        description="People who listed themselves on rajivwilliams.com/vendorpartner. Approve moves them to the vendor list."
+        crumbs={[{ label: 'Listed Vendors' }]}
+      />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={searchText}
@@ -191,24 +206,25 @@ const VendorPartners: React.FC = () => {
                 variant={statusFilter === value ? 'filled' : 'outlined'}
               />
             ))}
-            <Chip icon={<StorefrontOutlined />} label={`${rows.length} received`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
+            <Chip icon={<StorefrontOutlined />} label={`${rows.length} received`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
           </Stack>
         </Box>
         <Divider />
         {visible.length === 0 ? (
-          <Box sx={{ py: 10, textAlign: 'center' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>No applications yet</Typography>
-            <Typography variant="body2" color="text.secondary">They appear here after someone submits the public form.</Typography>
-          </Box>
+          <EmptyState
+            icon={StorefrontOutlined}
+            title="No applications yet"
+            description="They appear here after someone submits the public vendor partner form."
+          />
         ) : (
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Business</TableCell>
-                  <TableCell>Contact</TableCell>
-                  <TableCell>Industry</TableCell>
-                  <TableCell>Status</TableCell>
+                  <SortableHeadCell label="Business" sortKey="business" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Contact" sortKey="contact" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Industry" sortKey="industry" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
                   <TableCell>Links</TableCell>
                   <TableCell align="right">Decide</TableCell>
                 </TableRow>
@@ -258,6 +274,7 @@ const VendorPartners: React.FC = () => {
                           <span>
                             <IconButton
                               size="small"
+                              aria-label={`Approve ${row.companyName}`}
                               color="success"
                               disabled={statusMutation.isPending || row.status === 'approved'}
                               onClick={() => setPendingDecision({ row, decision: DECISIONS[0] })}
@@ -270,6 +287,7 @@ const VendorPartners: React.FC = () => {
                           <span>
                             <IconButton
                               size="small"
+                              aria-label={`Ask ${row.companyName} to resubmit`}
                               disabled={statusMutation.isPending || row.status === 'resubmit'}
                               onClick={() => setPendingDecision({ row, decision: DECISIONS[1] })}
                             >
@@ -281,6 +299,7 @@ const VendorPartners: React.FC = () => {
                           <span>
                             <IconButton
                               size="small"
+                              aria-label={`Reject ${row.companyName}`}
                               color="error"
                               disabled={statusMutation.isPending || row.status === 'rejected'}
                               onClick={() => setPendingDecision({ row, decision: DECISIONS[2] })}
@@ -290,7 +309,7 @@ const VendorPartners: React.FC = () => {
                           </span>
                         </Tooltip>
                         <Tooltip title="Remove">
-                          <IconButton size="small" onClick={() => setPending(row)}>
+                          <IconButton size="small" aria-label={`Remove ${row.companyName}`} onClick={() => setPending(row)}>
                             <DeleteOutline fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -310,45 +329,27 @@ const VendorPartners: React.FC = () => {
         </Box>
       )}
 
-      <Dialog open={pendingDecision !== null} onClose={() => { if (!statusMutation.isPending) setPendingDecision(null); }} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>{pendingDecision?.decision.label}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {pendingDecision ? pendingDecision.decision.confirm(pendingDecision.row) : ''}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setPendingDecision(null)} disabled={statusMutation.isPending}>Cancel</Button>
-          <Button
-            disabled={!pendingDecision || statusMutation.isPending}
-            onClick={() => pendingDecision && statusMutation.mutate({ id: pendingDecision.row._id, status: pendingDecision.decision.status })}
-            sx={pendingDecision?.decision.status === 'rejected'
-              ? { bgcolor: '#b42318', color: '#fff', '&:hover': { bgcolor: '#912018' } }
-              : { bgcolor: '#0f63a5', color: '#fff', '&:hover': { bgcolor: '#0c5288' } }}
-          >
-            {statusMutation.isPending ? 'Saving...' : pendingDecision?.decision.label}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingDecision !== null}
+        title={pendingDecision?.decision.label ?? 'Update application'}
+        description={pendingDecision ? pendingDecision.decision.confirm(pendingDecision.row) : undefined}
+        confirmLabel={pendingDecision?.decision.label ?? 'Confirm'}
+        tone={pendingDecision?.decision.status === 'rejected' ? 'danger' : 'primary'}
+        loading={statusMutation.isPending}
+        onClose={() => { if (!statusMutation.isPending) setPendingDecision(null); }}
+        onConfirm={() => pendingDecision && statusMutation.mutate({ id: pendingDecision.row._id, status: pendingDecision.decision.status })}
+      />
 
-      <Dialog open={pending !== null} onClose={() => { if (!removeMutation.isPending) setPending(null); }} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Remove this application?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {pending ? `${pending.companyName} will be removed, including the saved photo and brochure.` : ''}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setPending(null)} disabled={removeMutation.isPending}>Cancel</Button>
-          <Button
-            disabled={!pending || removeMutation.isPending}
-            onClick={() => pending && removeMutation.mutate(pending._id)}
-            sx={{ bgcolor: '#b42318', color: '#fff', '&:hover': { bgcolor: '#912018' } }}
-          >
-            {removeMutation.isPending ? 'Removing...' : 'Remove'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={pending !== null}
+        title="Remove this application?"
+        description={pending ? `${pending.companyName} will be removed, including the saved photo and brochure.` : undefined}
+        confirmLabel="Remove"
+        tone="danger"
+        loading={removeMutation.isPending}
+        onClose={() => { if (!removeMutation.isPending) setPending(null); }}
+        onConfirm={() => pending && removeMutation.mutate(pending._id)}
+      />
     </Box>
   );
 };

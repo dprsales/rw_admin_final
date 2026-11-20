@@ -1,7 +1,7 @@
+import { lazy } from "react";
 import Cookies from "js-cookie";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import {
-  Dashboard,
   Login,
   NotFound,
   Integration,
@@ -23,8 +23,12 @@ import Blogs from "../Pages/Blogs/Blogs";
 import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
-import { CrmHome, CrmShell, CrmStubPage } from "../crm";
+import { CrmHome, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
+import ServiceGate from "../Pages/ServiceGate/ServiceGate";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
+
+// Charts live only on the dashboard — keep them out of the initial bundle.
+const Dashboard = lazy(() => import("../Pages/Dashboard/Dashboard"));
 
 const isAuthenticated = () => Boolean(Cookies.get("access_token"));
 
@@ -32,7 +36,17 @@ const clearSession = () => {
   Cookies.remove("access_token");
   Cookies.remove("user_type");
   Cookies.remove("user_name");
+  Cookies.remove("crm_role");
+  Cookies.remove("rw_service");
   localStorage.clear();
+};
+
+const deskHome = () => {
+  const stored = Cookies.get("crm_role");
+  const crmRole = isCrmRole(stored)
+    ? stored
+    : stubCrmRoleFromUserType(Cookies.get("user_type"));
+  return crmHomeRoute(crmRole);
 };
 
 // Screen gate only. The API rejects a role that does not belong on that route.
@@ -40,9 +54,12 @@ const ProtectedRoute = ({ component, componentType, allow }: any) => {
   const isAuth = isAuthenticated();
   const role = Cookies.get("user_type");
   const admitted = canEnterApp(role);
-
   if (isAuth) {
     if (componentType === "login" && admitted) {
+      const preferred = Cookies.get("rw_service");
+      if (preferred === "crm" && canOpenRoute(role, "/crm")) {
+        return <Navigate to={deskHome()} replace />;
+      }
       return <Navigate to={homeRoute(role)} replace />;
     }
     if (admitted) {
@@ -52,26 +69,34 @@ const ProtectedRoute = ({ component, componentType, allow }: any) => {
       return component;
     }
     clearSession();
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   clearSession();
   if (componentType === "login") {
     return component;
   }
-  return <Navigate to="/login" replace />;
+  if (allow === "/crm") {
+    return <Navigate to="/login?service=crm" replace />;
+  }
+  return <Navigate to="/" replace />;
 };
 
 // Define routes for the app
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/login" replace />,
+    element: <ServiceGate />,
     errorElement: <NotFound />, // Custom 404 page
   },
   {
     path: "/login",
     element: <ProtectedRoute componentType={"login"} component={<Login />} />,
+  },
+  {
+    // Alias: same common login, CRM service selected.
+    path: "/crm/login",
+    element: <Navigate to="/login?service=crm" replace />,
   },
   {
     // Public, API-free walkthrough for stakeholder review. Production pages remain protected below.
@@ -84,7 +109,7 @@ const router = createBrowserRouter([
     element: <Join />,
   },
   {
-    // Sales CRM desk (Tailwind). Own shell — no ops admin sidebar.
+    // Sales CRM desk. Own shell — no ops admin sidebar.
     path: "/crm",
     element: (
       <ProtectedRoute allow="/crm" component={<CrmShell />} />
@@ -132,7 +157,7 @@ const router = createBrowserRouter([
         element: (
           <CrmStubPage
             title="Settings"
-            blurb="CRM Admin settings (roles, access, templates). Not ops Users."
+            blurb="CRM Admin settings (roles, access, templates). Not the ops Users screen."
           />
         ),
       },

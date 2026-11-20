@@ -44,6 +44,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import PageHeader from '../../Components/PageHeader'
+import EmptyState from '../../Components/EmptyState'
+import ConfirmDialog from '../../Components/ConfirmDialog'
+import { PageSkeleton } from '../../Components/LoadingState'
+import { tokens } from '../../Theme/tokens'
 import {
   approveAdminListing,
   deleteAdminListing,
@@ -380,7 +385,7 @@ function FieldRow({ label, value }: { label: string; value?: React.ReactNode }) 
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f63a5', mb: 1 }}>
+    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: tokens.goldText, mb: 1 }}>
       {children}
     </Typography>
   )
@@ -397,6 +402,7 @@ export default function ListingDetail() {
   const [rejectReason, setRejectReason] = useState('')
   const [expanded, setExpanded] = useState<string[]>(['overview', 'owner', 'basic'])
   const [mediaPreview, setMediaPreview] = useState<{ kind: 'image' | 'video'; index: number } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<AdminListing | null>(null)
 
   const { data: listing, isPending, error, isFetching } = useQuery<AdminListing>({
     queryKey: ['admin-listing', id],
@@ -480,8 +486,8 @@ export default function ListingDetail() {
 
   if (isPending) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
-        <CircularProgress aria-label="Loading listing" />
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageSkeleton />
       </Box>
     )
   }
@@ -489,11 +495,17 @@ export default function ListingDetail() {
   if (error || !listing) {
     return (
       <Box sx={{ p: { xs: 1, sm: 2 } }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/listings')} sx={{ mb: 2 }}>
-          Back to listings
-        </Button>
-        <Paper sx={{ p: 4, borderRadius: 3 }}>
-          <Typography color="error">Unable to load this listing. It may have been deleted.</Typography>
+        <PageHeader
+          title="Listing detail"
+          crumbs={[{ label: 'Listings', to: '/listings' }, { label: 'Listing detail' }]}
+        />
+        <Paper sx={{ borderRadius: 3 }}>
+          <EmptyState
+            title="Listing not found"
+            description="Unable to load this listing. It may have been deleted."
+            actionLabel="Back to listings"
+            onAction={() => navigate('/listings')}
+          />
         </Paper>
       </Box>
     )
@@ -546,90 +558,76 @@ export default function ListingDetail() {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 }, pb: 6 }} component="form" onSubmit={onSave}>
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={2}
-        justifyContent="space-between"
-        alignItems={{ xs: 'stretch', md: 'flex-start' }}
-        sx={{ mb: 2 }}
-      >
-        <Box>
-          <Button startIcon={<ArrowBack />} onClick={() => navigate('/listings')} sx={{ mb: 1, minHeight: 44 }}>
-            Back to listings
-          </Button>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, lineHeight: 1.25 }}>
-            {d.oneLineDescription || listing.title || 'Listing detail'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {listing.title}
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Chip size="small" label={listing.status} color={STATUS_COLOR[listing.status]} sx={{ textTransform: 'capitalize' }} />
-            <Chip size="small" variant="outlined" label={listing.listingType || '-'} />
-            {listing.bhk && <Chip size="small" variant="outlined" label={listing.bhk} />}
-            <Chip size="small" variant="outlined" label={formatPrice(listing.priceValue)} />
-            {isFetching && <Chip size="small" label="Refreshing" />}
-          </Stack>
-        </Box>
-
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
-          {!editing ? (
-            <Button variant="contained" startIcon={<EditOutlined />} onClick={onStartEdit} sx={{ minHeight: 44 }}>
-              Edit listing
+      <PageHeader
+        title={d.oneLineDescription || listing.title || 'Listing detail'}
+        description={listing.title}
+        crumbs={[{ label: 'Listings', to: '/listings' }, { label: 'Listing detail' }]}
+        actions={
+          <>
+            <Button startIcon={<ArrowBack />} onClick={() => navigate('/listings')} sx={{ minHeight: 44 }}>
+              Back to listings
             </Button>
-          ) : (
-            <>
-              <Button variant="outlined" onClick={onCancelEdit} disabled={saveMut.isPending} sx={{ minHeight: 44 }}>
-                Cancel
+            {!editing ? (
+              <Button variant="contained" startIcon={<EditOutlined />} onClick={onStartEdit} sx={{ minHeight: 44 }}>
+                Edit listing
               </Button>
+            ) : (
+              <>
+                <Button variant="outlined" onClick={onCancelEdit} disabled={saveMut.isPending} sx={{ minHeight: 44 }}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={saveMut.isPending ? <CircularProgress size={16} color="inherit" /> : <SaveOutlined />}
+                  disabled={saveMut.isPending}
+                  sx={{ minHeight: 44 }}
+                >
+                  Save changes
+                </Button>
+              </>
+            )}
+            {listing.status !== 'approved' && (
               <Button
-                type="submit"
+                color="success"
                 variant="contained"
-                startIcon={saveMut.isPending ? <CircularProgress size={16} color="inherit" /> : <SaveOutlined />}
-                disabled={saveMut.isPending}
+                startIcon={<CheckCircleOutline />}
+                disabled={editing || approveMut.isPending}
+                onClick={() => approveMut.mutate()}
                 sx={{ minHeight: 44 }}
               >
-                Save changes
+                Approve
               </Button>
-            </>
-          )}
-          {listing.status !== 'approved' && (
-            <Button
-              color="success"
-              variant="contained"
-              startIcon={<CheckCircleOutline />}
-              disabled={editing || approveMut.isPending}
-              onClick={() => approveMut.mutate()}
-              sx={{ minHeight: 44 }}
+            )}
+            {listing.status !== 'rejected' && (
+              <Button
+                color="warning"
+                variant="outlined"
+                disabled={editing}
+                onClick={() => { setRejectReason(''); setRejectOpen(true) }}
+                sx={{ minHeight: 44 }}
+              >
+                Reject
+              </Button>
+            )}
+            <IconButton
+              color="error"
+              aria-label="Delete listing"
+              disabled={editing || deleteMut.isPending}
+              onClick={() => setPendingDelete(listing)}
+              sx={{ minWidth: 44, minHeight: 44 }}
             >
-              Approve
-            </Button>
-          )}
-          {listing.status !== 'rejected' && (
-            <Button
-              color="warning"
-              variant="outlined"
-              disabled={editing}
-              onClick={() => { setRejectReason(''); setRejectOpen(true) }}
-              sx={{ minHeight: 44 }}
-            >
-              Reject
-            </Button>
-          )}
-          <IconButton
-            color="error"
-            aria-label="Delete listing"
-            disabled={editing || deleteMut.isPending}
-            onClick={() => {
-              if (window.confirm('Delete this listing and its photos/videos from CDN permanently?')) {
-                deleteMut.mutate()
-              }
-            }}
-            sx={{ minWidth: 44, minHeight: 44 }}
-          >
-            <DeleteOutline />
-          </IconButton>
-        </Stack>
+              <DeleteOutline />
+            </IconButton>
+          </>
+        }
+      />
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
+        <Chip size="small" label={listing.status} color={STATUS_COLOR[listing.status]} sx={{ textTransform: 'capitalize' }} />
+        <Chip size="small" variant="outlined" label={listing.listingType || '-'} />
+        {listing.bhk && <Chip size="small" variant="outlined" label={listing.bhk} />}
+        <Chip size="small" variant="outlined" label={formatPrice(listing.priceValue)} />
+        {isFetching && <Chip size="small" label="Refreshing" />}
       </Stack>
 
       {formError && (
@@ -646,7 +644,7 @@ export default function ListingDetail() {
             overflow: 'hidden',
             border: '1px solid',
             borderColor: 'divider',
-            bgcolor: '#f4f7fb',
+            bgcolor: tokens.panelAlt,
           }}
         >
           <Box
@@ -664,7 +662,7 @@ export default function ListingDetail() {
               border: 0,
               bgcolor: 'transparent',
               cursor: images.length ? 'pointer' : 'default',
-              '&:focus-visible': { outline: '2px solid #0f63a5', outlineOffset: -2 },
+              '&:focus-visible': { outline: `2px solid ${tokens.gold}`, outlineOffset: -2 },
             }}
           >
             <Box
@@ -677,7 +675,7 @@ export default function ListingDetail() {
                 objectFit: 'contain',
                 objectPosition: 'center',
                 display: 'block',
-                bgcolor: '#f4f7fb',
+                bgcolor: tokens.panelAlt,
               }}
             />
           </Box>
@@ -1243,11 +1241,11 @@ export default function ListingDetail() {
                       borderRadius: 1.5,
                       overflow: 'hidden',
                       cursor: 'pointer',
-                      bgcolor: '#eee',
+                      bgcolor: tokens.panelAlt,
                       width: 140,
                       height: 105,
                       '&:hover .media-preview-hint, &:focus-visible .media-preview-hint': { opacity: 1 },
-                      '&:focus-visible': { outline: '2px solid #0f63a5', outlineOffset: 2 },
+                      '&:focus-visible': { outline: `2px solid ${tokens.gold}`, outlineOffset: 2 },
                     }}
                   >
                     <Box
@@ -1264,8 +1262,8 @@ export default function ListingDetail() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        bgcolor: 'rgba(15, 99, 165, 0.45)',
-                        color: '#fff',
+                        bgcolor: tokens.gold,
+                        color: tokens.black,
                         opacity: 0,
                         transition: 'opacity 160ms ease',
                       }}
@@ -1294,7 +1292,7 @@ export default function ListingDetail() {
                           width: '100%',
                           maxHeight: 360,
                           borderRadius: 1.5,
-                          bgcolor: '#111',
+                          bgcolor: tokens.black,
                           display: 'block',
                         }}
                       />
@@ -1473,7 +1471,7 @@ export default function ListingDetail() {
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ bgcolor: '#0b1220', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 360 }}>
+        <DialogContent dividers sx={{ bgcolor: tokens.panel, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 360 }}>
           {mediaPreview?.kind === 'image' && images[mediaPreview.index] && (
             <Box
               component="img"
@@ -1488,7 +1486,7 @@ export default function ListingDetail() {
               src={videos[mediaPreview.index]}
               controls
               autoPlay
-              sx={{ width: '100%', maxHeight: '70vh', borderRadius: 1, bgcolor: '#000' }}
+              sx={{ width: '100%', maxHeight: '70vh', borderRadius: 1, bgcolor: tokens.black }}
             />
           )}
         </DialogContent>
@@ -1550,6 +1548,20 @@ export default function ListingDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete listing?"
+        description="Delete this listing and its photos/videos from CDN permanently?"
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMut.isPending}
+        onConfirm={() => {
+          setPendingDelete(null)
+          deleteMut.mutate()
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
     </Box>
   )
 }

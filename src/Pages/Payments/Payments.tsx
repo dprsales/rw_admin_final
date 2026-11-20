@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Pagination,
   Paper,
   Stack,
   Table,
@@ -24,8 +25,27 @@ import { ReceiptLong, Search } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { getCoachingPayments, sendCoachingInvoice, type CoachingPayment } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import StatCard from '../../Components/StatCard';
+import EmptyState from '../../Components/EmptyState';
+import { useTableSort, SortableHeadCell, type SortAccessors } from '../../Components/TableSort';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import { tokens } from '../../Theme/tokens';
 
 type StatusFilter = 'all' | CoachingPayment['status'];
+
+const PAYMENT_SORT: SortAccessors<CoachingPayment> = {
+  date: (payment) => payment.createdAt || '',
+  buyer: (payment) => payment.customer?.name || '',
+  module: (payment) => (payment.modules || []).map((module) => module.title).join(', '),
+  status: (payment) => payment.status,
+  amount: (payment) => payment.payableAmount || 0,
+};
+
+const ROWS_PER_PAGE = 10;
 
 const STATUS_LABEL: Record<CoachingPayment['status'], string> = {
   completed: 'Paid',
@@ -63,6 +83,7 @@ const Payments: React.FC = () => {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchText, setSearchText] = useState('');
   const [selected, setSelected] = useState<CoachingPayment | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data, isPending, error, refetch } = useQuery<CoachingPayment[], Error>({
@@ -118,6 +139,10 @@ const Payments: React.FC = () => {
     });
   }, [payments, filter, searchText]);
 
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(visible, PAYMENT_SORT);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
+  const pageRows = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
   if (isPending) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
@@ -141,43 +166,44 @@ const Payments: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Coaching payments
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Check each purchase, confirm the payment, then email the invoice to the buyer.
-        </Typography>
+      <PageHeader
+        title="Coaching payments"
+        description="Check each purchase, confirm the payment, then email the invoice to the buyer."
+        crumbs={[{ label: 'Payments' }]}
+        actions={
+          <Chip
+            label={`${payments.length} total`}
+            sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
+          />
+        }
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' },
+          gap: 1.5,
+          mb: 2.5,
+        }}
+      >
+        <StatCard label="Collected" value={inr(totals.collected)} icon={CheckCircleOutlineIcon} tone="green" hint="Payments confirmed" />
+        <StatCard label="Pending" value={totals.pending} icon={HourglassEmptyIcon} tone="gold" hint="Awaiting confirmation" />
+        <StatCard label="Failed" value={totals.failed} icon={ErrorOutlineIcon} tone="red" hint="Needs attention" />
+        <StatCard label="Invoices emailed" value={totals.invoiced} icon={EmailOutlinedIcon} tone="ink" hint="Sent to buyers" />
       </Box>
 
-      <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mb: 2 }}>
-        <Paper sx={{ px: 2, py: 1.5, minWidth: 160 }}>
-          <Typography variant="caption" color="text.secondary">Collected</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{inr(totals.collected)}</Typography>
-        </Paper>
-        <Paper sx={{ px: 2, py: 1.5, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">Pending</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{totals.pending}</Typography>
-        </Paper>
-        <Paper sx={{ px: 2, py: 1.5, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">Failed</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{totals.failed}</Typography>
-        </Paper>
-        <Paper sx={{ px: 2, py: 1.5, minWidth: 140 }}>
-          <Typography variant="caption" color="text.secondary">Invoices emailed</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{totals.invoiced}</Typography>
-        </Paper>
-      </Stack>
-
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search buyer, email, module, or payment id"
             size="small"
             sx={{ width: { xs: '100%', sm: 380 } }}
-            InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} /> }}
+            InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 1, color: tokens.textMuted }} /> }}
           />
           <Stack direction="row" spacing={1}>
             {(['all', 'completed', 'pending', 'failed'] as StatusFilter[]).map((value) => (
@@ -186,38 +212,48 @@ const Payments: React.FC = () => {
                 label={value === 'all' ? 'All' : STATUS_LABEL[value]}
                 color={value === 'all' ? 'default' : STATUS_COLOR[value]}
                 variant={filter === value ? 'filled' : 'outlined'}
-                onClick={() => setFilter(value)}
+                onClick={() => {
+                  setFilter(value);
+                  setCurrentPage(1);
+                }}
               />
             ))}
           </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+            {visible.length} of {payments.length} payments
+          </Typography>
         </Box>
         <Divider />
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Buyer</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Modules</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Payable</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Payment</TableCell>
+                <SortableHeadCell label="Date" sortKey="date" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Buyer" sortKey="buyer" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Module" sortKey="module" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Amount" sortKey="amount" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
+                <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
                 <TableCell sx={{ fontWeight: 700 }}>Invoice</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
-              {visible.length === 0 ? (
+              {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7}>
-                    <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-                      {payments.length === 0
-                        ? 'No coaching purchases yet.'
-                        : 'No payments match that search.'}
-                    </Typography>
+                    <EmptyState
+                      icon={ReceiptLong}
+                      title={payments.length === 0 ? 'No coaching purchases yet' : 'No payments found'}
+                      description={
+                        payments.length === 0
+                          ? 'Purchases will appear here as buyers complete checkout.'
+                          : 'Try a different search or status filter.'
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
-                visible.map((payment) => (
+                pageRows.map((payment) => (
                   <TableRow key={payment._id} hover>
                     <TableCell>{formatDate(payment.createdAt)}</TableCell>
                     <TableCell>
@@ -240,6 +276,18 @@ const Payments: React.FC = () => {
           </Table>
         </TableContainer>
       </Paper>
+
+      {sorted.length > ROWS_PER_PAGE && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={totalPages}
+            page={Math.min(currentPage, totalPages)}
+            onChange={(_, page) => setCurrentPage(page)}
+            color="primary"
+            shape="rounded"
+          />
+        </Box>
+      )}
 
       <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} fullWidth maxWidth="sm">
         {selected && (
@@ -301,7 +349,7 @@ const Payments: React.FC = () => {
                 startIcon={<ReceiptLong />}
                 disabled={selected.status !== 'completed' || invoiceMutation.isPending}
                 onClick={() => invoiceMutation.mutate(selected._id)}
-                sx={{ bgcolor: '#0f63a5', '&:hover': { bgcolor: '#0b4f83' } }}
+                sx={{ bgcolor: tokens.gold, color: tokens.black, '&:hover': { bgcolor: tokens.goldDark } }}
               >
                 {selected.status !== 'completed'
                   ? 'Invoice after payment'

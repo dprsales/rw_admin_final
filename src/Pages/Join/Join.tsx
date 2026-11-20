@@ -32,7 +32,10 @@ import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import VerifiedOutlinedIcon from '@mui/icons-material/VerifiedOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import { useSearchParams } from 'react-router-dom';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { tokens } from '../../Theme/tokens';
 import {
   acceptJoinDeclaration,
   acknowledgeJoinPolicy,
@@ -58,27 +61,27 @@ import {
 
 const JOIN_TOKEN_KEY = 'join_access_token';
 
-/** Team RW join portal tokens (Swiss-minimal, brand blue). */
+/** Team RW join portal palette, mapped to the shared dark theme tokens. */
 const JOIN = {
-  primary: '#0F63A5',
-  primaryDark: '#0B4F83',
-  primarySoft: '#E8F2FA',
-  ink: '#0F172A',
-  muted: '#64748B',
-  border: '#D9E4EF',
-  bg: '#F5F8FC',
-  card: '#FFFFFF',
-  success: '#15803D',
-  warn: '#C2410C',
+  primary: tokens.gold,
+  primaryDark: tokens.goldHover,
+  primarySoft: tokens.goldSoft,
+  ink: tokens.text,
+  muted: tokens.textMuted,
+  border: tokens.border,
+  bg: tokens.bg,
+  card: tokens.panel,
+  success: tokens.success,
+  warn: tokens.warning,
 };
 
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
-    bgcolor: '#fff',
+    bgcolor: tokens.input,
     borderRadius: 1.5,
     transition: 'box-shadow 180ms ease, border-color 180ms ease',
     '& fieldset': { borderColor: JOIN.border },
-    '&:hover fieldset': { borderColor: '#9BB8D1' },
+    '&:hover fieldset': { borderColor: tokens.border },
     '&.Mui-focused': {
       boxShadow: `0 0 0 3px ${JOIN.primarySoft}`,
     },
@@ -91,7 +94,7 @@ const cardSx = {
   p: { xs: 2.5, md: 3 },
   borderRadius: 2.5,
   border: `1px solid ${JOIN.border}`,
-  boxShadow: '0 10px 30px rgba(15, 99, 165, 0.06)',
+  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
   bgcolor: JOIN.card,
 };
 
@@ -293,7 +296,7 @@ const RepeatCard = ({
       p: 2.25,
       borderRadius: 2,
       border: `1px solid ${JOIN.border}`,
-      bgcolor: '#FBFCFE',
+      bgcolor: tokens.panelAlt,
     }}
   >
     <Typography
@@ -313,9 +316,10 @@ const PrimaryButtonSx = {
   px: 2.5,
   py: 1.1,
   bgcolor: JOIN.primary,
+  color: tokens.black,
   boxShadow: 'none',
   transition: 'background-color 180ms ease, box-shadow 180ms ease',
-  '&:hover': { bgcolor: JOIN.primaryDark, boxShadow: '0 6px 16px rgba(15, 99, 165, 0.25)' },
+  '&:hover': { bgcolor: JOIN.primaryDark, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.4)' },
 };
 
 const OutlineButtonSx = {
@@ -413,11 +417,11 @@ const DocumentPreviewCard = ({
       sx={{
         p: 2.25,
         borderRadius: 2,
-        border: `1px solid ${needsReupload ? '#FDBA74' : JOIN.border}`,
-        bgcolor: needsReupload ? '#FFF7ED' : JOIN.card,
+        border: `1px solid ${needsReupload ? tokens.warning : JOIN.border}`,
+        bgcolor: needsReupload ? tokens.warningSoft : JOIN.card,
         transition: 'border-color 180ms ease, box-shadow 180ms ease',
         '&:hover': {
-          boxShadow: '0 8px 20px rgba(15, 99, 165, 0.08)',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.4)',
         },
       }}
     >
@@ -428,12 +432,12 @@ const DocumentPreviewCard = ({
             minHeight: 104,
             borderRadius: 1.5,
             border: '1px dashed',
-            borderColor: needsReupload ? 'warning.light' : hasFile ? 'success.light' : 'divider',
+            borderColor: needsReupload ? tokens.warning : hasFile ? tokens.success : tokens.border,
             bgcolor: needsReupload
-              ? 'rgba(237, 108, 2, 0.06)'
+              ? tokens.warningSoft
               : hasFile
-                ? 'rgba(46, 125, 50, 0.04)'
-                : 'grey.50',
+                ? tokens.successSoft
+                : tokens.input,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -529,7 +533,7 @@ const DocumentPreviewCard = ({
               sx={{
                 ...PrimaryButtonSx,
                 ...(needsReupload
-                  ? { bgcolor: JOIN.warn, '&:hover': { bgcolor: '#9A3412' } }
+                  ? { bgcolor: JOIN.warn, color: tokens.black, '&:hover': { bgcolor: tokens.goldHover } }
                   : {}),
               }}
             >
@@ -566,53 +570,39 @@ const DocumentPreviewCard = ({
         </Stack>
       </Stack>
 
-      <Dialog open={Boolean(pendingFile)} onClose={() => setPendingFile(null)} fullWidth maxWidth="xs">
-        <DialogTitle>Replace this file?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            The current file will be removed from storage and replaced with{' '}
-            {pendingFile?.name || 'the new file'}.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPendingFile(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            sx={PrimaryButtonSx}
-            onClick={() => {
-              if (!pendingFile) return;
-              const file = pendingFile;
-              setPendingFile(null);
-              onUpload(file);
-            }}
-          >
-            Replace file
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(pendingFile)}
+        title="Replace this file?"
+        confirmLabel="Replace file"
+        tone="danger"
+        confirmDisabled={!pendingFile || busy || deleting}
+        onConfirm={() => {
+          if (!pendingFile) return;
+          const file = pendingFile;
+          setPendingFile(null);
+          onUpload(file);
+        }}
+        onClose={() => setPendingFile(null)}
+      >
+        <Typography variant="body2" color="text.secondary">
+          The current file will be removed from storage and replaced with{' '}
+          {pendingFile?.name || 'the new file'}.
+        </Typography>
+      </ConfirmDialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Delete this file?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            {doc.label} will be removed from the joining form and deleted from storage. This cannot
-            be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button
-            color="warning"
-            variant="contained"
-            onClick={() => {
-              setDeleteConfirmOpen(false);
-              onDelete();
-            }}
-          >
-            Delete file
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete this file?"
+        description={`${doc.label} will be removed from the joining form and deleted from storage. This cannot be undone.`}
+        confirmLabel="Delete file"
+        tone="danger"
+        loading={deleting}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          onDelete();
+        }}
+        onClose={() => setDeleteConfirmOpen(false)}
+      />
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{doc.label}</DialogTitle>
@@ -762,7 +752,9 @@ const Join: React.FC = () => {
     onSuccess: (response) => {
       setOtpSent(true);
       setStatusMessage(response.message);
+      toast.success(response.message);
     },
+    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   const verifyOtp = useMutation({
@@ -771,8 +763,10 @@ const Join: React.FC = () => {
       sessionStorage.setItem(JOIN_TOKEN_KEY, session.accessToken);
       setAccessToken(session.accessToken);
       setStatusMessage('Email verified. Complete each section below.');
+      toast.success('Email verified');
       await queryClient.invalidateQueries({ queryKey: ['join', token] });
     },
+    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   const saveForm = useMutation({
@@ -780,9 +774,11 @@ const Join: React.FC = () => {
     onSuccess: (draft) => {
       setSavedAt(draft.formDraftSavedAt || draft.personalSectionSavedAt);
       setStatusMessage('Details saved. You can return later with the same invitation link.');
+      toast.success('Details saved');
       queryClient.setQueryData(['join-form', accessToken], draft);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
+    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   const uploadDocument = useMutation({
@@ -790,39 +786,48 @@ const Join: React.FC = () => {
       uploadJoinDocument(accessToken, documentType, file),
     onSuccess: (checklist) => {
       setUploadingType('');
-      setStatusMessage(
-        `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`,
-      );
+      const message = `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`;
+      setStatusMessage(message);
+      toast.success(message);
       queryClient.setQueryData(['join-documents', accessToken], checklist);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
-    onError: () => setUploadingType(''),
+    onError: (error: any) => {
+      setUploadingType('');
+      toast.error(errorMessage(error));
+    },
   });
 
   const deleteDocument = useMutation({
     mutationFn: (documentType: string) => deleteJoinDocument(accessToken, documentType),
     onSuccess: (checklist) => {
       setDeletingType('');
-      setStatusMessage(
-        `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`,
-      );
+      const message = `Documents updated: ${checklist.uploadedCount} of ${checklist.requiredCount} required files uploaded.`;
+      setStatusMessage(message);
+      toast.success(message);
       queryClient.setQueryData(['join-documents', accessToken], checklist);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
-    onError: () => setDeletingType(''),
+    onError: (error: any) => {
+      setDeletingType('');
+      toast.error(errorMessage(error));
+    },
   });
 
   const acknowledgePolicy = useMutation({
     mutationFn: (policyId: string) => acknowledgeJoinPolicy(accessToken, policyId),
     onSuccess: (state) => {
       setAckingPolicyId('');
-      setStatusMessage(
-        `Policies accepted: ${state.acknowledgedCount} of ${state.requiredCount}.`,
-      );
+      const message = `Policies accepted: ${state.acknowledgedCount} of ${state.requiredCount}.`;
+      setStatusMessage(message);
+      toast.success(message);
       queryClient.setQueryData(['join-policies', accessToken], state);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
-    onError: () => setAckingPolicyId(''),
+    onError: (error: any) => {
+      setAckingPolicyId('');
+      toast.error(errorMessage(error));
+    },
   });
 
   const acceptDeclaration = useMutation({
@@ -830,21 +835,24 @@ const Join: React.FC = () => {
     onSuccess: (state) => {
       setDeclarationChecked(true);
       setStatusMessage('Joining declaration accepted. Open Review to submit your onboarding.');
+      toast.success('Joining declaration accepted');
       queryClient.setQueryData(['join-policies', accessToken], state);
       queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
     },
+    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   const submitPackage = useMutation({
     mutationFn: () => submitJoinPackage(accessToken),
     onSuccess: (state) => {
-      setStatusMessage(
-        state.alreadySubmitted
-          ? 'Your onboarding is submitted. HR will review it next.'
-          : 'Onboarding submitted.',
-      );
+      const message = state.alreadySubmitted
+        ? 'Your onboarding is submitted. HR will review it next.'
+        : 'Onboarding submitted.';
+      setStatusMessage(message);
+      toast.success(message);
       queryClient.setQueryData(['join-readiness', accessToken], state);
     },
+    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   useEffect(() => {
@@ -1146,8 +1154,8 @@ const Join: React.FC = () => {
                 sx={{
                   p: 2.25,
                   borderRadius: 2,
-                  border: `1px solid ${policy.acknowledged ? '#BBF7D0' : JOIN.border}`,
-                  bgcolor: policy.acknowledged ? '#F0FDF4' : JOIN.card,
+                  border: `1px solid ${policy.acknowledged ? tokens.success : JOIN.border}`,
+                  bgcolor: policy.acknowledged ? tokens.successSoft : JOIN.card,
                 }}
               >
                 <Stack spacing={1.5}>
@@ -1172,7 +1180,7 @@ const Join: React.FC = () => {
                       overflow: 'auto',
                       p: 1.5,
                       borderRadius: 1.5,
-                      bgcolor: '#F8FAFC',
+                      bgcolor: tokens.input,
                       border: `1px solid ${JOIN.border}`,
                       whiteSpace: 'pre-wrap',
                       typography: 'body2',
@@ -1202,8 +1210,8 @@ const Join: React.FC = () => {
             sx={{
               p: 2.25,
               borderRadius: 2,
-              border: `1px solid ${policyState?.declaration.accepted ? '#BBF7D0' : JOIN.border}`,
-              bgcolor: policyState?.declaration.accepted ? '#F0FDF4' : '#FFFBEB',
+              border: `1px solid ${policyState?.declaration.accepted ? tokens.success : JOIN.border}`,
+              bgcolor: policyState?.declaration.accepted ? tokens.successSoft : tokens.warningSoft,
             }}
           >
             <Stack spacing={1.5}>
@@ -1337,8 +1345,8 @@ const Join: React.FC = () => {
             sx={{
               p: 2.25,
               borderRadius: 2,
-              border: `1px solid ${row.ready ? '#BBF7D0' : JOIN.border}`,
-              bgcolor: row.ready ? '#F0FDF4' : JOIN.card,
+              border: `1px solid ${row.ready ? tokens.success : JOIN.border}`,
+              bgcolor: row.ready ? tokens.successSoft : JOIN.card,
             }}
           >
             <Stack direction="row" spacing={1.5} alignItems="flex-start" justifyContent="space-between">
@@ -1388,7 +1396,7 @@ const Join: React.FC = () => {
         minHeight: '100vh',
         bgcolor: JOIN.bg,
         backgroundImage:
-          'radial-gradient(ellipse at top, rgba(15, 99, 165, 0.10), transparent 55%), linear-gradient(180deg, #EEF4FA 0%, #F5F8FC 40%, #F8FAFC 100%)',
+          `radial-gradient(ellipse at top, ${tokens.goldSoft}, transparent 55%), linear-gradient(180deg, ${tokens.bg} 0%, ${tokens.panel} 100%)`,
         px: { xs: 1.5, md: 4 },
         py: { xs: 3, md: 6 },
       }}
@@ -1524,7 +1532,7 @@ const Join: React.FC = () => {
                   <Alert
                     icon={<VerifiedOutlinedIcon fontSize="inherit" />}
                     severity="success"
-                    sx={{ borderRadius: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}
+                    sx={{ borderRadius: 2, bgcolor: tokens.successSoft, border: `1px solid ${tokens.success}` }}
                   >
                     Email verified. Progress through the sections below. Save whenever you need a
                     break.

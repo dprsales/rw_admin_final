@@ -36,12 +36,19 @@ import {
   Visibility,
 } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import {
   deleteChannelPartner,
   downloadChannelPartnersCsv,
   getChannelPartners,
   updateChannelPartner,
 } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { TableSkeleton } from '../../Components/LoadingState';
+import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
 
 export interface ChannelPartnerUpload {
   field: string;
@@ -78,6 +85,15 @@ export interface ChannelPartner {
 const rowsPerPage = 12;
 const EMPTY_PARTNERS: ChannelPartner[] = [];
 
+const PARTNER_SORT = {
+  partner: (row: ChannelPartner) => row.name,
+  agency: (row: ChannelPartner) => row.agencyName,
+  city: (row: ChannelPartner) => row.city,
+  reference: (row: ChannelPartner) => row.referenceNo,
+  status: (row: ChannelPartner) => row.status,
+  applied: (row: ChannelPartner) => row.createdAt,
+};
+
 const STATUS_COLORS: Record<ChannelPartner['status'], 'info' | 'warning' | 'success' | 'error'> = {
   new: 'info',
   reviewing: 'warning',
@@ -89,11 +105,18 @@ const formatDate = (value?: string) => value ? new Date(value).toLocaleDateStrin
   day: '2-digit', month: 'short', year: 'numeric',
 }) : '-';
 
+const errorMessage = (error: any): string =>
+  error?.response?.data?.message ?? 'Something went wrong. Please try again.';
+
 const ChannelPartners: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPartner, setSelectedPartner] = useState<ChannelPartner | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | {
+    kind: 'approve' | 'delete' | 'reject';
+    partner: ChannelPartner;
+  }>(null);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
@@ -101,6 +124,12 @@ const ChannelPartners: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['channel-partners'] });
       setSelectedPartner(null);
+      setConfirmAction(null);
+      toast.success('Channel partner deleted');
+    },
+    onError: (error: any) => {
+      setConfirmAction(null);
+      toast.error(errorMessage(error));
     },
   });
 
@@ -110,8 +139,28 @@ const ChannelPartners: React.FC = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['channel-partners'] });
       setSelectedPartner((prev) => (prev ? { ...prev, status: variables.status } : prev));
+      setConfirmAction(null);
+      toast.success(variables.status === 'approved'
+        ? 'Partner approved and notified'
+        : variables.status === 'rejected'
+          ? 'Partner rejected'
+          : 'Status updated');
+    },
+    onError: (error: any) => {
+      setConfirmAction(null);
+      toast.error(errorMessage(error));
     },
   });
+
+  const runConfirmAction = () => {
+    if (!confirmAction) return;
+    const { kind, partner } = confirmAction;
+    if (kind === 'delete') {
+      deleteMutation.mutate(partner._id);
+    } else {
+      statusMutation.mutate({ partnerId: partner._id, status: kind === 'approve' ? 'approved' : 'rejected' });
+    }
+  };
 
   const { data, isPending, error } = useQuery<ChannelPartner[], Error>({
     queryKey: ['channel-partners'],
@@ -132,8 +181,9 @@ const ChannelPartners: React.FC = () => {
     ].some((value) => value?.toLowerCase().includes(query)));
   }, [partners, searchText]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredPartners.length / rowsPerPage));
-  const visiblePartners = filteredPartners.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const { sorted: sortedPartners, order, orderBy, toggle: toggleSort } = useTableSort(filteredPartners, PARTNER_SORT);
+  const totalPages = Math.max(1, Math.ceil(sortedPartners.length / rowsPerPage));
+  const visiblePartners = sortedPartners.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(event.target.value);
@@ -152,13 +202,23 @@ const ChannelPartners: React.FC = () => {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      toast.success('CSV exported');
+    } catch (error: any) {
+      toast.error(errorMessage(error));
     } finally {
       setExporting(false);
     }
   };
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageHeader title="Channel partners" description="Review agencies and brokers who have applied to sell RW inventory." crumbs={[{ label: 'Channel Partners' }]} />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableSkeleton rows={7} columns={7} />
+        </Paper>
+      </Box>
+    );
   }
 
   if (error) {
@@ -167,26 +227,26 @@ const ChannelPartners: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Channel partners</Typography>
-          <Typography variant="body2" color="text.secondary">Review agencies and brokers who have applied to sell RW inventory.</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Chip icon={<HandshakeOutlined />} label={`${partners.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
-          <Button
-            onClick={handleCsvExport}
-            disabled={exporting || partners.length === 0}
-            startIcon={<Download />}
-            variant="outlined"
-            sx={{ borderRadius: 1.5, borderColor: '#0f63a5', color: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#e7f1f7', borderColor: '#0f63a5' } }}
-          >
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </Button>
-        </Box>
-      </Box>
+      <PageHeader
+        title="Channel partners"
+        description="Review agencies and brokers who have applied to sell RW inventory."
+        crumbs={[{ label: 'Channel Partners' }]}
+        actions={
+          <>
+            <Chip icon={<HandshakeOutlined />} label={`${partners.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+            <Button
+              onClick={handleCsvExport}
+              disabled={exporting || partners.length === 0}
+              startIcon={<Download />}
+              variant="outlined"
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </>
+        }
+      />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={searchText}
@@ -201,17 +261,23 @@ const ChannelPartners: React.FC = () => {
         <Divider />
 
         {visiblePartners.length === 0 ? (
-          <Box sx={{ py: 10, px: 3, textAlign: 'center' }}>
-            <HandshakeOutlined sx={{ fontSize: 42, color: '#9bb9ca', mb: 1 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>No channel partners found</Typography>
-            <Typography variant="body2" color="text.secondary">New partner enrolments will appear here automatically.</Typography>
-          </Box>
+          <EmptyState
+            icon={HandshakeOutlined}
+            title="No channel partners found"
+            description="New partner enrolments will appear here automatically. Try a different search."
+          />
         ) : (
           <TableContainer>
             <Table sx={{ minWidth: 820 }}>
-              <TableHead sx={{ bgcolor: '#f3f8fb' }}>
+              <TableHead sx={{ bgcolor: tokens.surfaceAlt }}>
                 <TableRow>
-                  {['Partner', 'Agency', 'City', 'Reference', 'Status', 'Applied', 'Actions'].map((heading) => <TableCell key={heading} sx={{ fontWeight: 700, color: '#355466' }}>{heading}</TableCell>)}
+                  <SortableHeadCell label="Partner" sortKey="partner" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Agency" sortKey="agency" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="City" sortKey="city" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Reference" sortKey="reference" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Applied" sortKey="applied" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <TableCell sx={{ fontWeight: 700, color: tokens.text }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -229,7 +295,7 @@ const ChannelPartners: React.FC = () => {
                     <TableCell onClick={(event) => event.stopPropagation()}>
                       <Stack direction="row" spacing={0.5}>
                         <Tooltip title="View details">
-                          <IconButton size="small" onClick={() => setSelectedPartner(partner)}>
+                          <IconButton size="small" aria-label="View partner details" onClick={() => setSelectedPartner(partner)}>
                             <Visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -237,13 +303,10 @@ const ChannelPartners: React.FC = () => {
                           <Tooltip title="Approve & notify applicant">
                             <IconButton
                               size="small"
+                              aria-label={`Approve ${partner.name || 'this applicant'}`}
                               color="success"
                               disabled={statusMutation.isPending}
-                              onClick={() => {
-                                if (window.confirm(`Approve ${partner.name || 'this applicant'}? This immediately emails them the approval notice and commission creative.`)) {
-                                  statusMutation.mutate({ partnerId: partner._id, status: 'approved' });
-                                }
-                              }}
+                              onClick={() => setConfirmAction({ kind: 'approve', partner })}
                             >
                               <CheckCircleOutline fontSize="small" />
                             </IconButton>
@@ -269,13 +332,36 @@ const ChannelPartners: React.FC = () => {
         partner={selectedPartner}
         onClose={() => setSelectedPartner(null)}
         onDelete={(partnerId) => {
-          if (window.confirm('Delete this channel partner and its uploaded files permanently?')) {
-            deleteMutation.mutate(partnerId);
-          }
+          const partner = partners.find((item) => item._id === partnerId) ?? selectedPartner;
+          if (partner) setConfirmAction({ kind: 'delete', partner });
         }}
         onStatusChange={(status) => selectedPartner && statusMutation.mutate({ partnerId: selectedPartner._id, status })}
+        onConfirmAction={(kind) => selectedPartner && setConfirmAction({ kind, partner: selectedPartner })}
         savingStatus={statusMutation.isPending}
         deleting={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmAction?.kind === 'delete'
+          ? 'Delete channel partner?'
+          : confirmAction?.kind === 'reject'
+            ? 'Reject this application?'
+            : 'Approve this application?'}
+        description={confirmAction?.kind === 'delete'
+          ? 'This channel partner and all their uploaded files will be permanently removed. This cannot be undone.'
+          : confirmAction?.kind === 'reject'
+            ? `${confirmAction?.partner.name || 'This applicant'} will be marked as rejected.`
+            : `${confirmAction?.partner.name || 'This applicant'} will be emailed the approval notice and commission creative immediately.`}
+        confirmLabel={confirmAction?.kind === 'delete'
+          ? 'Delete partner'
+          : confirmAction?.kind === 'reject'
+            ? 'Reject'
+            : 'Approve & notify'}
+        tone={confirmAction?.kind === 'approve' ? 'primary' : 'danger'}
+        loading={deleteMutation.isPending || statusMutation.isPending}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
       />
     </Box>
   );
@@ -286,9 +372,10 @@ const PartnerDetails: React.FC<{
   onClose: () => void;
   onDelete: (partnerId: string) => void;
   onStatusChange: (status: ChannelPartner['status']) => void;
+  onConfirmAction: (kind: 'approve' | 'reject') => void;
   savingStatus: boolean;
   deleting: boolean;
-}> = ({ partner, onClose, onDelete, onStatusChange, savingStatus, deleting }) => (
+}> = ({ partner, onClose, onDelete, onStatusChange, onConfirmAction, savingStatus, deleting }) => (
   <Dialog open={Boolean(partner)} onClose={onClose} fullWidth maxWidth="md">
     {partner && <>
       <DialogTitle sx={{ pr: 6, fontWeight: 700 }}>
@@ -314,11 +401,7 @@ const PartnerDetails: React.FC<{
               size="small"
               startIcon={<CheckCircleOutline />}
               disabled={savingStatus || partner.status === 'approved'}
-              onClick={() => {
-                if (window.confirm(`Approve ${partner.name || 'this applicant'}? This immediately emails them the approval notice and commission creative.`)) {
-                  onStatusChange('approved');
-                }
-              }}
+              onClick={() => onConfirmAction('approve')}
             >
               {partner.status === 'approved' ? 'Approved' : 'Approve & notify'}
             </Button>
@@ -337,11 +420,7 @@ const PartnerDetails: React.FC<{
               size="small"
               startIcon={<CancelOutlined />}
               disabled={savingStatus || partner.status === 'rejected'}
-              onClick={() => {
-                if (window.confirm(`Reject ${partner.name || 'this applicant'}?`)) {
-                  onStatusChange('rejected');
-                }
-              }}
+              onClick={() => onConfirmAction('reject')}
             >
               Reject
             </Button>
@@ -372,9 +451,9 @@ const PartnerDetails: React.FC<{
                 href={upload.url}
                 target="_blank"
                 rel="noreferrer"
-                sx={{ display: 'inline-flex', flexDirection: 'column', px: 2, py: 1, borderRadius: 1.5, border: '1px solid #d5e3ec', bgcolor: '#f7fbfd', textDecoration: 'none', color: '#0f63a5', minWidth: 140 }}
+                sx={{ display: 'inline-flex', flexDirection: 'column', px: 2, py: 1, borderRadius: 1.5, border: `1px solid ${tokens.line}`, bgcolor: tokens.surfaceAlt, textDecoration: 'none', color: tokens.goldText, minWidth: 140 }}
               >
-                <Typography variant="caption" sx={{ textTransform: 'capitalize', color: 'text.secondary' }}>{upload.field.replace(/([A-Z])/g, ' $1').trim()}</Typography>
+                <Typography variant="caption" sx={{ textTransform: 'capitalize', color: tokens.textMuted }}>{upload.field.replace(/([A-Z])/g, ' $1').trim()}</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>{upload.fileName || 'View file'}</Typography>
               </Box>
             ))}
@@ -383,7 +462,7 @@ const PartnerDetails: React.FC<{
 
         {(partner.utmSource || partner.utmMedium || partner.utmCampaign || partner.referrer) && <>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Attribution</Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, p: 2, bgcolor: '#fafcfd', border: '1px solid #e4edf2', borderRadius: 1 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, p: 2, bgcolor: tokens.surfaceAlt, border: `1px solid ${tokens.line}`, borderRadius: 1 }}>
             <Detail label="UTM source" value={partner.utmSource} />
             <Detail label="UTM medium" value={partner.utmMedium} />
             <Detail label="UTM campaign" value={partner.utmCampaign} />
@@ -411,7 +490,7 @@ const PartnerDetails: React.FC<{
 const Detail: React.FC<{ label: string; value?: string; link?: string }> = ({ label, value, link }) => (
   <Box>
     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4 }}>{label}</Typography>
-    {link && value ? <Typography component="a" href={link} target={link.startsWith('http') ? '_blank' : undefined} rel="noreferrer" variant="body2" sx={{ color: '#0f63a5', wordBreak: 'break-word' }}>{value}</Typography> : <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{value || '-'}</Typography>}
+    {link && value ? <Typography component="a" href={link} target={link.startsWith('http') ? '_blank' : undefined} rel="noreferrer" variant="body2" sx={{ color: tokens.goldText, wordBreak: 'break-word' }}>{value}</Typography> : <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{value || '-'}</Typography>}
   </Box>
 );
 

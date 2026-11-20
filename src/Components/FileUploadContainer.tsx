@@ -5,6 +5,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import { FileUpload } from '../api/services'; // Ensure the path is correct
 import { toast } from 'react-toastify';
+import { tokens } from '../Theme/tokens';
 
 interface FileUploadContainerProps {
   onFileSelect: (url: string | null) => void; 
@@ -67,9 +68,9 @@ const FileUploadContainer: React.FC<FileUploadContainerProps> = ({
 
   // Determine border color based on upload status
   const borderColor =
-    uploadStatus === 'success' ? '#4CAF50' : 
-    uploadStatus === 'error' ? '#F44336' : 
-    isDragActive ? '#2196f3' : '#24272C90';
+    uploadStatus === 'success' ? tokens.success :
+    uploadStatus === 'error' ? tokens.danger :
+    isDragActive ? tokens.info : tokens.border;
 
   const handleRemoveImage = () => {
     setPreview(null); // Clear the preview
@@ -91,6 +92,7 @@ const FileUploadContainer: React.FC<FileUploadContainerProps> = ({
         cursor: 'pointer',
         position: 'relative',
         textAlign: 'center',
+        bgcolor: tokens.surfaceAlt,
       }}
     >
       <input {...getInputProps()} />
@@ -113,15 +115,16 @@ const FileUploadContainer: React.FC<FileUploadContainerProps> = ({
               {/* Remove Icon for Deleting Image */}
               <IconButton
                 onClick={handleRemoveImage}
-                sx={{ position: 'absolute', top: 0, right: 0, color: 'red' }}
+                aria-label="Remove selected image"
+                sx={{ position: 'absolute', top: 0, right: 0, color: tokens.dangerText }}
               >
                 <RemoveCircleOutlineIcon />
               </IconButton>
             </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column' }}>
-              <AddPhotoAlternateIcon sx={{ fontSize: '40px', color: "#6563FF", marginRight: '8px' }} />
-              <Typography variant="caption" sx={{ color: "#6563FF" }}>
+              <AddPhotoAlternateIcon sx={{ fontSize: '40px', color: tokens.gold, marginRight: '8px' }} />
+              <Typography variant="caption" sx={{ color: tokens.gold }}>
                 Drag & drop an image here, or click to select one
               </Typography>
             </Box>

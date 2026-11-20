@@ -1,297 +1,521 @@
 import { createTheme } from "@mui/material/styles";
+import { tokens } from "./tokens";
 
+const {
+  bg,
+  border,
+  gold,
+  goldHover,
+  goldSoft,
+  hover,
+  input,
+  panel,
+  panelAlt,
+  text,
+  textMuted,
+  topbar,
+} = tokens;
+
+/** Team RW admin: one dark surface system across every route. */
 export const theme = createTheme({
   palette: {
+    mode: "dark",
     primary: {
-      main: "#0f63a5",
-      light: "rgba(218, 46, 49, 0.1)",
-      dark: "rgba(218, 46, 49, 0.8)",
+      main: gold,
+      light: goldHover,
+      dark: tokens.gold,
+      contrastText: bg,
     },
     secondary: {
-      main: "#aaaaad",
-      light: "rgba(11, 120, 183, 0.1)",
-      dark: "rgba(11, 120, 183, 0.8)",
+      main: panelAlt,
+      light: hover,
+      dark: bg,
+      contrastText: text,
     },
     warning: {
-      main: "#30779d",
-      light: "rgba(218, 46, 49, 0.1)",
-      dark: "rgba(218, 46, 49, 0.8)",
+      main: tokens.warningText,
+      light: tokens.warningSoft,
+      dark: tokens.warning,
+      contrastText: bg,
     },
     info: {
-      main: "#ffffff",
-      light: "rgba(255, 255, 255, 0.1)",
-      dark: "rgba(255, 255, 255, 0.8)",
+      main: tokens.infoText,
+      contrastText: bg,
     },
+    success: {
+      main: tokens.successText,
+      contrastText: bg,
+    },
+    error: {
+      main: tokens.dangerText,
+      contrastText: bg,
+    },
+    text: {
+      primary: text,
+      secondary: textMuted,
+    },
+    divider: border,
     background: {
-      default: "#ffffff",
-      // default: 'transparent',
+      default: bg,
+      paper: panel,
     },
     common: {
-      black: "#000000",
-      white: "#ffffff",
+      black: bg,
+      white: text,
     },
   },
   typography: {
-    fontFamily: 'Gilroy, Poppins, sans-serif', 
-    button: {
-      textTransform: "none",
-      fontSize: "12px",  // Decreased from 14px
-    },
-    h1: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "30px", 
-      color: "#000000",
-  
-    },
-    h2: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "26px",
-      color: "#000000",
-   
-    },
-    h3: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "24px", 
-      color: "#000000",
-  
-    },
-    h4: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "22px",  // Decreased from 20px
-      color: "#000000",
-   
-    },
-    h5: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "20px",  // Decreased from 16px
-      color: "#000000",
-  
-    },
-    h6: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "18px",  // Decreased from 14px
-      color: "#000000",
-
-    },
-    subtitle1: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "16px",  // Decreased from 18px
-      color: "#000000",
-      opacity: "85%",
-
-    },
-    subtitle2: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "14px",  // Decreased from 16px
-      color: "#000000",
-      opacity: "85%",
-
-    },
-    body1: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "16px",  // Decreased from 14px
-      color: "#000000",
-   
-    },
-    body2: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "14px",  // Decreased from 12px
-      color: "#000000",
- 
-    },
-    caption: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "12px",   // Decreased from 10px
-      color: "#000000",
-
-    },
-    overline: {
-      fontFamily: 'Gilroy, Poppins, sans-serif',
-      fontSize: "10px",   // Decreased from 8px
-      color: "#000000",
-    },
-  },  
-  
+    fontFamily: "Gilroy, Poppins, sans-serif",
+    button: { textTransform: "none", fontSize: "13px", fontWeight: 650 },
+    h1: { fontSize: "30px", color: text },
+    h2: { fontSize: "26px", color: text },
+    h3: { fontSize: "24px", color: text },
+    h4: { fontSize: "22px", color: text },
+    h5: { fontSize: "20px", color: text },
+    h6: { fontSize: "18px", color: text, fontWeight: 650 },
+    subtitle1: { fontSize: "16px", color: text },
+    subtitle2: { fontSize: "14px", color: textMuted },
+    body1: { fontSize: "15px", color: text },
+    body2: { fontSize: "14px", color: textMuted },
+    caption: { fontSize: "12px", color: textMuted },
+    overline: { fontSize: "10px", color: gold, letterSpacing: "0.12em" },
+  },
+  shape: { borderRadius: 10 },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: bg,
+          color: text,
+          colorScheme: "dark",
+        },
+        "input, select, textarea": {
+          colorScheme: "dark",
+        },
+        "*:focus-visible": {
+          outline: `2px solid ${gold}`,
+          outlineOffset: 2,
+        },
+        "@supports not selector(:focus-visible)": {
+          "*:focus": { outline: `2px solid ${gold}`, outlineOffset: 2 },
+        },
+        "::selection": {
+          backgroundColor: goldSoft,
+          color: text,
+        },
+      },
+    },
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: '#ffffff',
-          boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
+          backgroundColor: topbar,
+          color: text,
+          boxShadow: "none",
+          borderBottom: `1px solid ${border}`,
         },
       },
     },
     MuiButton: {
+      defaultProps: { disableElevation: true },
       styleOverrides: {
         root: {
-          "&:hover": {
-            backgroundColor: "#aaaaad",
-            color: "#000000",
-            border: "1px solid #0f63a5",
-          },
-          textTransform: "capitalize",
-          fontFamily: 'Gilroy, Poppins, sans-serif',
+          fontFamily: "Gilroy, Poppins, sans-serif",
           fontSize: "14px",
-          borderRadius: "8px",
-          height: "38px",
-          padding: "8px 20px",
-          width: "auto",
-          color: "#ffffff",
-          backgroundColor: "#0f63a5",
-
+          fontWeight: 650,
+          borderRadius: "10px",
+          minHeight: 38,
+          padding: "8px 18px",
+        },
+        contained: {
+          color: bg,
+          backgroundColor: gold,
+          boxShadow: "none",
+          "&:hover": {
+            backgroundColor: goldHover,
+            color: bg,
+            boxShadow: "0 4px 14px rgba(195,155,83,0.18)",
+          },
+          "&.Mui-disabled": {
+            color: "rgba(245,242,236,0.35)",
+            backgroundColor: "rgba(195,155,83,0.28)",
+          },
+        },
+        containedPrimary: { color: bg },
+        containedSecondary: {
+          color: text,
+          backgroundColor: panelAlt,
+          border: `1px solid ${border}`,
+          "&:hover": { backgroundColor: hover, color: text, borderColor: gold },
+        },
+        containedError: {
+          color: text,
+          backgroundColor: tokens.danger,
+          "&:hover": { backgroundColor: tokens.dangerText, color: bg },
+        },
+        containedSuccess: {
+          color: text,
+          backgroundColor: tokens.success,
+          "&:hover": { backgroundColor: tokens.successText, color: bg },
         },
         outlined: {
-          '&:hover': {
-            color: '#000000',
-            border: "1.5px solid #aaaaad",
-            backgroundColor: '#aaaaad',
-            '& img': {
-              filter: 'brightness(0) invert(1)',
-            },
-            '& .MuiTypography-root': {
-              color: 'white',
-            },
+          color: text,
+          border: `1px solid ${border}`,
+          backgroundColor: "transparent",
+          "&:hover": {
+            border: `1px solid ${gold}`,
+            backgroundColor: goldSoft,
+            color: goldHover,
           },
-          textTransform: "capitalize",
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          fontSize: "14px",
-          borderRadius: "8px",
-          height: "38px",
-          padding: "8px 20px",
-          width: "auto",
-          border: "1.5px solid #aaaaad",
-          backgroundColor: '#ffffff',
-          color: '#aaaaad',
+        },
+        outlinedPrimary: { color: gold, borderColor: border },
+        outlinedError: {
+          color: tokens.dangerText,
+          border: `1px solid ${tokens.danger}`,
+          "&:hover": {
+            border: `1px solid ${tokens.danger}`,
+            backgroundColor: tokens.dangerSoft,
+            color: tokens.dangerText,
+          },
+        },
+        text: {
+          color: gold,
+          "&:hover": { backgroundColor: goldSoft, color: goldHover },
+        },
+        textError: {
+          color: tokens.dangerText,
+          "&:hover": { backgroundColor: tokens.dangerSoft, color: tokens.dangerText },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          color: textMuted,
+          "&:hover": { backgroundColor: hover, color: goldHover },
+        },
+        colorPrimary: { color: gold },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { fontWeight: 600, color: text, backgroundColor: panelAlt },
+        colorPrimary: { backgroundColor: goldSoft, color: goldHover },
+        colorSuccess: { backgroundColor: tokens.successSoft, color: tokens.successText },
+        colorError: { backgroundColor: tokens.dangerSoft, color: tokens.dangerText },
+        colorWarning: { backgroundColor: tokens.warningSoft, color: tokens.warningText },
+        colorInfo: { backgroundColor: tokens.infoSoft, color: tokens.infoText },
+        outlinedPrimary: { borderColor: border, color: gold },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: "none",
+          fontWeight: 600,
+          color: textMuted,
+          "&.Mui-selected": { color: gold },
+        },
+      },
+    },
+    MuiTabs: {
+      styleOverrides: { indicator: { backgroundColor: gold } },
+    },
+    MuiLink: {
+      styleOverrides: { root: { color: goldHover } },
+    },
+    MuiCheckbox: {
+      styleOverrides: {
+        root: {
+          color: "rgba(245,242,236,0.3)",
+          "&.Mui-checked": { color: gold },
+        },
+      },
+    },
+    MuiRadio: {
+      styleOverrides: {
+        root: {
+          color: "rgba(245,242,236,0.3)",
+          "&.Mui-checked": { color: gold },
+        },
+      },
+    },
+    MuiSwitch: {
+      styleOverrides: {
+        switchBase: {
+          "&.Mui-checked": { color: gold },
+          "&.Mui-checked + .MuiSwitch-track": { backgroundColor: gold },
+        },
+      },
+    },
+    MuiLinearProgress: {
+      styleOverrides: {
+        root: { backgroundColor: hover },
+        bar: { backgroundColor: gold },
+      },
+    },
+    MuiCircularProgress: {
+      styleOverrides: { root: { color: gold } },
+    },
+    MuiPaginationItem: {
+      styleOverrides: {
+        root: {
+          color: textMuted,
+          borderColor: border,
+          "&.Mui-selected": {
+            color: bg,
+            backgroundColor: gold,
+            "&:hover": { backgroundColor: goldHover },
+          },
         },
       },
     },
     MuiTextField: {
       styleOverrides: {
         root: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          '& fieldset': {
-            borderRadius: '10px',
-          },
-          '& input::placeholder': {
-            fontSize: '14px',
-            fontFamily: 'Gilroy, Poppins, sans-serif',
-          },
-          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-            display: 'none',
-          },
+          fontFamily: "Gilroy, Poppins, sans-serif",
+          "& fieldset": { borderRadius: "10px" },
         },
       },
     },
-    MuiSelect: {
+    MuiInput: {
       styleOverrides: {
-        outlined: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          color: "#000000",
-        },
+        root: { color: text },
+        input: { color: text, "&::placeholder": { color: textMuted, opacity: 0.75 } },
       },
+    },
+    MuiFilledInput: {
+      styleOverrides: {
+        root: {
+          backgroundColor: input,
+          "&:hover": { backgroundColor: input },
+          "&.Mui-focused": { backgroundColor: input },
+          "&::before": { borderBottomColor: border },
+          "&::after": { borderBottomColor: gold },
+        },
+        input: { color: text, "&::placeholder": { color: textMuted, opacity: 0.75 } },
+      },
+    },
+    MuiNativeSelect: {
+      styleOverrides: {
+        icon: { color: textMuted },
+        select: { backgroundColor: input, color: text },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: { outlined: { color: text } },
     },
     MuiInputLabel: {
       styleOverrides: {
         root: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          color: "#000000",
-          opacity: "70%",
-          fontSize: "20px",
+          fontFamily: "Gilroy, Poppins, sans-serif",
+          color: textMuted,
+          "&.Mui-focused": { color: gold },
         },
-        shrink: ({ ownerState }) => ({
-          ...(ownerState.shrink && {
-            fontSize: "18px !important",
-          }),
-        }),
       },
     },
     MuiOutlinedInput: {
       styleOverrides: {
         input: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          fontSize: "18px",
-          lineHeight: "27px",
-          color: "#000000",
+          fontFamily: "Gilroy, Poppins, sans-serif",
+          fontSize: "15px",
+          color: text,
+          "@media (max-width:600px)": { fontSize: "16px" },
         },
-        notchedOutline: {
-          borderColor: "#ccc",
-        },
+        notchedOutline: { borderColor: border },
         root: {
-          background: "white",
+          background: input,
+          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: border },
           "&.Mui-focused": {
-            background: "#F8F8F9",
-            boxShadow: "0px 6px 12px #3C599829",
+            background: input,
+            boxShadow: "none",
           },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: gold },
         },
       },
     },
     MuiMenuItem: {
       styleOverrides: {
         root: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          color: "#000000",
-          fontSize: "16px",
+          fontFamily: "Gilroy, Poppins, sans-serif",
+          color: text,
+          fontSize: "14px",
+          "&.Mui-selected": { backgroundColor: goldSoft },
+          "&.Mui-selected:hover": { backgroundColor: goldSoft },
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
-        elevation1: {
-          boxShadow: "0px 2px 10px #0000001A",
-        },
+        root: { backgroundImage: "none", color: text },
+        elevation1: { boxShadow: tokens.shadow },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: "0px 5px 20px #0000001A",
-          borderRadius: "10px",
+          boxShadow: tokens.shadowSoft,
+          borderRadius: "12px",
+          border: `1px solid ${border}`,
+          backgroundColor: panel,
         },
       },
+    },
+    MuiTableHead: {
+      styleOverrides: {
+        root: {
+          backgroundColor: panelAlt,
+          "& .MuiTableCell-head": {
+            color: text,
+            fontWeight: 700,
+            borderBottom: `1px solid ${border}`,
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderColor: border,
+          color: text,
+          fontSize: "13px",
+          padding: "12px 16px",
+          "@media (max-width:600px)": {
+            padding: "10px 12px",
+            fontSize: "12px",
+            whiteSpace: "nowrap",
+          },
+        },
+      },
+    },
+    MuiTableContainer: {
+      styleOverrides: { root: { WebkitOverflowScrolling: "touch" } },
+    },
+    MuiTableRow: {
+      styleOverrides: {
+        root: {
+          transition: "background-color 0.15s ease",
+          "&:hover": { backgroundColor: hover },
+        },
+      },
+    },
+    MuiTableSortLabel: {
+      styleOverrides: {
+        root: {
+          color: textMuted,
+          "&:hover": { color: gold },
+          "&.Mui-active": { color: `${gold} !important` },
+        },
+        icon: { color: `${goldHover} !important` },
+      },
+    },
+    MuiTablePagination: {
+      styleOverrides: {
+        root: { borderTop: `1px solid ${border}`, color: textMuted },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: { borderColor: border, backgroundColor: panel },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: "16px",
+          border: `1px solid ${border}`,
+          backgroundColor: panel,
+          boxShadow: tokens.shadowStrong,
+          backgroundImage: "none",
+        },
+      },
+    },
+    MuiBackdrop: {
+      styleOverrides: { root: { backgroundColor: "rgba(0,0,0,0.72)" } },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: { fontWeight: 700, fontSize: "18px", color: text, padding: "20px 24px 8px" },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: { root: { padding: "12px 24px 4px" } },
+    },
+    MuiDialogActions: {
+      styleOverrides: { root: { padding: "16px 24px 20px", gap: "8px" } },
     },
     MuiPopover: {
       styleOverrides: {
         paper: {
-          boxShadow: "0px 5px 20px #0000001A",
-          borderRadius: "8px",
+          backgroundColor: panelAlt,
+          boxShadow: tokens.shadow,
+          borderRadius: "12px",
+          border: `1px solid ${border}`,
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: panelAlt,
+          borderRadius: "12px",
+          border: `1px solid ${border}`,
+          boxShadow: tokens.shadow,
         },
       },
     },
     MuiFormLabel: {
       styleOverrides: {
         root: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          color: "#000000",
-          fontSize: "18px",
+          fontFamily: "Gilroy, Poppins, sans-serif",
+          color: textMuted,
+          "&.Mui-focused": { color: gold },
         },
       },
     },
     MuiFormControlLabel: {
+      styleOverrides: { label: { color: text } },
+    },
+    MuiFormHelperText: {
+      styleOverrides: { root: { marginLeft: "2px", fontSize: "11.5px" } },
+    },
+    MuiInputBase: {
       styleOverrides: {
-        label: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          fontSize: "18px",
-          color: "#000000",
+        input: { "&::placeholder": { color: textMuted, opacity: 0.75 } },
+      },
+    },
+    MuiSkeleton: {
+      styleOverrides: {
+        root: { backgroundColor: tokens.overlay, borderRadius: "8px" },
+      },
+    },
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
+          backgroundColor: panelAlt,
+          color: text,
+          fontSize: "11.5px",
+          borderRadius: "8px",
+          border: `1px solid ${border}`,
+          padding: "6px 10px",
+          boxShadow: tokens.shadow,
         },
+        arrow: { color: panelAlt },
       },
     },
     MuiAutocomplete: {
       styleOverrides: {
-        root: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-        },
-        option: {
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-          fontSize: "18px",
-        },
+        option: { fontSize: "14px" },
       },
     },
     MuiTypography: {
+      styleOverrides: { root: { fontFamily: "Gilroy, Poppins, sans-serif" } },
+    },
+    MuiAlert: {
       styleOverrides: {
-        root: {
-          color: "#000000", // Ensure default color is black
-          fontFamily: 'Gilroy, Poppins, sans-serif',
-        },
+        standardInfo: { backgroundColor: tokens.infoSoft, color: text },
+        standardSuccess: { backgroundColor: tokens.successSoft, color: text },
+        standardWarning: { backgroundColor: tokens.warningSoft, color: text },
+        standardError: { backgroundColor: tokens.dangerSoft, color: text },
       },
     },
   },

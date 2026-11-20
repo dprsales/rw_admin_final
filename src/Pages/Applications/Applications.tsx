@@ -4,7 +4,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  CircularProgress,
   Dialog,
   DialogContent,
   DialogActions,
@@ -12,10 +11,8 @@ import {
   Divider,
   IconButton,
   InputAdornment,
-  LinearProgress,
   Pagination,
   Paper,
-  Stack,
   Table,
   TableBody,
   TableCell,
@@ -27,7 +24,14 @@ import {
 } from '@mui/material';
 import { Close, DeleteOutline, Search, WorkOutline } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import { deleteApplication, downloadApplicationResume, getApplications } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import ConfirmDialog from '../../Components/ConfirmDialog';
+import { TableSkeleton } from '../../Components/LoadingState';
+import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
+import { tokens } from '../../Theme/tokens';
 
 export interface Application {
   _id: string;
@@ -148,12 +152,24 @@ const formatDate = (value?: string) => value ? new Date(value).toLocaleDateStrin
   day: '2-digit', month: 'short', year: 'numeric',
 }) : '-';
 
+const errorMessage = (error: any): string =>
+  error?.response?.data?.message ?? 'Something went wrong. Please try again.';
+
+const APPLICATION_SORT = {
+  candidate: (row: Application) => row.name,
+  role: (row: Application) => row.jobTitle,
+  experience: (row: Application) => row.experience,
+  applied: (row: Application) => row.createdAt,
+};
+
 const Applications: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [downloadingResume, setDownloadingResume] = useState(false);
   const queryClient = useQueryClient();
   const deleteMutation = useMutation({
@@ -161,6 +177,12 @@ const Applications: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       setSelectedApplication(null);
+      setDeleteTarget(null);
+      toast.success('Application deleted');
+    },
+    onError: (error: any) => {
+      setDeleteTarget(null);
+      toast.error(errorMessage(error));
     },
   });
   const { data, isPending, error } = useQuery<Application[], Error>({
@@ -182,8 +204,9 @@ const Applications: React.FC = () => {
     ].some((value) => value?.toLowerCase().includes(query)));
   }, [applications, searchText]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredApplications.length / rowsPerPage));
-  const visibleApplications = filteredApplications.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const { sorted: sortedApplications, order, orderBy, toggle: toggleSort } = useTableSort(filteredApplications, APPLICATION_SORT);
+  const totalPages = Math.max(1, Math.ceil(sortedApplications.length / rowsPerPage));
+  const visibleApplications = sortedApplications.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
   const filteredIds = filteredApplications.map((application) => application._id);
   const selectedCount = selectedIds.length;
   const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
@@ -205,25 +228,33 @@ const Applications: React.FC = () => {
     ));
   };
 
-  const deleteSelected = async () => {
+  const confirmBulkDelete = async () => {
     if (!selectedIds.length || bulkDeleting) return;
-    const count = selectedIds.length;
-    if (!window.confirm(`Delete ${count} application${count === 1 ? '' : 's'} and any stored resumes permanently?`)) return;
-
     setBulkDeleting(true);
-    const failed: string[] = [];
-    for (const applicationId of selectedIds) {
-      try {
-        await deleteApplication(applicationId);
-      } catch {
-        failed.push(applicationId);
+    try {
+      const ids = [...selectedIds];
+      const failed: string[] = [];
+      for (const applicationId of ids) {
+        try {
+          await deleteApplication(applicationId);
+        } catch {
+          failed.push(applicationId);
+        }
       }
+      const deletedCount = ids.length - failed.length;
+      setSelectedIds(failed);
+      if (selectedApplication && !failed.includes(selectedApplication._id)) setSelectedApplication(null);
+      await queryClient.invalidateQueries({ queryKey: ['applications'] });
+      if (failed.length) {
+        toast.error(`${failed.length} application${failed.length === 1 ? '' : 's'} could not be deleted.`);
+      }
+      if (deletedCount) {
+        toast.success(`${deletedCount} application${deletedCount === 1 ? '' : 's'} deleted.`);
+      }
+    } finally {
+      setBulkDeleting(false);
+      setBulkConfirmOpen(false);
     }
-    setSelectedIds(failed);
-    if (selectedApplication && !failed.includes(selectedApplication._id)) setSelectedApplication(null);
-    await queryClient.invalidateQueries({ queryKey: ['applications'] });
-    setBulkDeleting(false);
-    if (failed.length) window.alert(`${failed.length} application${failed.length === 1 ? '' : 's'} could not be deleted.`);
   };
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,13 +274,22 @@ const Applications: React.FC = () => {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Could not download the resume. Please try again.');
     } finally {
       setDownloadingResume(false);
     }
   };
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ p: { xs: 1, sm: 2 } }}>
+        <PageHeader title="Career applications" description="Review candidates who have applied to join the team." crumbs={[{ label: 'Applications' }]} />
+        <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          <TableSkeleton rows={7} columns={6} />
+        </Paper>
+      </Box>
+    );
   }
 
   if (error) {
@@ -258,15 +298,16 @@ const Applications: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Career applications</Typography>
-          <Typography variant="body2" color="text.secondary">Review candidates who have applied to join the team.</Typography>
-        </Box>
-        <Chip icon={<WorkOutline />} label={`${applications.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
-      </Box>
+      <PageHeader
+        title="Career applications"
+        description="Review candidates who have applied to join the team."
+        crumbs={[{ label: 'Applications' }]}
+        actions={
+          <Chip icon={<WorkOutline />} label={`${applications.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+        }
+      />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={searchText}
@@ -285,7 +326,7 @@ const Applications: React.FC = () => {
                 size="small"
                 startIcon={<DeleteOutline />}
                 disabled={bulkDeleting}
-                onClick={deleteSelected}
+                onClick={() => setBulkConfirmOpen(true)}
               >
                 {bulkDeleting ? 'Deleting...' : `Delete selected (${selectedCount})`}
               </Button>
@@ -295,15 +336,15 @@ const Applications: React.FC = () => {
         <Divider />
 
         {visibleApplications.length === 0 ? (
-          <Box sx={{ py: 10, px: 3, textAlign: 'center' }}>
-            <WorkOutline sx={{ fontSize: 42, color: '#9bb9ca', mb: 1 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>No applications found</Typography>
-            <Typography variant="body2" color="text.secondary">New career submissions will appear here automatically.</Typography>
-          </Box>
+          <EmptyState
+            icon={WorkOutline}
+            title="No applications found"
+            description="New career submissions will appear here automatically. Try a different search."
+          />
         ) : (
           <TableContainer>
             <Table sx={{ minWidth: 760 }}>
-              <TableHead sx={{ bgcolor: '#f3f8fb' }}>
+              <TableHead sx={{ bgcolor: tokens.surfaceAlt }}>
                 <TableRow>
                   <TableCell padding="checkbox">
                     <Checkbox
@@ -314,7 +355,11 @@ const Applications: React.FC = () => {
                       inputProps={{ 'aria-label': 'Select all matching applications' }}
                     />
                   </TableCell>
-                  {['Candidate', 'Role', 'Experience', 'Resume', 'Applied'].map((heading) => <TableCell key={heading} sx={{ fontWeight: 700, color: '#355466' }}>{heading}</TableCell>)}
+                  <SortableHeadCell label="Candidate" sortKey="candidate" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Role" sortKey="role" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Experience" sortKey="experience" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <TableCell sx={{ fontWeight: 700, color: tokens.text }}>Resume</TableCell>
+                  <SortableHeadCell label="Applied" sortKey="applied" order={order} activeKey={orderBy} onSort={toggleSort} />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -353,14 +398,31 @@ const Applications: React.FC = () => {
       <ApplicationDetails
         application={selectedApplication}
         onClose={() => setSelectedApplication(null)}
-        onDelete={(applicationId) => {
-          if (window.confirm('Delete this application and its stored resume permanently?')) {
-            deleteMutation.mutate(applicationId);
-          }
-        }}
+        onDelete={setDeleteTarget}
         onDownload={() => selectedApplication && handleResumeDownload(selectedApplication)}
         downloading={downloadingResume}
         deleting={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete application?"
+        description="This application and its stored resume will be permanently removed. This cannot be undone."
+        confirmLabel="Delete application"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title={`Delete ${selectedCount} application${selectedCount === 1 ? '' : 's'}?`}
+        description="The selected applications and any stored resumes will be permanently removed. This cannot be undone."
+        confirmLabel={`Delete ${selectedCount} application${selectedCount === 1 ? '' : 's'}`}
+        tone="danger"
+        loading={bulkDeleting}
+        onClose={() => setBulkConfirmOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
     </Box>
   );
@@ -407,22 +469,22 @@ const ApplicationDetails: React.FC<{
           <Detail label="Resume" value={application.resumeFileName || 'No resume attached'} />
         </Box>
         <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700 }}>Professional references</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, p: 2, bgcolor: '#fafcfd', border: '1px solid #e4edf2', borderRadius: 1 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, p: 2, bgcolor: tokens.surfaceAlt, border: `1px solid ${tokens.line}`, borderRadius: 1 }}>
           <Detail label="Reference 1" value={[application.ref1Name, application.ref1Number, application.ref1Relationship].filter(Boolean).join(' · ')} />
           <Detail label="Reference 2" value={[application.ref2Name, application.ref2Number, application.ref2Relationship].filter(Boolean).join(' · ')} />
         </Box>
         {application.resumeUrl && (
           <Box sx={{ display: 'flex', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
-            <Box component="a" href={application.resumeUrl} target="_blank" rel="noreferrer" sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', px: 2, py: 1, borderRadius: 1.5, bgcolor: '#0f63a5', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 600, '&:hover': { bgcolor: '#0b4f84' } }}>
+            <Box component="a" href={application.resumeUrl} target="_blank" rel="noreferrer" sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', px: 2, py: 1, borderRadius: 1.5, bgcolor: tokens.gold, color: tokens.black, textDecoration: 'none', fontSize: 14, fontWeight: 600, '&:hover': { bgcolor: tokens.goldDark } }}>
               View Resume
             </Box>
-            <Button onClick={onDownload} disabled={downloading} variant="outlined" sx={{ borderRadius: 1.5, borderColor: '#0f63a5', color: '#0f63a5', fontWeight: 600, '&:hover': { bgcolor: '#e7f1f7', borderColor: '#0f63a5' } }}>
+            <Button onClick={onDownload} disabled={downloading} variant="outlined" sx={{ borderRadius: 1.5, borderColor: tokens.gold, color: tokens.goldText, fontWeight: 600, '&:hover': { bgcolor: tokens.goldSoft, borderColor: tokens.gold } }}>
               {downloading ? 'Downloading...' : 'Download Resume'}
             </Button>
           </Box>
         )}
         <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700 }}>Cover letter / message</Typography>
-        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fafcfd', whiteSpace: 'pre-wrap' }}>
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: tokens.surfaceAlt, whiteSpace: 'pre-wrap' }}>
           <Typography variant="body2">{application.coverLetter?.replace('Résumé attached.', 'Resume attached.') || 'No message provided.'}</Typography>
         </Paper>
       </DialogContent>
@@ -444,7 +506,7 @@ const ApplicationDetails: React.FC<{
 const Detail: React.FC<{ label: string; value?: string; link?: string }> = ({ label, value, link }) => (
   <Box>
     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4 }}>{label}</Typography>
-    {link && value ? <Typography component="a" href={link} target={link.startsWith('http') ? '_blank' : undefined} rel="noreferrer" variant="body2" sx={{ color: '#0f63a5', wordBreak: 'break-word' }}>{value}</Typography> : <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{value || '-'}</Typography>}
+    {link && value ? <Typography component="a" href={link} target={link.startsWith('http') ? '_blank' : undefined} rel="noreferrer" variant="body2" sx={{ color: tokens.goldText, wordBreak: 'break-word' }}>{value}</Typography> : <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{value || '-'}</Typography>}
   </Box>
 );
 

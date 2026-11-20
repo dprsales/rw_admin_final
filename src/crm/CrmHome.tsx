@@ -1,5 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import Cookies from 'js-cookie';
+import {
+  CRM_ROLE_LABELS,
+  crmHomeBlurb,
+  isCrmRole,
+  stubCrmRoleFromUserType,
+} from './crmRoles';
 
 const STUB_CARDS = [
   { title: 'Overdue', hint: 'Missed follow-ups' },
@@ -8,26 +15,49 @@ const STUB_CARDS = [
   { title: 'New / unworked', hint: 'New Lead and Attempted' },
 ];
 
+function currentCrmRole() {
+  const stored = Cookies.get('crm_role');
+  if (isCrmRole(stored)) return stored;
+  return stubCrmRoleFromUserType(Cookies.get('user_type'));
+}
+
 /**
- * Day 14 home: My Day layout stub.
- * Real API lists land in later calendar days.
+ * Day 14–15 home: My Day layout stub, role-aware copy.
  */
 const CrmHome: React.FC = () => {
+  const crmRole = currentCrmRole();
+  const name = (Cookies.get('user_name') || 'Team').trim();
+
   return (
     <div className="crm-page">
+      <nav className="crm-crumbs" aria-label="Breadcrumb">
+        <span>Sales CRM</span>
+        <span className="crm-crumbs__sep" aria-hidden="true">/</span>
+        <span className="crm-crumbs__current">My Day</span>
+      </nav>
+
       <div className="crm-hero">
         <div>
-          <p className="crm-kicker">My Day</p>
+          <p className="crm-kicker">My Day · {CRM_ROLE_LABELS[crmRole]}</p>
           <h1 className="crm-title">Today’s desk</h1>
           <p className="crm-sub">
-            Cream, dark, and gold shell is live. Lead lists and Call / WhatsApp wire in next
-            days. No Outpero on this desk.
+            Hi {name}. {crmHomeBlurb(crmRole)}
           </p>
         </div>
         <Link to="/crm/leads" className="crm-btn">
           Open leads
         </Link>
       </div>
+
+      {crmRole === 'sales_manager' ? (
+        <div className="crm-panel" style={{ marginBottom: 16 }}>
+          <div className="crm-panel__head">Manager strip · stub</div>
+          <div className="crm-panel__empty">
+            Your people’s overdue and fresh queue counts land here. Open{' '}
+            <Link to="/crm/team">Team</Link> for the line.
+          </div>
+        </div>
+      ) : null}
 
       <div className="crm-stats">
         {STUB_CARDS.map((card) => (

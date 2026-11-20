@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { addProject, updateProject } from '../../../api/services';
 import { ArrowDropDown } from '@mui/icons-material';
 import { Projects } from '../ProjectInterface';
+import { tokens } from '../../../Theme/tokens';
 
 interface AddProjectProps {
     open: boolean;
@@ -144,7 +145,7 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose, initialData }) => 
                 sx: {
                     width: '100%',
                     maxWidth: '360px',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: tokens.panel,
                     borderRadius: '0px',
                     border: 'none',
                     overflowX: 'hidden',
@@ -160,11 +161,11 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose, initialData }) => 
                 justifyContent: 'space-between',
                 padding: '0 20px',
             }}>
-                <Typography variant="body1" sx={{ color: '#fff', fontWeight: '550' }}>
+                <Typography variant="body1" sx={{ color: tokens.textWhite, fontWeight: '550' }}>
                     {initialData ? 'Edit Project' : 'Add Project'}
                 </Typography>
-                <IconButton onClick={onClose} sx={{ color: 'white', mr: 2 }}>
-                    <CloseIcon sx={{ color: "white" }} />
+                <IconButton onClick={onClose} aria-label="Close editor" sx={{ color: tokens.text, mr: 2 }}>
+                    <CloseIcon sx={{ color: tokens.text }} />
                 </IconButton>
             </Box>
             <Box sx={{ p: 2 }}>
@@ -301,7 +302,7 @@ const AddAllProjects: FC<AddProjectProps> = ({ open, onClose, initialData }) => 
 
                     <Box>
                         <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }} disabled={mutation.isPending}>
-                            {initialData ? 'Update Project' : 'Add Project'}
+                            {mutation.isPending ? 'Saving…' : (initialData ? 'Update Project' : 'Add Project')}
                         </Button>
                     </Box>
                 </form>

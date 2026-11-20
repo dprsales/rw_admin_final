@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Box, TextField, InputAdornment, Button, Paper, Table,
+  Box, Chip, TextField, InputAdornment, Button, Paper, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Pagination, Typography,
   Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText,
   DialogActions, CircularProgress
@@ -14,6 +14,9 @@ import AddProject from './Drawers/AddProject';
 import { deleteProject } from '../../api/services';
 import { toast } from 'react-toastify';
 import AddAllProjects from './Drawers/AddAllProjects';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import { tokens } from '../../Theme/tokens';
 
 interface ProjectsProps {
   ProjectsData: Project[];
@@ -21,6 +24,7 @@ interface ProjectsProps {
   page: number;
   rowsPerPage: number;
   totalPages: number;
+  totalCount?: number;
   onPageChange: (page: number) => void;
   search: string;
   onSearchChange: (value: string) => void;
@@ -33,6 +37,7 @@ const Projects1: React.FC<ProjectsProps> = ({
   page,
   rowsPerPage,
   totalPages,
+  totalCount,
   onPageChange,
   search,
   onSearchChange,
@@ -106,7 +111,24 @@ const Projects1: React.FC<ProjectsProps> = ({
 
   return (
     <Box>
-      {/* Header and Add Button */}
+      <PageHeader
+        title="Projects"
+        description="Manage the project catalogue shown on the public site."
+        crumbs={[{ label: 'Projects' }]}
+        actions={
+          <>
+            <Chip
+              label={`${totalCount ?? ProjectsData.length} projects`}
+              sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
+            />
+            <Button variant="contained" startIcon={<Plus />} onClick={() => setIsAddDrawerOpen(true)}>
+              Add New Project
+            </Button>
+          </>
+        }
+      />
+
+      {/* Search */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <TextField
           placeholder="Search Projects..."
@@ -114,8 +136,9 @@ const Projects1: React.FC<ProjectsProps> = ({
           value={search}
           onChange={handleSearch}
           sx={{
-            width: 350,
-            backgroundColor: '#fff',
+            width: { xs: '100%', sm: 350 },
+            maxWidth: '100%',
+            backgroundColor: tokens.input,
             borderRadius: '8px',
             '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
           }}
@@ -127,20 +150,12 @@ const Projects1: React.FC<ProjectsProps> = ({
             )
           }}
         />
-        <Button
-          variant="contained"
-          startIcon={<Plus />}
-          sx={{ color: '#fff', ml: 2 }}
-         onClick={() => setIsAddDrawerOpen(true)}
-        >
-          Add New Project
-        </Button>
       </Box>
 
       {/* Table */}
       <TableContainer component={Paper}>
         <Table>
-          <TableHead sx={{ backgroundColor: '#30779d40' }}>
+          <TableHead sx={{ backgroundColor: tokens.panelAlt }}>
             <TableRow>
               <TableCell align="left" sx={{ padding: "8px" }}>
                 <Typography variant="caption" sx={{ marginLeft: "20px", fontWeight: '600' }}>S.No</Typography>
@@ -174,18 +189,27 @@ const Projects1: React.FC<ProjectsProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {ProjectsData.map((row, idx) => {
+            {ProjectsData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9}>
+                  <EmptyState
+                    title="No projects found"
+                    description={search.trim() ? 'Try a different search term.' : 'Add a project to start the catalogue.'}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : ProjectsData.map((row, idx) => {
               const isPending = !row.amenities?.length || !row.bankOffers?.length;
               const status = isPending
-                ? { text: 'Pending', color: 'red', bg: '#FF000020' }
-                : { text: 'Completed', color: 'green', bg: '#00800020' };
+                ? { text: 'Pending', color: tokens.warningText, bg: tokens.warningSoft }
+                : { text: 'Completed', color: tokens.successText, bg: tokens.successSoft };
 
               return (
                 <TableRow
                   key={row._id}
                   onClick={() => handleRowClick(row.projectId)}
                   sx={{ cursor: 'pointer','&:hover': {
-                        backgroundColor: '#f5f5f5',
+                        backgroundColor: tokens.hover,
                       } }}>
 
                   <TableCell sx={{ padding: '6px' }}>
@@ -244,7 +268,7 @@ const Projects1: React.FC<ProjectsProps> = ({
                       <IconButton
                         size="small"
                         onClick={(e) => handleDeleteClick(e, row.projectId, row.title)}
-                        sx={{ color: '#d32f2f' }}
+                        sx={{ color: tokens.danger }}
                       >
                         <DeleteIcon fontSize="small" />
                       </IconButton>

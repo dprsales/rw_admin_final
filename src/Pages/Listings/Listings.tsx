@@ -4,7 +4,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  CircularProgress,
   ClickAwayListener,
   Dialog,
   DialogActions,
@@ -59,6 +58,11 @@ import {
   resetAdminListingUserPassword,
   updateAdminListingUser,
 } from '../../api/services'
+import PageHeader from '../../Components/PageHeader'
+import EmptyState from '../../Components/EmptyState'
+import ConfirmDialog from '../../Components/ConfirmDialog'
+import { TableSkeleton } from '../../Components/LoadingState'
+import { tokens } from '../../Theme/tokens'
 
 type ListingStatus = 'pending' | 'approved' | 'rejected'
 
@@ -123,14 +127,23 @@ const formatDate = (value?: string) => {
 
 export default function Listings() {
   const [tab, setTab] = useState(0)
+  const { data: listingRows } = useQuery<AdminListing[]>({
+    queryKey: ['admin-listings'],
+    queryFn: () => getAdminListings(),
+  })
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Listings</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Review owner and builder listings from the public site. Approve goes live. Delete removes media from CDN.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Listings"
+        description="Review owner and builder listings from the public site. Approve goes live. Delete removes media from CDN."
+        crumbs={[{ label: 'Listings' }]}
+        actions={
+          <Chip
+            label={`${listingRows?.length ?? 0} listings`}
+            sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
+          />
+        }
+      />
       <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="Properties" />
         <Tab label="Listing accounts" />
@@ -149,6 +162,8 @@ function PropertiesPanel() {
   const [rejectTarget, setRejectTarget] = useState<{ ids: string[] } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [actionMenu, setActionMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string } | null>(null)
+  const [pendingBulkDelete, setPendingBulkDelete] = useState<string[] | null>(null)
 
   const { data, isPending, error } = useQuery<AdminListing[]>({
     queryKey: ['admin-listings'],
@@ -232,7 +247,11 @@ function PropertiesPanel() {
   }
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>
+    return (
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <TableSkeleton rows={8} columns={8} />
+      </Paper>
+    )
   }
   if (error) {
     return (
@@ -244,7 +263,7 @@ function PropertiesPanel() {
 
   return (
     <>
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: `0 8px 30px ${tokens.goldSoft}` }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             value={search}
@@ -265,7 +284,7 @@ function PropertiesPanel() {
                 sx={{ textTransform: 'capitalize' }}
               />
             ))}
-            <Chip label={`${rows.length} total`} sx={{ bgcolor: '#e7f1f7', color: '#0f63a5', fontWeight: 600 }} />
+            <Chip label={`${rows.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
           </Stack>
         </Box>
 
@@ -277,11 +296,7 @@ function PropertiesPanel() {
             <Button size="small" variant="outlined" color="warning"
               onClick={() => { setRejectReason(''); setRejectTarget({ ids: selected }) }}>Reject</Button>
             <Button size="small" variant="contained" color="error" disabled={bulkDelete.isPending}
-              onClick={() => {
-                if (window.confirm(`Delete ${selected.length} listing(s)? Photos and enquiries for those listings are removed.`)) {
-                  bulkDelete.mutate(selected)
-                }
-              }}>Delete</Button>
+              onClick={() => setPendingBulkDelete(selected)}>Delete</Button>
             <Button size="small" onClick={() => setSelected([])}>Clear</Button>
           </Box>
         )}
@@ -292,7 +307,12 @@ function PropertiesPanel() {
             <TableHead>
               <TableRow>
                 <TableCell padding="checkbox">
-                  <Checkbox checked={allVisibleSelected} indeterminate={selected.length > 0 && !allVisibleSelected} onChange={toggleAll} />
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    indeterminate={selected.length > 0 && !allVisibleSelected}
+                    onChange={toggleAll}
+                    inputProps={{ 'aria-label': 'Select all visible listings' }}
+                  />
                 </TableCell>
                 <TableCell>Property</TableCell>
                 <TableCell>Owner</TableCell>
@@ -306,9 +326,13 @@ function PropertiesPanel() {
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
-                    <Typography variant="h6">No listings yet</Typography>
-                    <Typography variant="body2" color="text.secondary">Submitted properties from the website appear here for review.</Typography>
+                  <TableCell colSpan={8}>
+                    <EmptyState
+                      title="No listings yet"
+                      description={search.trim() || status !== 'all'
+                        ? 'Try another search or status filter.'
+                        : 'Submitted properties from the website appear here for review.'}
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -320,6 +344,7 @@ function PropertiesPanel() {
                       onChange={() => setSelected((cur) =>
                         cur.includes(row._id) ? cur.filter((id) => id !== row._id) : [...cur, row._id],
                       )}
+                      inputProps={{ 'aria-label': `Select ${row.title || row._id}` }}
                     />
                   </TableCell>
                   <TableCell>
@@ -328,12 +353,12 @@ function PropertiesPanel() {
                         component="img"
                         src={row.coverImage || ''}
                         alt=""
-                        sx={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 1, bgcolor: '#eee', display: row.coverImage ? 'block' : 'none' }}
+                        sx={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 1, bgcolor: tokens.panelAlt, display: row.coverImage ? 'block' : 'none' }}
                       />
                       <Box>
                         <Typography
                           variant="body2"
-                          sx={{ fontWeight: 600, maxWidth: 260, cursor: 'pointer', color: '#0f63a5' }}
+                          sx={{ fontWeight: 600, maxWidth: 260, cursor: 'pointer', color: tokens.goldText }}
                           noWrap
                           onClick={() => navigate(`/listings/${row._id}`)}
                         >
@@ -406,8 +431,11 @@ function PropertiesPanel() {
                 mt: 0.5,
                 minWidth: 180,
                 borderRadius: 2,
+                bgcolor: tokens.glass,
+                backdropFilter: tokens.glassBlur,
+                WebkitBackdropFilter: tokens.glassBlur,
                 border: '1px solid',
-                borderColor: 'divider',
+                borderColor: tokens.border,
                 overflow: 'hidden',
               }}
             >
@@ -452,9 +480,7 @@ function PropertiesPanel() {
                     onClick={() => {
                       if (!actionRow) return
                       closeActionMenu()
-                      if (window.confirm('Delete this listing and its photos/videos from CDN permanently?')) {
-                        deleteOne.mutate(actionRow._id)
-                      }
+                      setPendingDelete({ id: actionRow._id })
                     }}
                     disabled={deleteOne.isPending}
                     sx={{ color: 'error.main' }}
@@ -495,6 +521,35 @@ function PropertiesPanel() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete listing?"
+        description="Delete this listing and its photos/videos from CDN permanently?"
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteOne.isPending}
+        onConfirm={() => {
+          if (!pendingDelete) return
+          deleteOne.mutate(pendingDelete.id)
+          setPendingDelete(null)
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
+      <ConfirmDialog
+        open={pendingBulkDelete !== null}
+        title="Delete listings?"
+        description={`Delete ${pendingBulkDelete?.length ?? 0} listing(s)? Photos and enquiries for those listings are removed.`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={bulkDelete.isPending}
+        onConfirm={() => {
+          if (!pendingBulkDelete) return
+          bulkDelete.mutate(pendingBulkDelete)
+          setPendingBulkDelete(null)
+        }}
+        onClose={() => setPendingBulkDelete(null)}
+      />
     </>
   )
 }
@@ -509,6 +564,8 @@ function ListingUsersPanel() {
   const [editForm, setEditForm] = useState({ email: '', name: '', mobile: '', city: '' })
   const [passwordId, setPasswordId] = useState<string | null>(null)
   const [password, setPassword] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: string } | null>(null)
+  const [pendingBulkDelete, setPendingBulkDelete] = useState<string[] | null>(null)
 
   const { data, isPending, error } = useQuery<ListingUserRow[]>({
     queryKey: ['admin-listing-users'],
@@ -575,7 +632,11 @@ function ListingUsersPanel() {
   }, [rows, search])
 
   if (isPending) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}><CircularProgress /></Box>
+    return (
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <TableSkeleton rows={8} columns={6} />
+      </Paper>
+    )
   }
   if (error) {
     return <Paper sx={{ p: 4, borderRadius: 3 }}><Typography color="error">Unable to load listing accounts.</Typography></Paper>
@@ -583,7 +644,7 @@ function ListingUsersPanel() {
 
   return (
     <>
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 30px rgba(15, 99, 165, 0.08)' }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: `0 8px 30px ${tokens.goldSoft}` }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField
             value={search}
@@ -596,9 +657,7 @@ function ListingUsersPanel() {
           <Stack direction="row" spacing={1}>
             {selected.length > 0 && (
               <Button color="error" variant="outlined" size="small"
-                onClick={() => {
-                  if (window.confirm(`Delete ${selected.length} account(s) and all their listings?`)) bulkDeleteMut.mutate(selected)
-                }}>
+                onClick={() => setPendingBulkDelete(selected)}>
                 Delete selected ({selected.length})
               </Button>
             )}
@@ -619,6 +678,16 @@ function ListingUsersPanel() {
               </TableRow>
             </TableHead>
             <TableBody>
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6}>
+                    <EmptyState
+                      title="No listing accounts"
+                      description={search.trim() ? 'Try another search.' : 'Add an account to give owners access to their listings.'}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
               {filtered.map((row) => (
                 <TableRow key={row.id} hover>
                   <TableCell padding="checkbox">
@@ -627,6 +696,7 @@ function ListingUsersPanel() {
                       onChange={() => setSelected((cur) =>
                         cur.includes(row.id) ? cur.filter((id) => id !== row.id) : [...cur, row.id],
                       )}
+                      inputProps={{ 'aria-label': `Select ${row.name || row.email} account` }}
                     />
                   </TableCell>
                   <TableCell>
@@ -648,9 +718,8 @@ function ListingUsersPanel() {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => {
-                        if (window.confirm('Delete this listing account and every property it owns?')) deleteMut.mutate(row.id)
-                      }}
+                      aria-label={`Delete ${row.name || row.email} account`}
+                      onClick={() => setPendingDelete({ id: row.id })}
                     >
                       <DeleteOutline fontSize="small" />
                     </IconButton>
@@ -714,6 +783,35 @@ function ListingUsersPanel() {
           <Button variant="contained" disabled={passwordMut.isPending || password.length < 8} onClick={() => passwordMut.mutate()}>Update</Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete listing account?"
+        description="Delete this listing account and every property it owns?"
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMut.isPending}
+        onConfirm={() => {
+          if (!pendingDelete) return
+          deleteMut.mutate(pendingDelete.id)
+          setPendingDelete(null)
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
+      <ConfirmDialog
+        open={pendingBulkDelete !== null}
+        title="Delete listing accounts?"
+        description={`Delete ${pendingBulkDelete?.length ?? 0} account(s) and all their listings?`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={bulkDeleteMut.isPending}
+        onConfirm={() => {
+          if (!pendingBulkDelete) return
+          bulkDeleteMut.mutate(pendingBulkDelete)
+          setPendingBulkDelete(null)
+        }}
+        onClose={() => setPendingBulkDelete(null)}
+      />
     </>
   )
 }

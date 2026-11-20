@@ -7,9 +7,13 @@ import {
     Button,
     Typography,
     Grid,
+    Chip,
 } from '@mui/material';
 import { useState } from 'react';
 import axios from 'axios';
+import PageHeader from '../../Components/PageHeader';
+import { CardGridSkeleton } from '../../Components/LoadingState';
+import { tokens } from '../../Theme/tokens';
 
 interface Integration {
     name: string;
@@ -37,6 +41,7 @@ const integrations: Integration[] = [
 
 const IntegrationPage: React.FC = () => {
     const [integrationStatus, setIntegrationStatus] = useState(integrations);
+    const [checking, setChecking] = useState(false);
 
     const handleConnect = async (name: string) => {
         if (name === 'Facebook') {
@@ -55,6 +60,7 @@ const IntegrationPage: React.FC = () => {
     };
 
     const checkFacebookConnection = async () => {
+        setChecking(true);
         try {
             const response = await axios.get(
                 `${process.env.REACT_APP_BACKEND_URL}/auth/status`
@@ -70,6 +76,8 @@ const IntegrationPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Error checking Facebook connection status:', error);
+        } finally {
+            setChecking(false);
         }
     };
 
@@ -79,13 +87,21 @@ const IntegrationPage: React.FC = () => {
     }, []);
 
     return (
-        <Box sx={{ padding: 4 }}>
-            <Typography variant="h4" gutterBottom>
-                Integration Page
-            </Typography>
-            <Typography variant="subtitle1" gutterBottom>
-                Manage your integrations below:
-            </Typography>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+            <PageHeader
+                title="Integrations"
+                description="Manage your integrations below."
+                crumbs={[{ label: 'Integrations' }]}
+                actions={
+                    <Chip
+                        label={`${integrationStatus.length} integrations`}
+                        sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
+                    />
+                }
+            />
+            {checking ? (
+                <CardGridSkeleton cards={integrationStatus.length} />
+            ) : (
             <Grid container spacing={4}>
                 {integrationStatus.map((integration) => (
                     <Grid item xs={12} sm={6} md={4} key={integration.name}>
@@ -130,6 +146,7 @@ const IntegrationPage: React.FC = () => {
                     </Grid>
                 ))}
             </Grid>
+            )}
         </Box>
     );
 };

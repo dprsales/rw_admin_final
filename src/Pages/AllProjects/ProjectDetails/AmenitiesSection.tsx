@@ -55,7 +55,7 @@ const AmenitiesSection: React.FC<Props> = ({ slug, refetch, data }) => {
     <Paper sx={{ p: 2, mb: 2 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={550}>Amenities</Typography>
-        <IconButton sx={{ color: 'primary.main' }} onClick={() => setDrawerOpen(true)}>
+        <IconButton aria-label="Edit amenities section" sx={{ color: 'primary.main' }} onClick={() => setDrawerOpen(true)}>
           <EditIcon />
         </IconButton>
       </Box>

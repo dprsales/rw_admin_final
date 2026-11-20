@@ -1,10 +1,11 @@
-import { ThemeProvider } from "@emotion/react";
+import { Suspense } from "react";
 import { RouterProvider } from "react-router-dom";
 import "./App.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import router from "./Routes";
 import { theme } from "./Theme";
-import { Box } from "@mui/material";
+import { tokens } from "./Theme/tokens";
+import { Box, CircularProgress, CssBaseline, ThemeProvider } from "@mui/material";
 import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -20,8 +21,11 @@ function App() {
   return (
     <Box className="App">
       <ThemeProvider theme={theme}>
+        <CssBaseline />
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
+          <Suspense fallback={<Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: tokens.paper }}><CircularProgress sx={{ color: tokens.gold }} /></Box>}>
+            <RouterProvider router={router} />
+          </Suspense>
         </QueryClientProvider>
         <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
       </ThemeProvider>

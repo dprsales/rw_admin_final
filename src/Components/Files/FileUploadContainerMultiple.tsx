@@ -2,6 +2,8 @@ import React, { useState, useEffect, ChangeEvent } from 'react';
 import { Box, IconButton, Typography, Button } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import { toast } from 'react-toastify';
+import { tokens } from '../../Theme/tokens';
 
 interface FileUploadContainerMultipleProps {
   images: File[];
@@ -30,7 +32,7 @@ const FileUploadContainerMultiple: React.FC<FileUploadContainerMultipleProps> = 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const newFiles = Array.from(event.target.files || []);
     if (newFiles.length + images.length > 10) {
-      alert("You can only upload up to 10 images.");
+      toast.error("You can only upload up to 10 images.");
       return;
     }
     setImages(prevImages => [...prevImages, ...newFiles]);
@@ -49,7 +51,8 @@ const FileUploadContainerMultiple: React.FC<FileUploadContainerMultipleProps> = 
             <img src={src} alt={`preview-${index}`} style={{ width: '100px', height: '100px', objectFit: 'cover' }} />
             <IconButton
               onClick={() => handleRemoveImage(index)}
-              sx={{ position: 'absolute', top: 0, right: 0, color: 'red' }}
+              aria-label={`Remove image ${index + 1}`}
+              sx={{ position: 'absolute', top: 0, right: 0, color: tokens.dangerText }}
             >
               <RemoveCircleOutlineIcon />
             </IconButton>

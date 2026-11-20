@@ -64,7 +64,7 @@ const ConnectedLivingSection: React.FC<ConnectedLivingProps> = ({ slug, refetch,
       {/* Heading and Edit Icon */}
       <Box display="flex" alignItems="center" justifyContent="space-between">
         <Typography variant="h5" fontWeight={550}>Connected Living</Typography>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: 'primary.main' }}>
+        <IconButton onClick={() => setDrawerOpen(true)} aria-label="Edit connected living section" sx={{ color: 'primary.main' }}>
           <EditIcon />
         </IconButton>
       </Box>

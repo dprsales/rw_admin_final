@@ -11,6 +11,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
 import { deleteLead, getLeads, releaseLeadCall, sendLeadCall } from '../../api/services';
+import PageHeader from '../../Components/PageHeader';
+import EmptyState from '../../Components/EmptyState';
+import { TableSkeleton } from '../../Components/LoadingState';
+import { tokens } from '../../Theme/tokens';
 
 // ----------------------
 // Type Declarations
@@ -312,15 +316,15 @@ export function krisahStatusLabel(lead: Pick<Lead, 'source' | 'pageSource' | 'kr
 }
 
 const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: string; color: string }> = {
-  completed: { label: 'Completed', bg: '#e8f5e9', color: '#1b5e20' },
-  invite_sent: { label: 'Invite sent', bg: '#e3f2fd', color: '#0d47a1' },
-  not_started: { label: 'Not started', bg: '#fff3e0', color: '#e65100' },
+  completed: { label: 'Completed', bg: tokens.successSoft, color: tokens.success },
+  invite_sent: { label: 'Invite sent', bg: tokens.infoSoft, color: tokens.info },
+  not_started: { label: 'Not started', bg: tokens.warningSoft, color: tokens.warning },
 };
 
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
   const key = krisahStatusKey(lead);
   if (key === 'none') {
-    return <Typography variant="caption" sx={{ color: '#9e9e9e' }}>-</Typography>;
+    return <Typography variant="caption" sx={{ color: tokens.textMuted }}>-</Typography>;
   }
   const chip = KRISAH_CHIP[key];
   const label = key === 'completed' && lead.krisahScore != null ? `Completed · ${lead.krisahScore}` : chip.label;
@@ -583,11 +587,24 @@ const AllLeads: React.FC = () => {
   // ----------------------
   // Loading / Error States
   // ---------------------- 
-  if (isPending) return <Typography>Loading...</Typography>;
+  if (isPending) return (
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <PageHeader title="Leads" description="Every enquiry from the website, sorted by source and service." crumbs={[{ label: 'Leads' }]} />
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        <TableSkeleton rows={8} columns={6} />
+      </Paper>
+    </Box>
+  );
   if (error) return <Typography color="error">Error fetching leads.</Typography>;
 
   return (
-    <Box>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <PageHeader
+        title="Leads"
+        description="Every enquiry from the website, sorted by source and service."
+        crumbs={[{ label: 'Leads' }]}
+        actions={<Chip label={`${filteredLeads.length} leads`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />}
+      />
       {/* Search & Filters */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -605,8 +622,8 @@ const AllLeads: React.FC = () => {
             }}
             sx={{ 
               width: { xs: '100%', sm: '350px' },
-              backgroundColor: '#fff',
-              boxShadow: '0px 10px 25px rgba(0, 0, 0, 0.1)',
+              backgroundColor: tokens.input,
+              boxShadow: '0px 10px 25px rgba(0, 0, 0, 0.35)',
               height: '36px',
               borderRadius: '8px', // Added border radius as per the design
               '& .MuiOutlinedInput-notchedOutline': {
@@ -629,7 +646,7 @@ const AllLeads: React.FC = () => {
                 marginRight: '10px',
               },
               '& .MuiSvgIcon-root': {
-                color: '#30779d',
+                color: tokens.goldText,
               },
               '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
                 border: 'none',
@@ -645,27 +662,27 @@ const AllLeads: React.FC = () => {
               sx={{
                 width: '100%',
                 height: "40px",
-                border: "1px solid #1212121A",
+                border: `1px solid ${tokens.border}`,
                 borderRadius: "20px",
                 opacity: 1,
-                boxShadow: "0px 6px 14px #36408D08",
+                boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                 fontSize: "12px",
-                color: "#1D1D1D",
+                color: tokens.text,
                 textAlign: 'left',
               }}
             >
               <MenuItem value="">
-                <Typography variant='caption' sx={{ color: '#1D1D1D', opacity: 0.6, fontWeight: 450 }}>
+                <Typography variant='caption' sx={{ color: tokens.text, opacity: 0.6, fontWeight: 450 }}>
                   Type
                 </Typography>
               </MenuItem>
               <MenuItem value="project">
-                <Typography variant='caption' sx={{  color: '#1D1D1D' , fontWeight: 450 }}>
+                <Typography variant='caption' sx={{  color: tokens.text , fontWeight: 450 }}>
                   Project
                 </Typography>
               </MenuItem>
               <MenuItem value="individual">
-                <Typography variant='caption' sx={{ color: '#1D1D1D' , fontWeight: 450 }}>
+                <Typography variant='caption' sx={{ color: tokens.text , fontWeight: 450 }}>
                   Contact 
                 </Typography>
               </MenuItem>
@@ -684,7 +701,7 @@ const AllLeads: React.FC = () => {
                   <Box display="flex" alignItems="center">
                     {selected.length > 0 ? (
                       <>
-                        <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: 0.6 }}>Sources</Typography>
+                        <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Sources</Typography>
                         <Box
                            component="span"
                           borderRadius="50%"
@@ -697,39 +714,39 @@ const AllLeads: React.FC = () => {
                           justifyContent="center"
 
                           sx={{
-                            backgroundColor: '#30779d',
-                            color: '#FFFFFF',
+                            backgroundColor: tokens.gold,
+                            color: tokens.black,
                           }}
                         >
                           {selected.length}
                         </Box>
                       </>
                     ) : (
-                      <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: 0.6 }}>Select Sources</Typography>
+                      <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Select Sources</Typography>
                     )}
                   </Box>
                 )}
                 sx={{
                   width: '100%',
                   height: "40px",
-                  border: "1px solid #1212121A",
+                  border: `1px solid ${tokens.border}`,
                   borderRadius: "20px",
                   opacity: 1,
-                  boxShadow: "0px 6px 14px #36408D08",
+                  boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
                   fontSize: "12px",
-                  color: "#1D1D1D",
+                  color: tokens.text,
                   textAlign: 'left',
                 }}
               >
                 <ListSubheader sx={{ background: 'transparent' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>
                     Sources
                   </Typography>
                 </ListSubheader>
                 {sourceOptions.map((source) => (
                   <MenuItem key={source} value={source}>
-                    <Checkbox checked={selectedSources.indexOf(source) > -1} size="small"   sx={{ color: '#1D1D1D', fontSize: "10px" }}/>
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>{source}</Typography>
+                    <Checkbox checked={selectedSources.indexOf(source) > -1} size="small"   sx={{ color: tokens.text, fontSize: "10px" }}/>
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{source}</Typography>
                   </MenuItem>
                 ))}
               </Select>
@@ -746,15 +763,15 @@ const AllLeads: React.FC = () => {
               displayEmpty
               sx={{
                 height: '40px',
-                border: '1px solid #1212121A',
+                border: `1px solid ${tokens.border}`,
                 borderRadius: '20px',
-                boxShadow: '0px 6px 14px #36408D08',
+                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
                 fontSize: '12px',
-                color: '#1D1D1D',
+                color: tokens.text,
               }}
             >
               <MenuItem value="">
-                <Typography variant="caption" sx={{ color: '#1D1D1D', opacity: 0.6 }}>CRM stage</Typography>
+                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>CRM stage</Typography>
               </MenuItem>
               {STAGE_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
@@ -774,15 +791,15 @@ const AllLeads: React.FC = () => {
               displayEmpty
               sx={{
                 height: '40px',
-                border: '1px solid #1212121A',
+                border: `1px solid ${tokens.border}`,
                 borderRadius: '20px',
-                boxShadow: '0px 6px 14px #36408D08',
+                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
                 fontSize: '12px',
-                color: '#1D1D1D',
+                color: tokens.text,
               }}
             >
               <MenuItem value="">
-                <Typography variant="caption" sx={{ color: '#1D1D1D', opacity: 0.6 }}>KRISAH status</Typography>
+                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>KRISAH status</Typography>
               </MenuItem>
               <MenuItem value="not_started">
                 <Typography variant="caption">Not started</Typography>
@@ -805,16 +822,16 @@ const AllLeads: React.FC = () => {
                 IconComponent={ArrowDropDownIcon}
                 displayEmpty
                 renderValue={(selected) => (
-                  <Typography variant='caption' sx={{ fontSize: '10px', color: '#1D1D1D', opacity: selected.length ? 1 : 0.6 }}>
+                  <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: selected.length ? 1 : 0.6 }}>
                     {selected.length ? `Recommended (${selected.length})` : 'Recommended service'}
                   </Typography>
                 )}
-                sx={{ height: "40px", border: "1px solid #1212121A", borderRadius: "20px", boxShadow: "0px 6px 14px #36408D08", fontSize: "12px", color: "#1D1D1D" }}
+                sx={{ height: "40px", border: `1px solid ${tokens.border}`, borderRadius: "20px", boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)", fontSize: "12px", color: tokens.text }}
               >
                 {serviceOptions.map((key) => (
                   <MenuItem key={key} value={key}>
-                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: '#1D1D1D' }} />
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D' }}>{SERVICE_LABEL[key] || key}</Typography>
+                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: tokens.text }} />
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{SERVICE_LABEL[key] || key}</Typography>
                   </MenuItem>
                 ))}
               </Select>
@@ -828,10 +845,10 @@ const AllLeads: React.FC = () => {
           sx={{
             height: '40px',
             borderRadius: '20px',
-            borderColor: '#1212121A',
-            boxShadow: '0px 6px 14px #36408D08',
+            borderColor: tokens.border,
+            boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
             fontSize: '12px',
-            color: '#1D1D1D',
+            color: tokens.text,
             textTransform: 'none',
             px: 2,
           }}
@@ -846,7 +863,7 @@ const AllLeads: React.FC = () => {
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
           <MenuItem disabled>
-            <Typography variant="caption" sx={{ fontWeight: 500, color: '#1D1D1D', opacity: 0.5 }}>Export CSV</Typography>
+            <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text, opacity: 0.5 }}>Export CSV</Typography>
           </MenuItem>
           <MenuItem
             disabled={!selectedCount || deleteMutation.isPending}
@@ -856,7 +873,7 @@ const AllLeads: React.FC = () => {
               setConfirmDelete(true);
             }}
           >
-            <Typography variant="caption" sx={{ fontWeight: 500, color: selectedCount ? '#c62828' : '#1D1D1D' }}>
+            <Typography variant="caption" sx={{ fontWeight: 500, color: selectedCount ? tokens.danger : tokens.text }}>
               Delete{selectedCount ? ` (${selectedCount})` : ''}
             </Typography>
           </MenuItem>
@@ -890,7 +907,7 @@ const AllLeads: React.FC = () => {
         )}
 
         <Table sx={{ minWidth: 1040 }} stickyHeader={false}>
-          <TableHead sx={{ backgroundColor: '#30779d40' }}>
+          <TableHead sx={{ backgroundColor: tokens.panelAlt }}>
             <TableRow>
               <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
                 <Checkbox
@@ -909,6 +926,18 @@ const AllLeads: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
+            {paginatedRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10}>
+                  <EmptyState
+                    title="No leads found"
+                    description={searchText.trim() || stageFilter || selectedSources.length || selectedServices.length || krisahFilter
+                      ? 'Try changing or clearing the filters.'
+                      : 'New website enquiries will appear here.'}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : null}
             {paginatedRows.map((lead, index) => (
               <TableRow
                 key={lead._id}
@@ -1049,11 +1078,11 @@ const AllLeads: React.FC = () => {
                 minWidth: "22px",
                 fontSize: "14px",
                 fontWeight: "bold",
-                backgroundColor: "#EFEFEF",
+                backgroundColor: tokens.panelAlt,
               },
               "& .Mui-selected": {
                 backgroundColor: theme.palette.primary.main,
-                color: "#fff",
+                color: tokens.black,
               },
             }}
           />

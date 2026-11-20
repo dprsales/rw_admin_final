@@ -14,6 +14,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckIcon from '@mui/icons-material/Check';
 import Cookies from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
+import ConfirmDialog from '../../Components/ConfirmDialog';
 import {
   CALL_STATUS_LABEL,
   CRM_SOURCE_LABEL,
@@ -45,6 +47,7 @@ import {
   updateLead,
   updateLeadNote,
 } from '../../api/services';
+import { tokens } from '../../Theme/tokens';
 
 /** Flip to true after Meta approves the first templates and Live API campaigns exist. */
 const WHATSAPP_MANUAL_SEND_READY = false;
@@ -196,7 +199,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
         borderRadius: 2,
         px: 2,
         py: 0.5,
-        bgcolor: '#fafbfc',
+        bgcolor: tokens.panelAlt,
       }}
     >
       {children}
@@ -323,6 +326,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [noteBusyId, setNoteBusyId] = useState<string | null>(null);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
   const normalizeNote = (a: LeadNoteActivity): LeadNoteActivity => ({
     ...a,
@@ -392,7 +396,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setWaInfo('');
     try {
       const result = await sendLeadWhatsapp(leadId, waCampaign);
-      setWaInfo(result?.message || 'WhatsApp sent.');
+      const message = result?.message || 'WhatsApp sent.';
+      setWaInfo(message);
+      toast.success(message);
       setWaOpen(false);
       if (result?.activity) {
         setNotes((prev) => [normalizeNote(result.activity as LeadNoteActivity), ...prev]);
@@ -404,7 +410,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
         err?.response?.data?.message ||
         err?.message ||
         'Could not send WhatsApp. Try again.';
-      setWaError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setWaError(message);
+      toast.error(message);
     } finally {
       setWaSending(false);
     }
@@ -425,6 +433,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setEditingId(null);
     setEditDraft('');
     setNoteBusyId(null);
+    setDeleteNoteId(null);
     setNotes([]);
     void loadNotes();
   }, [open, lead?._id, loadNotes]);
@@ -464,11 +473,14 @@ const LeadModal: React.FC<LeadModalProps> = ({
       }
       const normalized = normalizeNote({ ...saved, note: saved.note || text, authorName: saved.authorName || me });
       setNotes((prev) => [normalized, ...prev.filter((n) => n._id !== tempId && n._id !== normalized._id)]);
+      toast.success('Note saved');
     } catch (err: any) {
       setNotes((prev) => prev.filter((n) => n._id !== tempId));
       setDraft(text);
       const msg = err?.response?.data?.message || err?.message || 'Could not save the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -521,23 +533,32 @@ const LeadModal: React.FC<LeadModalProps> = ({
       }
       setEditingId(null);
       setEditDraft('');
+      toast.success('Note updated');
     } catch (err: any) {
       setNotes((prev) => prev.map((n) => (n._id === id ? { ...n, note: previous } : n)));
       const msg =
         err?.response?.data?.message ||
         err?.message ||
         'Could not update the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setNoteBusyId(null);
     }
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    const leadId = String(lead?._id || '');
+  const handleDeleteNote = (noteId: string) => {
     const id = String(noteId || '');
-    if (!leadId || !id || noteBusyId || id.startsWith('temp-')) return;
-    if (!window.confirm('Delete this note? This cannot be undone.')) return;
+    if (!lead?._id || !id || noteBusyId || id.startsWith('temp-')) return;
+    setDeleteNoteId(id);
+  };
+
+  const confirmDeleteNote = async () => {
+    const leadId = String(lead?._id || '');
+    const id = deleteNoteId;
+    if (!leadId || !id) return;
+    setDeleteNoteId(null);
     const previous = notes;
     setNoteBusyId(id);
     setSaveError('');
@@ -545,13 +566,16 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setNotes((prev) => prev.filter((n) => n._id !== id));
     try {
       await deleteLeadNote(leadId, id);
+      toast.success('Note deleted');
     } catch (err: any) {
       setNotes(previous);
       const msg =
         err?.response?.data?.message ||
         err?.message ||
         'Could not delete the note. Try again.';
-      setSaveError(Array.isArray(msg) ? msg.join(', ') : String(msg));
+      const message = Array.isArray(msg) ? msg.join(', ') : String(msg);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setNoteBusyId(null);
     }
@@ -681,12 +705,12 @@ const LeadModal: React.FC<LeadModalProps> = ({
                       sx={{
                         textTransform: 'none',
                         fontWeight: 600,
-                        borderColor: '#25D366',
-                        color: '#128C7E',
-                        '&:hover': { borderColor: '#128C7E', bgcolor: 'rgba(37,211,102,0.06)' },
+                        borderColor: tokens.success,
+                        color: tokens.success,
+                        '&:hover': { borderColor: tokens.success, bgcolor: tokens.successSoft },
                         '&.Mui-disabled': {
-                          borderColor: 'rgba(37,211,102,0.35)',
-                          color: 'rgba(18,140,126,0.45)',
+                          borderColor: tokens.successSoft,
+                          color: tokens.textMuted,
                         },
                       }}
                     >
@@ -901,10 +925,10 @@ const LeadModal: React.FC<LeadModalProps> = ({
                 borderColor: 'divider',
                 borderRadius: 2,
                 overflow: 'hidden',
-                bgcolor: '#fff',
+                bgcolor: tokens.input,
               }}
             >
-              <Box sx={{ px: 2, pt: 2, pb: 1.5, bgcolor: '#fafbfc', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ px: 2, pt: 2, pb: 1.5, bgcolor: tokens.panelAlt, borderBottom: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
                   Log a call, summary, or follow-up
                 </Typography>
@@ -921,7 +945,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                   inputProps={{ maxLength: 4000 }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      bgcolor: '#fff',
+                      bgcolor: tokens.input,
                       fontSize: '0.9rem',
                       lineHeight: 1.55,
                     },
@@ -1018,7 +1042,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                 borderRadius: '50%',
                                 bgcolor: 'primary.main',
                                 mt: 0.55,
-                                boxShadow: '0 0 0 3px rgba(25, 118, 210, 0.12)',
+                                boxShadow: `0 0 0 3px ${tokens.goldSoft}`,
                                 zIndex: 1,
                               }}
                             />
@@ -1054,7 +1078,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                   <IconButton
                                     size="small"
                                     aria-label="Delete note"
-                                    onClick={() => void handleDeleteNote(item._id)}
+                                    onClick={() => handleDeleteNote(item._id)}
                                     disabled={Boolean(noteBusyId)}
                                     sx={{ color: 'text.secondary' }}
                                   >
@@ -1070,7 +1094,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                 borderRadius: 1.5,
                                 px: 1.5,
                                 py: 1.15,
-                                bgcolor: '#fafbfc',
+                                bgcolor: tokens.panelAlt,
                               }}
                             >
                               {isEditing ? (
@@ -1086,7 +1110,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                                     inputProps={{ maxLength: 4000 }}
                                     sx={{
                                       '& .MuiOutlinedInput-root': {
-                                        bgcolor: '#fff',
+                                        bgcolor: tokens.input,
                                         fontSize: '0.9rem',
                                       },
                                     }}
@@ -1340,12 +1364,23 @@ const LeadModal: React.FC<LeadModalProps> = ({
               ? <CircularProgress size={14} color="inherit" />
               : <WhatsAppIcon sx={{ fontSize: 16 }} />
           }
-          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe57' } }}
+          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: tokens.success, '&:hover': { bgcolor: tokens.successSoft } }}
         >
           {waSending ? 'Sending…' : 'Send message'}
         </Button>
       </DialogActions>
     </Dialog>
+
+    <ConfirmDialog
+      open={Boolean(deleteNoteId)}
+      title="Delete this note?"
+      description="This cannot be undone."
+      confirmLabel="Delete"
+      tone="danger"
+      loading={Boolean(deleteNoteId) && noteBusyId === deleteNoteId}
+      onConfirm={() => void confirmDeleteNote()}
+      onClose={() => setDeleteNoteId(null)}
+    />
     </>
   );
 };

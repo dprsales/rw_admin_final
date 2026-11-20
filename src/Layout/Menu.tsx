@@ -10,6 +10,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Cookies from "js-cookie";
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { tokens } from "../Theme/tokens";
 
 interface ProfileData {
   name?: string;
@@ -58,7 +59,7 @@ const AccountMenu: React.FC<AccountMenuProps> = () => {
               // alt={profiledata?.name || "BM"}
               src="/static/images/avatar/2.jpg"
               sx={{
-                backgroundColor: "#30779d",
+                backgroundColor: tokens.info,
                 width: "40px",
                 height: "40px",
                 fontWeight: "500",
