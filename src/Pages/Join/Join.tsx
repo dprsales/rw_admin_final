@@ -107,8 +107,12 @@ const STEPS = [
   'Bank',
   'Documents',
   'Policies',
+  'NDNC',
   'Review',
 ];
+
+const NDNC_POLICY_ID = 'confidentiality_ndnc';
+const NDNC_SIGNATURE_TYPE = 'ndnc_signature';
 
 const STEP_HELP: Record<string, string> = {
   Personal: 'Your contact and family details for the joining record.',
@@ -119,22 +123,40 @@ const STEP_HELP: Record<string, string> = {
   References: 'Add at least one professional reference (manager, HR, or similar).',
   Bank: 'Salary account details. Double-check IFSC and account number.',
   Documents: 'Upload clear PDF or image files. Preview before you finish.',
-  Policies: 'Read each policy, accept it, then sign the final joining declaration.',
+  Policies: 'Read each workplace policy in full, then accept it.',
+  NDNC:
+    'Read the NDNC and confidentiality rules, accept them, upload your signature, then confirm the joining declaration.',
   Review: 'Check that form, documents, and policies are complete, then submit your onboarding once.',
 };
 
 const FORM_ISSUE_LABELS: Record<string, string> = {
   phone: 'Phone number',
+  dateOfBirth: 'Date of birth',
+  gender: 'Gender',
+  fatherName: "Father's name",
+  motherName: "Mother's name",
+  maritalStatus: 'Marital status',
+  spouseName: 'Spouse name',
+  bloodGroup: 'Blood group',
+  nationality: 'Nationality',
+  currentCity: 'Current city',
+  hometown: 'Hometown',
+  languagesKnown: 'Languages known',
   currentAddress: 'Current address',
+  permanentAddress: 'Permanent address',
   emergencyContactName: 'Emergency contact name',
   emergencyContactPhone: 'Emergency contact phone',
-  education: 'At least one education row',
+  emergencyContactRelation: 'Emergency relation',
+  totalExperienceYears: 'Total experience',
+  noticePeriodDays: 'Notice period',
+  education: 'Education with year and marks',
   previousEmployment: 'Work history from latest to oldest, or mark fresher',
-  references: 'At least one professional reference',
+  references: 'At least one full professional reference',
   bankAccountHolderName: 'Bank account holder name',
   bankName: 'Bank name',
   bankAccountNumber: 'Bank account number',
   bankIfsc: 'IFSC',
+  bankBranch: 'Bank branch',
 };
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
@@ -142,14 +164,13 @@ const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Prefer not
 const BLOOD_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'];
 const NATIONALITY_OPTIONS = ['Indian', 'Other'];
 const RELATION_OPTIONS = ['Spouse', 'Parent', 'Sibling', 'Friend', 'Relative', 'Colleague', 'Other'];
-/** Professional references only (no friends or personal contacts). */
+/** Workplace references only (manager, HR, lead, client). */
 const REFERENCE_RELATION_OPTIONS = [
   'Reporting manager',
   'Former manager',
   'HR / People team',
   'Team lead / supervisor',
   'Client / business contact',
-  'Teacher / professor',
 ];
 const QUALIFICATION_OPTIONS = [
   '10th',
@@ -239,6 +260,84 @@ const emptyForm = {
   bankBranch: '',
 };
 
+const filled = (value?: string | boolean | null) => Boolean(String(value ?? '').trim());
+
+/** Client-side required checks for form steps before Next. */
+const missingFieldsForFormStep = (
+  stepIndex: number,
+  form: typeof emptyForm,
+): string[] => {
+  const missing: string[] = [];
+  if (stepIndex === 0) {
+    if (!filled(form.phone)) missing.push('Phone');
+    if (!filled(form.dateOfBirth)) missing.push('Date of birth');
+    if (!filled(form.gender)) missing.push('Gender');
+    if (!filled(form.fatherName)) missing.push("Father's name");
+    if (!filled(form.motherName)) missing.push("Mother's name");
+    if (!filled(form.maritalStatus)) missing.push('Marital status');
+    if (form.maritalStatus === 'Married' && !filled(form.spouseName)) missing.push('Spouse name');
+    if (!filled(form.bloodGroup)) missing.push('Blood group');
+    if (!filled(form.nationality)) missing.push('Nationality');
+    if (!filled(form.currentCity)) missing.push('Current city');
+    if (!filled(form.hometown)) missing.push('Hometown');
+    if (!filled(form.languagesKnown)) missing.push('Languages known');
+    if (!filled(form.currentAddress)) missing.push('Current address');
+    if (!filled(form.permanentAddress)) missing.push('Permanent address');
+    if (!filled(form.emergencyContactName)) missing.push('Emergency contact name');
+    if (!filled(form.emergencyContactPhone)) missing.push('Emergency contact phone');
+    if (!filled(form.emergencyContactRelation)) missing.push('Emergency relation');
+  }
+  if (stepIndex === 1) {
+    if (!filled(form.totalExperienceYears)) missing.push('Total experience');
+    if (!filled(form.noticePeriodDays)) missing.push('Notice period');
+  }
+  if (stepIndex === 2) {
+    const eduOk = form.education.some(
+      (row) =>
+        filled(row.qualification) &&
+        filled(row.institution) &&
+        filled(row.yearOfPassing) &&
+        filled(row.percentageOrCgpa),
+    );
+    if (!eduOk) missing.push('One complete education row (degree, institution, year, marks)');
+  }
+  if (stepIndex === 3 && !form.isFresher) {
+    const jobOk = form.previousEmployment.some(
+      (row) =>
+        filled(row.companyName) &&
+        filled(row.designation) &&
+        filled(row.fromDate) &&
+        filled(row.toDate) &&
+        filled(row.lastCtc) &&
+        filled(row.reasonForLeaving),
+    );
+    if (!jobOk) {
+      missing.push('One complete work history row, or mark yourself as a fresher');
+    }
+  }
+  if (stepIndex === 4) {
+    const refOk = form.references.some(
+      (row) =>
+        filled(row.name) &&
+        filled(row.phone) &&
+        filled(row.relation) &&
+        filled(row.organization) &&
+        filled(row.designation) &&
+        filled(row.email) &&
+        filled(row.yearsKnown),
+    );
+    if (!refOk) missing.push('One complete professional reference');
+  }
+  if (stepIndex === 5) {
+    if (!filled(form.bankAccountHolderName)) missing.push('Account holder name');
+    if (!filled(form.bankName)) missing.push('Bank name');
+    if (!filled(form.bankAccountNumber)) missing.push('Account number');
+    if (!filled(form.bankIfsc)) missing.push('IFSC');
+    if (!filled(form.bankBranch)) missing.push('Branch');
+  }
+  return missing;
+};
+
 const errorMessage = (error: any): string => {
   const message = error?.response?.data?.message;
   if (Array.isArray(message)) return message.join(' ');
@@ -250,13 +349,15 @@ const OptionSelect = ({
   value,
   options,
   onChange,
+  required = false,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  required?: boolean;
 }) => (
-  <FormControl fullWidth size="medium" sx={fieldSx}>
+  <FormControl fullWidth size="medium" required={required} sx={fieldSx}>
     <InputLabel id={`${label}-label`}>{label}</InputLabel>
     <Select
       labelId={`${label}-label`}
@@ -906,34 +1007,36 @@ const Join: React.FC = () => {
   const showForm = Boolean(accessToken) && verified;
   const documentsStepIndex = STEPS.indexOf('Documents');
   const policiesStepIndex = STEPS.indexOf('Policies');
+  const ndncStepIndex = STEPS.indexOf('NDNC');
   const reviewStepIndex = STEPS.indexOf('Review');
   const isDocumentsStep = activeStep === documentsStepIndex;
   const isPoliciesStep = activeStep === policiesStepIndex;
+  const isNdncStep = activeStep === ndncStepIndex;
   const isReviewStep = activeStep === reviewStepIndex;
-  const hideDraftSave = isDocumentsStep || isPoliciesStep || isReviewStep;
+  const hideDraftSave = isDocumentsStep || isPoliciesStep || isNdncStep || isReviewStep;
 
   const renderStep = () => {
     if (activeStep === 0) {
       return (
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}><Field label="Phone" value={form.phone} onChange={(e) => setField('phone', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Alternate phone" value={form.alternatePhone} onChange={(e) => setField('alternatePhone', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)} InputLabelProps={{ shrink: true }} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Gender" value={form.gender} options={GENDER_OPTIONS} onChange={(v) => setField('gender', v)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Father's name" value={form.fatherName} onChange={(e) => setField('fatherName', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Mother's name" value={form.motherName} onChange={(e) => setField('motherName', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Marital status" value={form.maritalStatus} options={MARITAL_OPTIONS} onChange={(v) => setField('maritalStatus', v)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Spouse name" value={form.spouseName} onChange={(e) => setField('spouseName', e.target.value)} disabled={form.maritalStatus !== 'Married'} helperText={form.maritalStatus !== 'Married' ? 'Needed only if married' : ' '} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Blood group" value={form.bloodGroup} options={BLOOD_OPTIONS} onChange={(v) => setField('bloodGroup', v)} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Nationality" value={form.nationality} options={NATIONALITY_OPTIONS} onChange={(v) => setField('nationality', v)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Current city" value={form.currentCity} onChange={(e) => setField('currentCity', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Hometown" value={form.hometown} onChange={(e) => setField('hometown', e.target.value)} /></Grid>
-          <Grid item xs={12}><Field label="Languages known" value={form.languagesKnown} onChange={(e) => setField('languagesKnown', e.target.value)} placeholder="e.g. English, Hindi, Telugu" /></Grid>
-          <Grid item xs={12}><Field label="Current address" value={form.currentAddress} onChange={(e) => setField('currentAddress', e.target.value)} multiline minRows={2} /></Grid>
-          <Grid item xs={12}><Field label="Permanent address" value={form.permanentAddress} onChange={(e) => setField('permanentAddress', e.target.value)} multiline minRows={2} /></Grid>
-          <Grid item xs={12} sm={4}><Field label="Emergency contact name" value={form.emergencyContactName} onChange={(e) => setField('emergencyContactName', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={4}><Field label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(e) => setField('emergencyContactPhone', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={4}><OptionSelect label="Emergency relation" value={form.emergencyContactRelation} options={RELATION_OPTIONS} onChange={(v) => setField('emergencyContactRelation', v)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Alternate phone" value={form.alternatePhone} onChange={(e) => setField('alternatePhone', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)} InputLabelProps={{ shrink: true }} required /></Grid>
+          <Grid item xs={12} sm={6}><OptionSelect label="Gender" value={form.gender} options={GENDER_OPTIONS} onChange={(v) => setField('gender', v)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Father's name" value={form.fatherName} onChange={(e) => setField('fatherName', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Mother's name" value={form.motherName} onChange={(e) => setField('motherName', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><OptionSelect label="Marital status" value={form.maritalStatus} options={MARITAL_OPTIONS} onChange={(v) => setField('maritalStatus', v)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Spouse name" value={form.spouseName} onChange={(e) => setField('spouseName', e.target.value)} disabled={form.maritalStatus !== 'Married'} required={form.maritalStatus === 'Married'} helperText={form.maritalStatus !== 'Married' ? 'Needed only if married' : ' '} /></Grid>
+          <Grid item xs={12} sm={6}><OptionSelect label="Blood group" value={form.bloodGroup} options={BLOOD_OPTIONS} onChange={(v) => setField('bloodGroup', v)} required /></Grid>
+          <Grid item xs={12} sm={6}><OptionSelect label="Nationality" value={form.nationality} options={NATIONALITY_OPTIONS} onChange={(v) => setField('nationality', v)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Current city" value={form.currentCity} onChange={(e) => setField('currentCity', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Hometown" value={form.hometown} onChange={(e) => setField('hometown', e.target.value)} required /></Grid>
+          <Grid item xs={12}><Field label="Languages known" value={form.languagesKnown} onChange={(e) => setField('languagesKnown', e.target.value)} placeholder="e.g. English, Hindi, Telugu" required /></Grid>
+          <Grid item xs={12}><Field label="Current address" value={form.currentAddress} onChange={(e) => setField('currentAddress', e.target.value)} multiline minRows={2} required /></Grid>
+          <Grid item xs={12}><Field label="Permanent address" value={form.permanentAddress} onChange={(e) => setField('permanentAddress', e.target.value)} multiline minRows={2} required /></Grid>
+          <Grid item xs={12} sm={4}><Field label="Emergency contact name" value={form.emergencyContactName} onChange={(e) => setField('emergencyContactName', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={4}><Field label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(e) => setField('emergencyContactPhone', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={4}><OptionSelect label="Emergency relation" value={form.emergencyContactRelation} options={RELATION_OPTIONS} onChange={(v) => setField('emergencyContactRelation', v)} required /></Grid>
         </Grid>
       );
     }
@@ -941,14 +1044,14 @@ const Join: React.FC = () => {
     if (activeStep === 1) {
       return (
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><Field label="Total experience (years)" value={form.totalExperienceYears} onChange={(e) => setField('totalExperienceYears', e.target.value)} inputProps={{ inputMode: 'decimal' }} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Notice period" value={form.noticePeriodDays} options={NOTICE_OPTIONS} onChange={(v) => setField('noticePeriodDays', v)} /></Grid>
-          <Grid item xs={12}><Field label="LinkedIn URL" value={form.linkedInUrl} onChange={(e) => setField('linkedInUrl', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Passport number" value={form.passportNumber} onChange={(e) => setField('passportNumber', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Driving licence number" value={form.drivingLicenseNumber} onChange={(e) => setField('drivingLicenseNumber', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={4}><Field label="UAN number" value={form.uanNumber} onChange={(e) => setField('uanNumber', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={4}><Field label="PF number" value={form.pfNumber} onChange={(e) => setField('pfNumber', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={4}><Field label="ESI number" value={form.esiNumber} onChange={(e) => setField('esiNumber', e.target.value)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Total experience (years)" value={form.totalExperienceYears} onChange={(e) => setField('totalExperienceYears', e.target.value)} inputProps={{ inputMode: 'decimal' }} required helperText="Use 0 if fresher" /></Grid>
+          <Grid item xs={12} sm={6}><OptionSelect label="Notice period" value={form.noticePeriodDays} options={NOTICE_OPTIONS} onChange={(v) => setField('noticePeriodDays', v)} required /></Grid>
+          <Grid item xs={12}><Field label="LinkedIn URL" value={form.linkedInUrl} onChange={(e) => setField('linkedInUrl', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Passport number" value={form.passportNumber} onChange={(e) => setField('passportNumber', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Driving licence number" value={form.drivingLicenseNumber} onChange={(e) => setField('drivingLicenseNumber', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={4}><Field label="UAN number" value={form.uanNumber} onChange={(e) => setField('uanNumber', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={4}><Field label="PF number" value={form.pfNumber} onChange={(e) => setField('pfNumber', e.target.value)} helperText="Optional" /></Grid>
+          <Grid item xs={12} sm={4}><Field label="ESI number" value={form.esiNumber} onChange={(e) => setField('esiNumber', e.target.value)} helperText="Optional" /></Grid>
         </Grid>
       );
     }
@@ -966,12 +1069,13 @@ const Join: React.FC = () => {
                       value={row.qualification}
                       options={QUALIFICATION_OPTIONS}
                       onChange={(v) => updateEducation(index, 'qualification', v)}
+                      required
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}><Field label="Institution" value={row.institution} onChange={(e) => updateEducation(index, 'institution', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={4}><Field label="Year of passing" value={row.yearOfPassing} onChange={(e) => updateEducation(index, 'yearOfPassing', e.target.value)} inputProps={{ inputMode: 'numeric', maxLength: 4 }} /></Grid>
-                  <Grid item xs={12} sm={4}><Field label="Percentage / CGPA" value={row.percentageOrCgpa} onChange={(e) => updateEducation(index, 'percentageOrCgpa', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={4}><Field label="Specialization" value={row.specialization} onChange={(e) => updateEducation(index, 'specialization', e.target.value)} /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Institution" value={row.institution} onChange={(e) => updateEducation(index, 'institution', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={4}><Field label="Year of passing" value={row.yearOfPassing} onChange={(e) => updateEducation(index, 'yearOfPassing', e.target.value)} inputProps={{ inputMode: 'numeric', maxLength: 4 }} required /></Grid>
+                  <Grid item xs={12} sm={4}><Field label="Percentage / CGPA" value={row.percentageOrCgpa} onChange={(e) => updateEducation(index, 'percentageOrCgpa', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={4}><Field label="Specialization" value={row.specialization} onChange={(e) => updateEducation(index, 'specialization', e.target.value)} helperText="Optional" /></Grid>
                 </Grid>
                 {form.education.length > 1 && (
                   <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, education: c.education.filter((_, i) => i !== index) }))}>
@@ -1007,14 +1111,14 @@ const Join: React.FC = () => {
                 >
                   <Stack spacing={2}>
                     <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}><Field label="Company name" value={row.companyName} onChange={(e) => updateEmployment(index, 'companyName', e.target.value)} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="Designation" value={row.designation} onChange={(e) => updateEmployment(index, 'designation', e.target.value)} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="From" type="month" value={row.fromDate} onChange={(e) => updateEmployment(index, 'fromDate', e.target.value)} InputLabelProps={{ shrink: true }} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="To" type="month" value={row.toDate} onChange={(e) => updateEmployment(index, 'toDate', e.target.value)} InputLabelProps={{ shrink: true }} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="Last CTC" value={row.lastCtc} onChange={(e) => updateEmployment(index, 'lastCtc', e.target.value)} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="Reason for leaving" value={row.reasonForLeaving} onChange={(e) => updateEmployment(index, 'reasonForLeaving', e.target.value)} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="Manager / reference name" value={row.referenceName} onChange={(e) => updateEmployment(index, 'referenceName', e.target.value)} /></Grid>
-                      <Grid item xs={12} sm={6}><Field label="Manager / reference phone" value={row.referencePhone} onChange={(e) => updateEmployment(index, 'referencePhone', e.target.value)} /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Company name" value={row.companyName} onChange={(e) => updateEmployment(index, 'companyName', e.target.value)} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Designation" value={row.designation} onChange={(e) => updateEmployment(index, 'designation', e.target.value)} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="From" type="month" value={row.fromDate} onChange={(e) => updateEmployment(index, 'fromDate', e.target.value)} InputLabelProps={{ shrink: true }} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="To" type="month" value={row.toDate} onChange={(e) => updateEmployment(index, 'toDate', e.target.value)} InputLabelProps={{ shrink: true }} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Last CTC" value={row.lastCtc} onChange={(e) => updateEmployment(index, 'lastCtc', e.target.value)} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Reason for leaving" value={row.reasonForLeaving} onChange={(e) => updateEmployment(index, 'reasonForLeaving', e.target.value)} required /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Manager / reference name" value={row.referenceName} onChange={(e) => updateEmployment(index, 'referenceName', e.target.value)} helperText="Optional" /></Grid>
+                      <Grid item xs={12} sm={6}><Field label="Manager / reference phone" value={row.referencePhone} onChange={(e) => updateEmployment(index, 'referencePhone', e.target.value)} helperText="Optional" /></Grid>
                     </Grid>
                     {form.previousEmployment.length > 1 && (
                       <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, previousEmployment: c.previousEmployment.filter((_, i) => i !== index) }))}>
@@ -1037,28 +1141,29 @@ const Join: React.FC = () => {
       return (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            At least one professional reference is required (manager, HR, team lead, client, or
-            teacher). Friends and personal contacts are not accepted.
+            At least one professional reference is required (manager, HR, team lead, or client).
+            Friends and personal contacts are not accepted.
           </Typography>
           {form.references.map((row, index) => (
             <RepeatCard key={`ref-${index}`} title={`Professional reference ${index + 1}`}>
               <Stack spacing={2}>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}><Field label="Full name" value={row.name} onChange={(e) => updateReference(index, 'name', e.target.value)} /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Full name" value={row.name} onChange={(e) => updateReference(index, 'name', e.target.value)} required /></Grid>
                   <Grid item xs={12} sm={6}>
                     <OptionSelect
                       label="Professional relation"
                       value={row.relation}
                       options={REFERENCE_RELATION_OPTIONS}
                       onChange={(v) => updateReference(index, 'relation', v)}
+                      required
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}><Field label="Phone" value={row.phone} onChange={(e) => updateReference(index, 'phone', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={6}><Field label="Email" type="email" value={row.email} onChange={(e) => updateReference(index, 'email', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={6}><Field label="Organization" value={row.organization} onChange={(e) => updateReference(index, 'organization', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={6}><Field label="Designation" value={row.designation} onChange={(e) => updateReference(index, 'designation', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={8}><Field label="Address" value={row.address} onChange={(e) => updateReference(index, 'address', e.target.value)} /></Grid>
-                  <Grid item xs={12} sm={4}><Field label="Years known" value={row.yearsKnown} onChange={(e) => updateReference(index, 'yearsKnown', e.target.value)} inputProps={{ inputMode: 'numeric' }} /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Phone" value={row.phone} onChange={(e) => updateReference(index, 'phone', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Email" type="email" value={row.email} onChange={(e) => updateReference(index, 'email', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Organization" value={row.organization} onChange={(e) => updateReference(index, 'organization', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={6}><Field label="Designation" value={row.designation} onChange={(e) => updateReference(index, 'designation', e.target.value)} required /></Grid>
+                  <Grid item xs={12} sm={8}><Field label="Address" value={row.address} onChange={(e) => updateReference(index, 'address', e.target.value)} helperText="Optional" /></Grid>
+                  <Grid item xs={12} sm={4}><Field label="Years known" value={row.yearsKnown} onChange={(e) => updateReference(index, 'yearsKnown', e.target.value)} inputProps={{ inputMode: 'numeric' }} required /></Grid>
                 </Grid>
                 {form.references.length > 1 && (
                   <Button sx={OutlineButtonSx} onClick={() => setForm((c) => ({ ...c, references: c.references.filter((_, i) => i !== index) }))}>
@@ -1078,11 +1183,11 @@ const Join: React.FC = () => {
     if (activeStep === 5) {
       return (
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} /></Grid>
-          <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} /></Grid>
-          <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} required /></Grid>
+          <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} required /></Grid>
+          <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} required /></Grid>
         </Grid>
       );
     }
@@ -1097,18 +1202,27 @@ const Join: React.FC = () => {
         );
       }
 
+      const idDocuments = (checklist?.documents || []).filter(
+        (doc) => doc.documentType !== NDNC_SIGNATURE_TYPE,
+      );
+      const idRequired = idDocuments.filter((doc) => doc.required);
+      const idUploaded = idRequired.filter(
+        (doc) => doc.status !== 'Missing' && doc.status !== 'Re-upload Required',
+      ).length;
+
       return (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
             Upload PDF, JPG, or PNG files up to 5 MB. Each uploaded file shows a preview so you can
-            confirm the right document before moving on.
+            confirm the right document before moving on. Your NDNC signature is collected on the next
+            NDNC step.
           </Typography>
           {checklist && (
             <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
-              {checklist.uploadedCount} of {checklist.requiredCount} required files uploaded
+              {idUploaded} of {idRequired.length} identity documents uploaded
             </Typography>
           )}
-          {(checklist?.documents || []).map((doc) => {
+          {idDocuments.map((doc) => {
             const busy = uploadingType === doc.documentType && uploadDocument.isPending;
             const deleting = deletingType === doc.documentType && deleteDocument.isPending;
             return (
@@ -1143,18 +1257,23 @@ const Join: React.FC = () => {
         );
       }
 
+      const handbookPolicies = (policyState?.policies || []).filter(
+        (policy) => policy.policyId !== NDNC_POLICY_ID,
+      );
+      const handbookAccepted = handbookPolicies.filter((policy) => policy.acknowledged).length;
+
       return (
         <Stack spacing={2.5}>
           <Typography variant="body2" color="text.secondary">
-            Read each policy in full, then accept it. After all policies are accepted, confirm the
-            joining declaration.
+            Read each workplace policy in full, then accept it. NDNC and your signature come on the
+            next step.
           </Typography>
           {policyState && (
             <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">
-              {policyState.acknowledgedCount} of {policyState.requiredCount} policies accepted
+              {handbookAccepted} of {handbookPolicies.length} workplace policies accepted
             </Typography>
           )}
-          {(policyState?.policies || []).map((policy) => {
+          {handbookPolicies.map((policy) => {
             const busy = ackingPolicyId === policy.policyId && acknowledgePolicy.isPending;
             return (
               <Paper
@@ -1213,6 +1332,128 @@ const Join: React.FC = () => {
               </Paper>
             );
           })}
+        </Stack>
+      );
+    }
+
+    if (activeStep === ndncStepIndex) {
+      const policyState = policiesQuery.data;
+      const checklist = documentsQuery.data;
+      if (policiesQuery.isPending || documentsQuery.isPending) {
+        return (
+          <Stack alignItems="center" py={2}>
+            <CircularProgress size={24} />
+          </Stack>
+        );
+      }
+
+      const ndncPolicy = (policyState?.policies || []).find(
+        (policy) => policy.policyId === NDNC_POLICY_ID,
+      );
+      const signatureDoc = (checklist?.documents || []).find(
+        (doc) => doc.documentType === NDNC_SIGNATURE_TYPE,
+      );
+      const signatureReady = Boolean(
+        signatureDoc &&
+          signatureDoc.status !== 'Missing' &&
+          signatureDoc.status !== 'Re-upload Required',
+      );
+      const ndncBusy =
+        ackingPolicyId === NDNC_POLICY_ID && acknowledgePolicy.isPending;
+      const signatureBusy =
+        uploadingType === NDNC_SIGNATURE_TYPE && uploadDocument.isPending;
+      const signatureDeleting =
+        deletingType === NDNC_SIGNATURE_TYPE && deleteDocument.isPending;
+      const canConfirmDeclaration =
+        Boolean(policyState?.allPoliciesAcknowledged) && signatureReady;
+
+      return (
+        <Stack spacing={2.5}>
+          <Typography variant="body2" color="text.secondary">
+            Read the confidentiality and NDNC rules, accept them, then upload a clear image or scan
+            of your signature. That file is your signed NDNC acknowledgement for HR.
+          </Typography>
+
+          {ndncPolicy && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.25,
+                borderRadius: 2,
+                border: `1px solid ${ndncPolicy.acknowledged ? tokens.success : JOIN.border}`,
+                bgcolor: ndncPolicy.acknowledged ? tokens.successSoft : JOIN.card,
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography fontWeight={700}>{ndncPolicy.title}</Typography>
+                  <Chip
+                    size="small"
+                    color={ndncPolicy.acknowledged ? 'success' : 'default'}
+                    label={ndncPolicy.acknowledged ? 'Accepted' : 'Pending'}
+                    role="status"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Version {ndncPolicy.version}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {ndncPolicy.summary}
+                </Typography>
+                <Box
+                  sx={{
+                    maxHeight: 220,
+                    overflow: 'auto',
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    bgcolor: tokens.input,
+                    border: `1px solid ${JOIN.border}`,
+                    whiteSpace: 'pre-wrap',
+                    typography: 'body2',
+                    color: JOIN.ink,
+                  }}
+                >
+                  {ndncPolicy.body}
+                </Box>
+                <Button
+                  variant={ndncPolicy.acknowledged ? 'outlined' : 'contained'}
+                  disabled={ndncPolicy.acknowledged || ndncBusy}
+                  sx={ndncPolicy.acknowledged ? OutlineButtonSx : PrimaryButtonSx}
+                  onClick={() => {
+                    setAckingPolicyId(NDNC_POLICY_ID);
+                    acknowledgePolicy.mutate(NDNC_POLICY_ID);
+                  }}
+                >
+                  {ndncBusy
+                    ? 'Saving…'
+                    : ndncPolicy.acknowledged
+                      ? 'NDNC accepted'
+                      : 'I accept the NDNC and confidentiality rules'}
+                </Button>
+              </Stack>
+            </Paper>
+          )}
+
+          {signatureDoc && (
+            <DocumentPreviewCard
+              key={`${signatureDoc.documentType}-${signatureDoc.version}-${signatureDoc.status}`}
+              doc={{
+                ...signatureDoc,
+                label: 'Your signature for NDNC',
+              }}
+              accessToken={accessToken}
+              busy={signatureBusy}
+              deleting={signatureDeleting}
+              onUpload={(file) => {
+                setUploadingType(NDNC_SIGNATURE_TYPE);
+                uploadDocument.mutate({ documentType: NDNC_SIGNATURE_TYPE, file });
+              }}
+              onDelete={() => {
+                setDeletingType(NDNC_SIGNATURE_TYPE);
+                deleteDocument.mutate(NDNC_SIGNATURE_TYPE);
+              }}
+            />
+          )}
 
           <Paper
             elevation={0}
@@ -1224,7 +1465,9 @@ const Join: React.FC = () => {
             }}
           >
             <Stack spacing={1.5}>
-              <Typography fontWeight={700}>{policyState?.declaration.title || 'Joining declaration'}</Typography>
+              <Typography fontWeight={700}>
+                {policyState?.declaration.title || 'Joining declaration'}
+              </Typography>
               <Typography variant="caption" color="text.secondary">
                 Version {policyState?.declaration.version}
               </Typography>
@@ -1242,7 +1485,7 @@ const Join: React.FC = () => {
                   <Checkbox
                     checked={declarationChecked || Boolean(policyState?.declaration.accepted)}
                     disabled={
-                      !policyState?.allPoliciesAcknowledged ||
+                      !canConfirmDeclaration ||
                       Boolean(policyState?.declaration.accepted) ||
                       acceptDeclaration.isPending
                     }
@@ -1251,16 +1494,17 @@ const Join: React.FC = () => {
                 }
                 label="I confirm this declaration is true and complete"
               />
-              {!policyState?.allPoliciesAcknowledged && (
+              {!canConfirmDeclaration && (
                 <Typography variant="caption" color="text.secondary">
-                  Accept every policy above before you can confirm the declaration.
+                  Accept every workplace policy, accept NDNC, and upload your signature before you
+                  can confirm the declaration.
                 </Typography>
               )}
               <Button
                 variant="contained"
                 sx={PrimaryButtonSx}
                 disabled={
-                  !policyState?.allPoliciesAcknowledged ||
+                  !canConfirmDeclaration ||
                   Boolean(policyState?.declaration.accepted) ||
                   !declarationChecked ||
                   acceptDeclaration.isPending
@@ -1309,13 +1553,13 @@ const Join: React.FC = () => {
       },
       {
         key: 'policies',
-        title: 'Policies and declaration',
+        title: 'Policies, NDNC, and declaration',
         ready: Boolean(readiness?.policies.ready),
         detail: readiness?.policies.ready
-          ? 'All policies and the joining declaration are accepted.'
+          ? 'Workplace policies, NDNC, and the joining declaration are accepted.'
           : `${readiness?.policies.acknowledgedCount || 0} of ${readiness?.policies.requiredCount || 0} policies accepted${
               readiness?.policies.declarationAccepted ? '' : ', declaration still pending'
-            }.`,
+            }. Upload your NDNC signature on the NDNC step if it is still missing.`,
       },
     ];
 
@@ -1668,6 +1912,11 @@ const Join: React.FC = () => {
                                 variant="contained"
                                 sx={{ ...PrimaryButtonSx, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() => {
+                                  const missing = missingFieldsForFormStep(activeStep, form);
+                                  if (missing.length) {
+                                    toast.error(`Fill required fields: ${missing.join(', ')}`);
+                                    return;
+                                  }
                                   if (activeStep === reviewStepIndex - 1) {
                                     queryClient.invalidateQueries({
                                       queryKey: ['join-readiness', accessToken],
