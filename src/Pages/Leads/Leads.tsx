@@ -111,8 +111,8 @@ export const CALL_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-/** True only for a live dial. Stale queued/in_progress on old rows must not lock the button. */
-const ACTIVE_CALL_MAX_AGE_MS = 3 * 60 * 1000;
+/** True only for a live dial. Must stay above Outpero's 5 min cap + summary delay. */
+const ACTIVE_CALL_MAX_AGE_MS = 12 * 60 * 1000;
 export function isLeadCallInFlight(
   lead: Pick<Lead, 'lastCallStatus' | 'lastCallAt'>,
 ): boolean {
