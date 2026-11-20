@@ -262,34 +262,38 @@ const emptyForm = {
 
 const filled = (value?: string | boolean | null) => Boolean(String(value ?? '').trim());
 
-/** Client-side required checks for form steps before Next. */
-const missingFieldsForFormStep = (
+/** Field-key map for inline errors (no long toast lists). */
+const collectStepErrors = (
   stepIndex: number,
   form: typeof emptyForm,
-): string[] => {
-  const missing: string[] = [];
+): Record<string, string> => {
+  const errors: Record<string, string> = {};
+  const need = (key: string, ok: boolean, message = 'Required') => {
+    if (!ok) errors[key] = message;
+  };
+
   if (stepIndex === 0) {
-    if (!filled(form.phone)) missing.push('Phone');
-    if (!filled(form.dateOfBirth)) missing.push('Date of birth');
-    if (!filled(form.gender)) missing.push('Gender');
-    if (!filled(form.fatherName)) missing.push("Father's name");
-    if (!filled(form.motherName)) missing.push("Mother's name");
-    if (!filled(form.maritalStatus)) missing.push('Marital status');
-    if (form.maritalStatus === 'Married' && !filled(form.spouseName)) missing.push('Spouse name');
-    if (!filled(form.bloodGroup)) missing.push('Blood group');
-    if (!filled(form.nationality)) missing.push('Nationality');
-    if (!filled(form.currentCity)) missing.push('Current city');
-    if (!filled(form.hometown)) missing.push('Hometown');
-    if (!filled(form.languagesKnown)) missing.push('Languages known');
-    if (!filled(form.currentAddress)) missing.push('Current address');
-    if (!filled(form.permanentAddress)) missing.push('Permanent address');
-    if (!filled(form.emergencyContactName)) missing.push('Emergency contact name');
-    if (!filled(form.emergencyContactPhone)) missing.push('Emergency contact phone');
-    if (!filled(form.emergencyContactRelation)) missing.push('Emergency relation');
+    need('phone', filled(form.phone));
+    need('dateOfBirth', filled(form.dateOfBirth));
+    need('gender', filled(form.gender));
+    need('fatherName', filled(form.fatherName));
+    need('motherName', filled(form.motherName));
+    need('maritalStatus', filled(form.maritalStatus));
+    if (form.maritalStatus === 'Married') need('spouseName', filled(form.spouseName));
+    need('bloodGroup', filled(form.bloodGroup));
+    need('nationality', filled(form.nationality));
+    need('currentCity', filled(form.currentCity));
+    need('hometown', filled(form.hometown));
+    need('languagesKnown', filled(form.languagesKnown));
+    need('currentAddress', filled(form.currentAddress));
+    need('permanentAddress', filled(form.permanentAddress));
+    need('emergencyContactName', filled(form.emergencyContactName));
+    need('emergencyContactPhone', filled(form.emergencyContactPhone));
+    need('emergencyContactRelation', filled(form.emergencyContactRelation));
   }
   if (stepIndex === 1) {
-    if (!filled(form.totalExperienceYears)) missing.push('Total experience');
-    if (!filled(form.noticePeriodDays)) missing.push('Notice period');
+    need('totalExperienceYears', filled(form.totalExperienceYears));
+    need('noticePeriodDays', filled(form.noticePeriodDays));
   }
   if (stepIndex === 2) {
     const eduOk = form.education.some(
@@ -299,7 +303,11 @@ const missingFieldsForFormStep = (
         filled(row.yearOfPassing) &&
         filled(row.percentageOrCgpa),
     );
-    if (!eduOk) missing.push('One complete education row (degree, institution, year, marks)');
+    need(
+      'education',
+      eduOk,
+      'Add at least one row with degree, institution, year, and marks',
+    );
   }
   if (stepIndex === 3 && !form.isFresher) {
     const jobOk = form.previousEmployment.some(
@@ -311,9 +319,11 @@ const missingFieldsForFormStep = (
         filled(row.lastCtc) &&
         filled(row.reasonForLeaving),
     );
-    if (!jobOk) {
-      missing.push('One complete work history row, or mark yourself as a fresher');
-    }
+    need(
+      'previousEmployment',
+      jobOk,
+      'Add one complete job, or mark yourself as a fresher',
+    );
   }
   if (stepIndex === 4) {
     const refOk = form.references.some(
@@ -326,16 +336,16 @@ const missingFieldsForFormStep = (
         filled(row.email) &&
         filled(row.yearsKnown),
     );
-    if (!refOk) missing.push('One complete professional reference');
+    need('references', refOk, 'Add one complete professional reference');
   }
   if (stepIndex === 5) {
-    if (!filled(form.bankAccountHolderName)) missing.push('Account holder name');
-    if (!filled(form.bankName)) missing.push('Bank name');
-    if (!filled(form.bankAccountNumber)) missing.push('Account number');
-    if (!filled(form.bankIfsc)) missing.push('IFSC');
-    if (!filled(form.bankBranch)) missing.push('Branch');
+    need('bankAccountHolderName', filled(form.bankAccountHolderName));
+    need('bankName', filled(form.bankName));
+    need('bankAccountNumber', filled(form.bankAccountNumber));
+    need('bankIfsc', filled(form.bankIfsc));
+    need('bankBranch', filled(form.bankBranch));
   }
-  return missing;
+  return errors;
 };
 
 const errorMessage = (error: any): string => {
@@ -350,14 +360,18 @@ const OptionSelect = ({
   options,
   onChange,
   required = false,
+  error = false,
+  helperText,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
   required?: boolean;
+  error?: boolean;
+  helperText?: string;
 }) => (
-  <FormControl fullWidth size="medium" required={required} sx={fieldSx}>
+  <FormControl fullWidth size="medium" required={required} error={error} sx={fieldSx}>
     <InputLabel id={`${label}-label`}>{label}</InputLabel>
     <Select
       labelId={`${label}-label`}
@@ -374,6 +388,14 @@ const OptionSelect = ({
         </MenuItem>
       ))}
     </Select>
+    {helperText ? (
+      <Typography
+        variant="caption"
+        sx={{ mt: 0.75, ml: 1.75, color: error ? 'error.main' : 'text.secondary' }}
+      >
+        {helperText}
+      </Typography>
+    ) : null}
   </FormControl>
 );
 
@@ -745,7 +767,42 @@ const Join: React.FC = () => {
   const [form, setForm] = useState(emptyForm);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setStepErrors({});
+  }, [activeStep]);
+
+  const clearStepError = (key: string) => {
+    setStepErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const fieldError = (key: string) => Boolean(stepErrors[key]);
+  const fieldHelper = (key: string, fallback?: string) => stepErrors[key] || fallback;
+
+  const StepIssuesAlert = () =>
+    Object.keys(stepErrors).length ? (
+      <Alert
+        id="join-step-issues"
+        severity="warning"
+        variant="outlined"
+        sx={{
+          borderRadius: 2,
+          borderColor: tokens.warning,
+          bgcolor: tokens.warningSoft,
+          color: JOIN.ink,
+          '& .MuiAlert-icon': { color: tokens.warning },
+        }}
+      >
+        Complete the highlighted fields on this step to continue.
+      </Alert>
+    ) : null;
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['join', token],
@@ -965,10 +1022,12 @@ const Join: React.FC = () => {
   }, [policiesQuery.data?.declaration.accepted]);
 
   const setField = (key: keyof typeof emptyForm, value: string | boolean) => {
+    clearStepError(String(key));
     setForm((current) => ({ ...current, [key]: value }));
   };
 
   const updateEducation = (index: number, key: keyof JoinEducationRow, value: string) => {
+    clearStepError('education');
     setForm((current) => ({
       ...current,
       education: current.education.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
@@ -976,6 +1035,7 @@ const Join: React.FC = () => {
   };
 
   const updateEmployment = (index: number, key: keyof JoinEmploymentRow, value: string) => {
+    clearStepError('previousEmployment');
     setForm((current) => ({
       ...current,
       previousEmployment: current.previousEmployment.map((row, i) =>
@@ -985,6 +1045,7 @@ const Join: React.FC = () => {
   };
 
   const updateReference = (index: number, key: keyof JoinReferenceRow, value: string) => {
+    clearStepError('references');
     setForm((current) => ({
       ...current,
       references: current.references.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
@@ -1018,47 +1079,59 @@ const Join: React.FC = () => {
   const renderStep = () => {
     if (activeStep === 0) {
       return (
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><Field label="Phone" value={form.phone} onChange={(e) => setField('phone', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Alternate phone" value={form.alternatePhone} onChange={(e) => setField('alternatePhone', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)} InputLabelProps={{ shrink: true }} required /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Gender" value={form.gender} options={GENDER_OPTIONS} onChange={(v) => setField('gender', v)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Father's name" value={form.fatherName} onChange={(e) => setField('fatherName', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Mother's name" value={form.motherName} onChange={(e) => setField('motherName', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Marital status" value={form.maritalStatus} options={MARITAL_OPTIONS} onChange={(v) => setField('maritalStatus', v)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Spouse name" value={form.spouseName} onChange={(e) => setField('spouseName', e.target.value)} disabled={form.maritalStatus !== 'Married'} required={form.maritalStatus === 'Married'} helperText={form.maritalStatus !== 'Married' ? 'Needed only if married' : ' '} /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Blood group" value={form.bloodGroup} options={BLOOD_OPTIONS} onChange={(v) => setField('bloodGroup', v)} required /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Nationality" value={form.nationality} options={NATIONALITY_OPTIONS} onChange={(v) => setField('nationality', v)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Current city" value={form.currentCity} onChange={(e) => setField('currentCity', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Hometown" value={form.hometown} onChange={(e) => setField('hometown', e.target.value)} required /></Grid>
-          <Grid item xs={12}><Field label="Languages known" value={form.languagesKnown} onChange={(e) => setField('languagesKnown', e.target.value)} placeholder="e.g. English, Hindi, Telugu" required /></Grid>
-          <Grid item xs={12}><Field label="Current address" value={form.currentAddress} onChange={(e) => setField('currentAddress', e.target.value)} multiline minRows={2} required /></Grid>
-          <Grid item xs={12}><Field label="Permanent address" value={form.permanentAddress} onChange={(e) => setField('permanentAddress', e.target.value)} multiline minRows={2} required /></Grid>
-          <Grid item xs={12} sm={4}><Field label="Emergency contact name" value={form.emergencyContactName} onChange={(e) => setField('emergencyContactName', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={4}><Field label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(e) => setField('emergencyContactPhone', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={4}><OptionSelect label="Emergency relation" value={form.emergencyContactRelation} options={RELATION_OPTIONS} onChange={(v) => setField('emergencyContactRelation', v)} required /></Grid>
-        </Grid>
+        <Stack spacing={2}>
+          <StepIssuesAlert />
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}><Field label="Phone" value={form.phone} onChange={(e) => setField('phone', e.target.value)} required error={fieldError('phone')} helperText={fieldHelper('phone')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Alternate phone" value={form.alternatePhone} onChange={(e) => setField('alternatePhone', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)} InputLabelProps={{ shrink: true }} required error={fieldError('dateOfBirth')} helperText={fieldHelper('dateOfBirth')} /></Grid>
+            <Grid item xs={12} sm={6}><OptionSelect label="Gender" value={form.gender} options={GENDER_OPTIONS} onChange={(v) => setField('gender', v)} required error={fieldError('gender')} helperText={fieldHelper('gender')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Father's name" value={form.fatherName} onChange={(e) => setField('fatherName', e.target.value)} required error={fieldError('fatherName')} helperText={fieldHelper('fatherName')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Mother's name" value={form.motherName} onChange={(e) => setField('motherName', e.target.value)} required error={fieldError('motherName')} helperText={fieldHelper('motherName')} /></Grid>
+            <Grid item xs={12} sm={6}><OptionSelect label="Marital status" value={form.maritalStatus} options={MARITAL_OPTIONS} onChange={(v) => setField('maritalStatus', v)} required error={fieldError('maritalStatus')} helperText={fieldHelper('maritalStatus')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Spouse name" value={form.spouseName} onChange={(e) => setField('spouseName', e.target.value)} disabled={form.maritalStatus !== 'Married'} required={form.maritalStatus === 'Married'} error={fieldError('spouseName')} helperText={fieldHelper('spouseName', form.maritalStatus !== 'Married' ? 'Needed only if married' : undefined)} /></Grid>
+            <Grid item xs={12} sm={6}><OptionSelect label="Blood group" value={form.bloodGroup} options={BLOOD_OPTIONS} onChange={(v) => setField('bloodGroup', v)} required error={fieldError('bloodGroup')} helperText={fieldHelper('bloodGroup')} /></Grid>
+            <Grid item xs={12} sm={6}><OptionSelect label="Nationality" value={form.nationality} options={NATIONALITY_OPTIONS} onChange={(v) => setField('nationality', v)} required error={fieldError('nationality')} helperText={fieldHelper('nationality')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Current city" value={form.currentCity} onChange={(e) => setField('currentCity', e.target.value)} required error={fieldError('currentCity')} helperText={fieldHelper('currentCity')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Hometown" value={form.hometown} onChange={(e) => setField('hometown', e.target.value)} required error={fieldError('hometown')} helperText={fieldHelper('hometown')} /></Grid>
+            <Grid item xs={12}><Field label="Languages known" value={form.languagesKnown} onChange={(e) => setField('languagesKnown', e.target.value)} placeholder="e.g. English, Hindi, Telugu" required error={fieldError('languagesKnown')} helperText={fieldHelper('languagesKnown')} /></Grid>
+            <Grid item xs={12}><Field label="Current address" value={form.currentAddress} onChange={(e) => setField('currentAddress', e.target.value)} multiline minRows={2} required error={fieldError('currentAddress')} helperText={fieldHelper('currentAddress')} /></Grid>
+            <Grid item xs={12}><Field label="Permanent address" value={form.permanentAddress} onChange={(e) => setField('permanentAddress', e.target.value)} multiline minRows={2} required error={fieldError('permanentAddress')} helperText={fieldHelper('permanentAddress')} /></Grid>
+            <Grid item xs={12} sm={4}><Field label="Emergency contact name" value={form.emergencyContactName} onChange={(e) => setField('emergencyContactName', e.target.value)} required error={fieldError('emergencyContactName')} helperText={fieldHelper('emergencyContactName')} /></Grid>
+            <Grid item xs={12} sm={4}><Field label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(e) => setField('emergencyContactPhone', e.target.value)} required error={fieldError('emergencyContactPhone')} helperText={fieldHelper('emergencyContactPhone')} /></Grid>
+            <Grid item xs={12} sm={4}><OptionSelect label="Emergency relation" value={form.emergencyContactRelation} options={RELATION_OPTIONS} onChange={(v) => setField('emergencyContactRelation', v)} required error={fieldError('emergencyContactRelation')} helperText={fieldHelper('emergencyContactRelation')} /></Grid>
+          </Grid>
+        </Stack>
       );
     }
 
     if (activeStep === 1) {
       return (
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><Field label="Total experience (years)" value={form.totalExperienceYears} onChange={(e) => setField('totalExperienceYears', e.target.value)} inputProps={{ inputMode: 'decimal' }} required helperText="Use 0 if fresher" /></Grid>
-          <Grid item xs={12} sm={6}><OptionSelect label="Notice period" value={form.noticePeriodDays} options={NOTICE_OPTIONS} onChange={(v) => setField('noticePeriodDays', v)} required /></Grid>
-          <Grid item xs={12}><Field label="LinkedIn URL" value={form.linkedInUrl} onChange={(e) => setField('linkedInUrl', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Passport number" value={form.passportNumber} onChange={(e) => setField('passportNumber', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Driving licence number" value={form.drivingLicenseNumber} onChange={(e) => setField('drivingLicenseNumber', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={4}><Field label="UAN number" value={form.uanNumber} onChange={(e) => setField('uanNumber', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={4}><Field label="PF number" value={form.pfNumber} onChange={(e) => setField('pfNumber', e.target.value)} helperText="Optional" /></Grid>
-          <Grid item xs={12} sm={4}><Field label="ESI number" value={form.esiNumber} onChange={(e) => setField('esiNumber', e.target.value)} helperText="Optional" /></Grid>
-        </Grid>
+        <Stack spacing={2}>
+          <StepIssuesAlert />
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}><Field label="Total experience (years)" value={form.totalExperienceYears} onChange={(e) => setField('totalExperienceYears', e.target.value)} inputProps={{ inputMode: 'decimal' }} required error={fieldError('totalExperienceYears')} helperText={fieldHelper('totalExperienceYears', 'Use 0 if fresher')} /></Grid>
+            <Grid item xs={12} sm={6}><OptionSelect label="Notice period" value={form.noticePeriodDays} options={NOTICE_OPTIONS} onChange={(v) => setField('noticePeriodDays', v)} required error={fieldError('noticePeriodDays')} helperText={fieldHelper('noticePeriodDays')} /></Grid>
+            <Grid item xs={12}><Field label="LinkedIn URL" value={form.linkedInUrl} onChange={(e) => setField('linkedInUrl', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Passport number" value={form.passportNumber} onChange={(e) => setField('passportNumber', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Driving licence number" value={form.drivingLicenseNumber} onChange={(e) => setField('drivingLicenseNumber', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={4}><Field label="UAN number" value={form.uanNumber} onChange={(e) => setField('uanNumber', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={4}><Field label="PF number" value={form.pfNumber} onChange={(e) => setField('pfNumber', e.target.value)} helperText="Optional" /></Grid>
+            <Grid item xs={12} sm={4}><Field label="ESI number" value={form.esiNumber} onChange={(e) => setField('esiNumber', e.target.value)} helperText="Optional" /></Grid>
+          </Grid>
+        </Stack>
       );
     }
 
     if (activeStep === 2) {
       return (
         <Stack spacing={2}>
+          <StepIssuesAlert />
+          {stepErrors.education ? (
+            <Alert severity="warning" variant="outlined" sx={{ borderRadius: 2 }}>
+              {stepErrors.education}
+            </Alert>
+          ) : null}
           {form.education.map((row, index) => (
             <RepeatCard key={`edu-${index}`} title={`Qualification ${index + 1}`}>
               <Stack spacing={2}>
@@ -1095,6 +1168,12 @@ const Join: React.FC = () => {
     if (activeStep === 3) {
       return (
         <Stack spacing={2}>
+          <StepIssuesAlert />
+          {stepErrors.previousEmployment ? (
+            <Alert severity="warning" variant="outlined" sx={{ borderRadius: 2 }}>
+              {stepErrors.previousEmployment}
+            </Alert>
+          ) : null}
           <FormControlLabel
             control={<Checkbox checked={form.isFresher} onChange={(e) => setField('isFresher', e.target.checked)} />}
             label="I am a fresher (no previous employment)"
@@ -1140,6 +1219,12 @@ const Join: React.FC = () => {
     if (activeStep === 4) {
       return (
         <Stack spacing={2}>
+          <StepIssuesAlert />
+          {stepErrors.references ? (
+            <Alert severity="warning" variant="outlined" sx={{ borderRadius: 2 }}>
+              {stepErrors.references}
+            </Alert>
+          ) : null}
           <Typography variant="body2" color="text.secondary">
             At least one professional reference is required (manager, HR, team lead, or client).
             Friends and personal contacts are not accepted.
@@ -1182,13 +1267,16 @@ const Join: React.FC = () => {
 
     if (activeStep === 5) {
       return (
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} required /></Grid>
-          <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} required /></Grid>
-          <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} required /></Grid>
-        </Grid>
+        <Stack spacing={2}>
+          <StepIssuesAlert />
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}><Field label="Account holder name" value={form.bankAccountHolderName} onChange={(e) => setField('bankAccountHolderName', e.target.value)} required error={fieldError('bankAccountHolderName')} helperText={fieldHelper('bankAccountHolderName')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Bank name" value={form.bankName} onChange={(e) => setField('bankName', e.target.value)} required error={fieldError('bankName')} helperText={fieldHelper('bankName')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="Account number" value={form.bankAccountNumber} onChange={(e) => setField('bankAccountNumber', e.target.value)} required error={fieldError('bankAccountNumber')} helperText={fieldHelper('bankAccountNumber')} /></Grid>
+            <Grid item xs={12} sm={6}><Field label="IFSC" value={form.bankIfsc} onChange={(e) => setField('bankIfsc', e.target.value.toUpperCase())} required error={fieldError('bankIfsc')} helperText={fieldHelper('bankIfsc')} /></Grid>
+            <Grid item xs={12}><Field label="Branch" value={form.bankBranch} onChange={(e) => setField('bankBranch', e.target.value)} required error={fieldError('bankBranch')} helperText={fieldHelper('bankBranch')} /></Grid>
+          </Grid>
+        </Stack>
       );
     }
 
@@ -1912,11 +2000,17 @@ const Join: React.FC = () => {
                                 variant="contained"
                                 sx={{ ...PrimaryButtonSx, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() => {
-                                  const missing = missingFieldsForFormStep(activeStep, form);
-                                  if (missing.length) {
-                                    toast.error(`Fill required fields: ${missing.join(', ')}`);
+                                  const errors = collectStepErrors(activeStep, form);
+                                  if (Object.keys(errors).length) {
+                                    setStepErrors(errors);
+                                    window.requestAnimationFrame(() => {
+                                      document
+                                        .getElementById('join-step-issues')
+                                        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    });
                                     return;
                                   }
+                                  setStepErrors({});
                                   if (activeStep === reviewStepIndex - 1) {
                                     queryClient.invalidateQueries({
                                       queryKey: ['join-readiness', accessToken],
