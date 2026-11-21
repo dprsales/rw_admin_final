@@ -303,15 +303,10 @@ export const theme = createTheme({
     },
     MuiSelect: {
       defaultProps: {
-        // Dropdowns should not lock page scroll or drop a dim backdrop over the app.
+        // Dropdowns should not lock page scroll or leave a click-blocking backdrop.
         MenuProps: {
           disableScrollLock: true,
-          slotProps: {
-            backdrop: {
-              invisible: true,
-              sx: { backgroundColor: "transparent" },
-            },
-          },
+          hideBackdrop: true,
         },
       },
       styleOverrides: { outlined: { color: text } },
@@ -510,12 +505,8 @@ export const theme = createTheme({
     MuiMenu: {
       defaultProps: {
         disableScrollLock: true,
-        slotProps: {
-          backdrop: {
-            invisible: true,
-            sx: { backgroundColor: "transparent" },
-          },
-        },
+        // Avoid a full-screen modal layer that blocks clicks after the menu closes.
+        hideBackdrop: true,
       },
       styleOverrides: {
         paper: {

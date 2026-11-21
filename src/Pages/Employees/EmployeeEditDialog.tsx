@@ -170,6 +170,8 @@ const EmployeeEditDialog: React.FC<Props> = ({ open, employee, onClose }) => {
         personalSectionSavedAt: _p,
         formDraftSavedAt: _d,
         onboardingStatus: _o,
+        joinCompletedSteps: _steps,
+        joinStepTotal: _total,
         ...payload
       } = joinForm;
       return saveEmployeeForm(employee._id, payload);
@@ -278,7 +280,15 @@ const EmployeeEditDialog: React.FC<Props> = ({ open, employee, onClose }) => {
   const documents: JoinDocumentItem[] = (documentsQuery.data as JoinDocumentsChecklist | undefined)?.documents || [];
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      disableScrollLock
+      // Keep typing available even if a parent menu/popper was just closed.
+      disableRestoreFocus
+    >
       <DialogTitle>
         Edit employee
         {employee ? (
@@ -352,7 +362,21 @@ const EmployeeEditDialog: React.FC<Props> = ({ open, employee, onClose }) => {
         ) : null}
 
         {employee && tab === 1 ? (
-          formQuery.isPending || !joinForm ? (
+          formQuery.isPending && !joinForm ? (
+            <Stack alignItems="center" py={6}>
+              <CircularProgress size={28} />
+            </Stack>
+          ) : formQuery.isError && !joinForm ? (
+            <Stack spacing={2} py={2}>
+              <Alert severity="error">
+                {errorMessage(formQuery.error) ||
+                  'Could not load the joining form. Restart the API if this route is new, then try again.'}
+              </Alert>
+              <Button variant="outlined" onClick={() => formQuery.refetch()}>
+                Retry
+              </Button>
+            </Stack>
+          ) : !joinForm ? (
             <Stack alignItems="center" py={6}>
               <CircularProgress size={28} />
             </Stack>
