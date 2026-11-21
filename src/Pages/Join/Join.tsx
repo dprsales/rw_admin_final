@@ -45,6 +45,7 @@ import {
   getJoinForm,
   getJoinPolicies,
   getJoinReadiness,
+  markJoinStepComplete,
   requestJoinOtp,
   resolveInvitation,
   resumeJoinSession,
@@ -767,6 +768,9 @@ const Join: React.FC = () => {
   const [form, setForm] = useState(emptyForm);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [restoredStep, setRestoredStep] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
@@ -800,7 +804,8 @@ const Join: React.FC = () => {
           '& .MuiAlert-icon': { color: tokens.warning },
         }}
       >
-        Complete the highlighted fields on this step to continue.
+        {Object.values(stepErrors)[0] ||
+          'Complete the highlighted fields on this step to continue.'}
       </Alert>
     ) : null;
 
@@ -905,7 +910,16 @@ const Join: React.FC = () => {
       bankBranch: draft.bankBranch || '',
     });
     setSavedAt(draft.formDraftSavedAt || draft.personalSectionSavedAt);
-  }, [formQuery.data]);
+    const savedSteps = Array.from(
+      new Set((draft.joinCompletedSteps || []).filter((step) => Number.isInteger(step))),
+    ).sort((a, b) => a - b);
+    setCompletedSteps(savedSteps);
+    if (!restoredStep) {
+      const nextOpen = STEPS.findIndex((_, index) => !savedSteps.includes(index));
+      setActiveStep(nextOpen >= 0 ? nextOpen : Math.max(0, STEPS.length - 1));
+      setRestoredStep(true);
+    }
+  }, [formQuery.data, restoredStep]);
 
   const sendOtp = useMutation({
     mutationFn: () => requestJoinOtp(token),
@@ -929,14 +943,30 @@ const Join: React.FC = () => {
     onError: (error: any) => toast.error(errorMessage(error)),
   });
 
+  const applyProgressDraft = (draft: JoinFormDraft) => {
+    setSavedAt(draft.formDraftSavedAt || draft.personalSectionSavedAt);
+    const savedSteps = Array.from(
+      new Set((draft.joinCompletedSteps || []).filter((step) => Number.isInteger(step))),
+    ).sort((a, b) => a - b);
+    setCompletedSteps(savedSteps);
+    queryClient.setQueryData(['join-form', accessToken], draft);
+    queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
+  };
+
   const saveForm = useMutation({
-    mutationFn: () => saveJoinForm(accessToken, form),
-    onSuccess: (draft) => {
-      setSavedAt(draft.formDraftSavedAt || draft.personalSectionSavedAt);
-      setStatusMessage('Details saved. You can return later with the same invitation link.');
-      toast.success('Details saved');
-      queryClient.setQueryData(['join-form', accessToken], draft);
-      queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
+    mutationFn: (completedStep?: number) =>
+      saveJoinForm(accessToken, {
+        ...form,
+        ...(typeof completedStep === 'number' ? { completedStep } : {}),
+      }),
+    onSuccess: (draft, completedStep) => {
+      applyProgressDraft(draft);
+      setStatusMessage(
+        typeof completedStep === 'number'
+          ? `${STEPS[completedStep]} saved. Continue when you are ready.`
+          : 'Details saved. You can return later with the same invitation link.',
+      );
+      toast.success(typeof completedStep === 'number' ? 'Section saved' : 'Details saved');
     },
     onError: (error: any) => toast.error(errorMessage(error)),
   });
@@ -1729,7 +1759,100 @@ const Join: React.FC = () => {
     );
   };
 
-  const progressValue = ((activeStep + 1) / STEPS.length) * 100;
+  const collectGateErrors = (stepIndex: number): Record<string, string> => {
+    if (stepIndex <= 5) return collectStepErrors(stepIndex, form);
+
+    if (stepIndex === documentsStepIndex) {
+      const checklist = documentsQuery.data;
+      const idDocs = (checklist?.documents || []).filter(
+        (doc) => doc.documentType !== NDNC_SIGNATURE_TYPE,
+      );
+      const required = idDocs.filter((doc) => doc.required);
+      const missing = required.filter(
+        (doc) => doc.status === 'Missing' || doc.status === 'Re-upload Required',
+      );
+      if (missing.length) {
+        return {
+          documents: `Upload ${missing.length} required document${missing.length === 1 ? '' : 's'} before continuing`,
+        };
+      }
+      return {};
+    }
+
+    if (stepIndex === policiesStepIndex) {
+      const policyState = policiesQuery.data;
+      const handbook = (policyState?.policies || []).filter(
+        (policy) => policy.policyId !== NDNC_POLICY_ID,
+      );
+      const pending = handbook.filter((policy) => !policy.acknowledged);
+      if (pending.length) {
+        return {
+          policies: `Accept ${pending.length} remaining workplace polic${pending.length === 1 ? 'y' : 'ies'}`,
+        };
+      }
+      return {};
+    }
+
+    if (stepIndex === ndncStepIndex) {
+      const policyState = policiesQuery.data;
+      const checklist = documentsQuery.data;
+      const ndncPolicy = (policyState?.policies || []).find(
+        (policy) => policy.policyId === NDNC_POLICY_ID,
+      );
+      const signatureDoc = (checklist?.documents || []).find(
+        (doc) => doc.documentType === NDNC_SIGNATURE_TYPE,
+      );
+      const signatureReady = Boolean(
+        signatureDoc &&
+          signatureDoc.status !== 'Missing' &&
+          signatureDoc.status !== 'Re-upload Required',
+      );
+      const errors: Record<string, string> = {};
+      if (!ndncPolicy?.acknowledged) errors.ndnc = 'Accept the NDNC rules first';
+      if (!signatureReady) errors.signature = 'Upload your NDNC signature file';
+      if (!policyState?.declaration?.accepted) errors.declaration = 'Confirm the joining declaration';
+      return errors;
+    }
+
+    return {};
+  };
+
+  const completedCount = readinessQuery.data?.alreadySubmitted
+    ? STEPS.length
+    : completedSteps.length;
+  const progressValue = (completedCount / STEPS.length) * 100;
+
+  const goNextSection = async () => {
+    const errors = collectGateErrors(activeStep);
+    if (Object.keys(errors).length) {
+      setStepErrors(errors);
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById('join-step-issues')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return;
+    }
+    setStepErrors({});
+    setAdvancing(true);
+    try {
+      if (activeStep <= 5) {
+        await saveForm.mutateAsync(activeStep);
+      } else if (activeStep < reviewStepIndex) {
+        const draft = await markJoinStepComplete(accessToken, activeStep);
+        applyProgressDraft(draft);
+        toast.success('Section complete');
+      }
+      if (activeStep === reviewStepIndex - 1) {
+        queryClient.invalidateQueries({ queryKey: ['join-readiness', accessToken] });
+      }
+      setActiveStep((step) => Math.min(STEPS.length - 1, step + 1));
+    } catch (error: any) {
+      toast.error(errorMessage(error));
+    } finally {
+      setAdvancing(false);
+    }
+  };
 
   return (
     <Box
@@ -1893,7 +2016,7 @@ const Join: React.FC = () => {
                           mb={1}
                         >
                           <Typography variant="caption" sx={{ color: JOIN.muted, fontWeight: 600 }}>
-                            Step {activeStep + 1} of {STEPS.length}
+                            {completedCount} of {STEPS.length} sections done
                           </Typography>
                           <Typography variant="caption" sx={{ color: JOIN.primary, fontWeight: 700 }}>
                             {Math.round(progressValue)}% complete
@@ -1928,10 +2051,11 @@ const Join: React.FC = () => {
                               color: JOIN.muted,
                             },
                             '& .MuiStepLabel-label.Mui-active': { color: JOIN.ink },
+                            '& .MuiStepLabel-label.Mui-completed': { color: JOIN.ink },
                           }}
                         >
-                          {STEPS.map((label) => (
-                            <Step key={label}>
+                          {STEPS.map((label, index) => (
+                            <Step key={label} completed={completedSteps.includes(index) || completedCount >= STEPS.length}>
                               <StepLabel>{label}</StepLabel>
                             </Step>
                           ))}
@@ -1989,10 +2113,10 @@ const Join: React.FC = () => {
                               <Button
                                 variant="outlined"
                                 sx={{ ...OutlineButtonSx, width: { xs: '100%', sm: 'auto' } }}
-                                onClick={() => saveForm.mutate()}
-                                disabled={saveForm.isPending || !form.phone.trim()}
+                                onClick={() => saveForm.mutate(undefined)}
+                                disabled={saveForm.isPending || advancing || !form.phone.trim()}
                               >
-                                {saveForm.isPending ? 'Saving…' : 'Save draft'}
+                                {saveForm.isPending && !advancing ? 'Saving…' : 'Save draft'}
                               </Button>
                             )}
                             {activeStep < STEPS.length - 1 ? (
@@ -2000,26 +2124,11 @@ const Join: React.FC = () => {
                                 variant="contained"
                                 sx={{ ...PrimaryButtonSx, width: { xs: '100%', sm: 'auto' } }}
                                 onClick={() => {
-                                  const errors = collectStepErrors(activeStep, form);
-                                  if (Object.keys(errors).length) {
-                                    setStepErrors(errors);
-                                    window.requestAnimationFrame(() => {
-                                      document
-                                        .getElementById('join-step-issues')
-                                        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    });
-                                    return;
-                                  }
-                                  setStepErrors({});
-                                  if (activeStep === reviewStepIndex - 1) {
-                                    queryClient.invalidateQueries({
-                                      queryKey: ['join-readiness', accessToken],
-                                    });
-                                  }
-                                  setActiveStep((step) => Math.min(STEPS.length - 1, step + 1));
+                                  void goNextSection();
                                 }}
+                                disabled={advancing || saveForm.isPending}
                               >
-                                Next section
+                                {advancing ? 'Saving…' : 'Next section'}
                               </Button>
                             ) : (
                               <Typography

@@ -976,15 +976,28 @@ const Employees: React.FC = () => {
                     <TableCell>{employee.department}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(employee.joiningDate)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                        <Chip size="small" label={employee.onboardingStatus} />
-                        {employee.invitationExpired && employee.canResendJoinLink ? (
-                          <Chip
-                            size="small"
-                            color="warning"
-                            variant="outlined"
-                            label="Link expired"
-                          />
+                      <Stack spacing={0.5}>
+                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                          <Chip size="small" label={employee.onboardingStatus} />
+                          {employee.invitationExpired && employee.canResendJoinLink ? (
+                            <Chip
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                              label="Link expired"
+                            />
+                          ) : null}
+                        </Stack>
+                        {employee.joinProgress &&
+                        ['Invited', 'In Progress', 'Corrections Required'].includes(
+                          employee.onboardingStatus,
+                        ) ? (
+                          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.35 }}>
+                            {employee.joinProgress.label}
+                            {employee.joinProgress.nextStep
+                              ? ` · Next: ${employee.joinProgress.nextStep}`
+                              : ''}
+                          </Typography>
                         ) : null}
                       </Stack>
                     </TableCell>

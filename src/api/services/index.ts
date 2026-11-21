@@ -449,6 +449,14 @@ export const createUser = (data: {
   return http.post('/users', data);
 };
 
+export interface EmployeeJoinProgress {
+  completedCount: number;
+  totalSteps: number;
+  percent: number;
+  label: string;
+  nextStep: string;
+}
+
 export interface EmployeeRecord {
   _id: string;
   employeeCode: string;
@@ -466,6 +474,8 @@ export interface EmployeeRecord {
   invitationExpired?: boolean;
   invitationEmailVerified?: boolean;
   canResendJoinLink?: boolean;
+  joinCompletedSteps?: number[];
+  joinProgress?: EmployeeJoinProgress;
 }
 
 export interface CreateEmployeeInput {
@@ -759,6 +769,8 @@ export interface JoinFormDraft {
   personalSectionSavedAt: string | null;
   formDraftSavedAt: string | null;
   onboardingStatus: string;
+  joinCompletedSteps?: number[];
+  joinStepTotal?: number;
 }
 
 /** @deprecated use JoinFormDraft */
@@ -812,9 +824,23 @@ export const saveJoinForm = async (
     | 'personalSectionSavedAt'
     | 'formDraftSavedAt'
     | 'onboardingStatus'
-  >,
+    | 'joinCompletedSteps'
+    | 'joinStepTotal'
+  > & { completedStep?: number },
 ) => {
   const response = await joinHttp.put('/join/form', data, joinAuth(accessToken));
+  return response.data as JoinFormDraft;
+};
+
+export const markJoinStepComplete = async (
+  accessToken: string,
+  completedStep: number,
+): Promise<JoinFormDraft> => {
+  const response = await joinHttp.post(
+    '/join/progress',
+    { completedStep },
+    joinAuth(accessToken),
+  );
   return response.data as JoinFormDraft;
 };
 
