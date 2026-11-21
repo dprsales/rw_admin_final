@@ -724,7 +724,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                   {coachingCall
                     ? 'Outpero dials this coaching enquiry. Results come back after the call.'
                     : 'Outpero dials this consulting enquiry. Results come back after the call.'}
-                </Typography>
+              </Typography>
               )}
             </Box>
           )}
@@ -912,7 +912,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-<Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3 }}>
             <Typography
               variant="overline"
               sx={{ display: 'block', color: 'text.secondary', fontWeight: 700, letterSpacing: 0.08, mb: 1 }}
