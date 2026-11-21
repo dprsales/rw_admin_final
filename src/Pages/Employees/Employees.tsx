@@ -11,8 +11,12 @@ import {
   DialogTitle,
   Divider,
   FormControl,
+  IconButton,
   InputAdornment,
   InputLabel,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Pagination,
   Paper,
@@ -28,14 +32,26 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { PersonAddAlt1, Search } from '@mui/icons-material';
+import {
+  DeleteOutline,
+  DescriptionOutlined,
+  EditOutlined,
+  MoreVert,
+  PersonAddAlt1,
+  RateReviewOutlined,
+  Replay,
+  Search,
+  SendOutlined,
+} from '@mui/icons-material';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
 import {
   approveEmployeeDocument,
   approveEmployeePackage,
   createEmployee,
+  deleteEmployee,
   deleteEmployeeDocument,
   fetchEmployeeDocumentBlob,
   getEmployeeDocuments,
@@ -46,6 +62,7 @@ import {
   resendEmployeeJoinLink,
   sendEmployeeInvitation,
   startEmployeePackageReview,
+  updateEmployee,
   type CreateEmployeeInput,
   type EmployeePackageReview,
   type EmployeeRecord,
@@ -57,6 +74,7 @@ import ConfirmDialog from '../../Components/ConfirmDialog';
 import EmptyState from '../../Components/EmptyState';
 import { useTableSort, SortableHeadCell, type SortAccessors } from '../../Components/TableSort';
 import { tokens } from '../../Theme/tokens';
+import { roleSatisfies } from '../../utils/roles';
 
 const EMPTY_FORM: CreateEmployeeInput = {
   firstName: '',
@@ -66,6 +84,15 @@ const EMPTY_FORM: CreateEmployeeInput = {
   designation: '',
   department: '',
   joiningDate: '',
+};
+
+const EMPLOYMENT_STATUSES = ['Prejoining', 'Active', 'Inactive', 'Exited'] as const;
+
+const toDateInputValue = (value?: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toISOString().slice(0, 10);
 };
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
@@ -690,7 +717,12 @@ const PackageReviewDialog = ({
 
 const Employees: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EmployeeRecord | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [menuEmployee, setMenuEmployee] = useState<EmployeeRecord | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [employmentStatus, setEmploymentStatus] = useState<string>('Prejoining');
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [reviewEmployee, setReviewEmployee] = useState<EmployeeRecord | null>(null);
   const [packageEmployee, setPackageEmployee] = useState<EmployeeRecord | null>(null);
@@ -698,6 +730,22 @@ const Employees: React.FC = () => {
   const [onboardingFilter, setOnboardingFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
+  const canManageRecords = roleSatisfies(Cookies.get('user_type'), 'super_admin');
+
+  const closeRowMenu = () => {
+    setMenuAnchor(null);
+    setMenuEmployee(null);
+  };
+
+  const openRowMenu = (event: React.MouseEvent<HTMLElement>, employee: EmployeeRecord) => {
+    setMenuAnchor(event.currentTarget);
+    setMenuEmployee(employee);
+  };
+
+  const runMenuAction = (action: () => void) => {
+    closeRowMenu();
+    action();
+  };
 
   const { data, isPending, error, refetch } = useQuery<EmployeeRecord[], Error>({
     queryKey: ['employees'],
@@ -722,13 +770,40 @@ const Employees: React.FC = () => {
     onError: (requestError: any) => toast.error(errorMessage(requestError)),
   });
 
+  const closeEditor = () => {
+    setCreateOpen(false);
+    setEditingEmployee(null);
+    setForm(EMPTY_FORM);
+    setEmploymentStatus('Prejoining');
+    setFormErrors({});
+  };
+
   const createMutation = useMutation({
     mutationFn: createEmployee,
     onSuccess: () => {
       toast.success('Employee created');
-      setCreateOpen(false);
-      setForm(EMPTY_FORM);
-      setFormErrors({});
+      closeEditor();
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (requestError: any) => toast.error(errorMessage(requestError)),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: CreateEmployeeInput & { employmentStatus: string } }) =>
+      updateEmployee(id, payload),
+    onSuccess: () => {
+      toast.success('Employee updated');
+      closeEditor();
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (requestError: any) => toast.error(errorMessage(requestError)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (employeeId: string) => deleteEmployee(employeeId),
+    onSuccess: () => {
+      toast.success('Employee deleted');
+      setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
     onError: (requestError: any) => toast.error(errorMessage(requestError)),
@@ -768,11 +843,35 @@ const Employees: React.FC = () => {
     setFormErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  const submitCreate = () => {
+  const openCreate = () => {
+    setEditingEmployee(null);
+    setForm(EMPTY_FORM);
+    setEmploymentStatus('Prejoining');
+    setFormErrors({});
+    setCreateOpen(true);
+  };
+
+  const openEdit = (employee: EmployeeRecord) => {
+    setEditingEmployee(employee);
+    setForm({
+      firstName: employee.firstName || '',
+      lastName: employee.lastName || '',
+      personalEmail: employee.personalEmail || '',
+      phone: employee.phone || '',
+      designation: employee.designation || '',
+      department: employee.department || '',
+      joiningDate: toDateInputValue(employee.joiningDate),
+    });
+    setEmploymentStatus(employee.employmentStatus || 'Prejoining');
+    setFormErrors({});
+    setCreateOpen(true);
+  };
+
+  const submitEditor = () => {
     const errors = validate(form);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    createMutation.mutate({
+    const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       personalEmail: form.personalEmail.trim(),
@@ -780,8 +879,18 @@ const Employees: React.FC = () => {
       designation: form.designation.trim(),
       department: form.department.trim(),
       joiningDate: form.joiningDate,
-    });
+    };
+    if (editingEmployee) {
+      updateMutation.mutate({
+        id: editingEmployee._id,
+        payload: { ...payload, employmentStatus },
+      });
+      return;
+    }
+    createMutation.mutate(payload);
   };
+
+  const editorSaving = createMutation.isPending || updateMutation.isPending;
 
   if (isPending) {
     return (
@@ -808,20 +917,12 @@ const Employees: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <PageHeader
         title="Employees"
-        description="Create a draft employee record. Review documents and full onboarding from each row."
+        description="Create a draft employee record. Review documents and full onboarding from each row. Super admin can edit or delete records."
         crumbs={[{ label: 'Employees' }]}
         actions={
           <>
             <Chip label={`${rows.length} total`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
-            <Button
-              onClick={() => {
-                setForm(EMPTY_FORM);
-                setFormErrors({});
-                setCreateOpen(true);
-              }}
-              startIcon={<PersonAddAlt1 />}
-              variant="contained"
-            >
+            <Button onClick={openCreate} startIcon={<PersonAddAlt1 />} variant="contained">
               Add employee
             </Button>
           </>
@@ -872,7 +973,7 @@ const Employees: React.FC = () => {
         </Box>
         <Divider />
         <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 1100 }}>
+          <Table size="small" sx={{ minWidth: 980 }}>
             <TableHead>
               <TableRow>
                 <SortableHeadCell label="Employee ID" sortKey="employeeId" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
@@ -883,11 +984,8 @@ const Employees: React.FC = () => {
                 <SortableHeadCell label="Department" sortKey="department" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
                 <SortableHeadCell label="Joining date" sortKey="joiningDate" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} />
                 <SortableHeadCell label="Onboarding" sortKey="onboarding" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700 }} />
-                <TableCell
-                  align="right"
-                  sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: 360, pr: 3 }}
-                >
-                  Actions
+                <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: 'nowrap', width: 72, pr: 2 }}>
+                  More
                 </TableCell>
               </TableRow>
             </TableHead>
@@ -904,15 +1002,7 @@ const Employees: React.FC = () => {
                           : 'Try a different search or onboarding status.'
                       }
                       actionLabel={rows.length === 0 ? 'Add employee' : undefined}
-                      onAction={
-                        rows.length === 0
-                          ? () => {
-                              setForm(EMPTY_FORM);
-                              setFormErrors({});
-                              setCreateOpen(true);
-                            }
-                          : undefined
-                      }
+                      onAction={rows.length === 0 ? openCreate : undefined}
                     />
                   </TableCell>
                 </TableRow>
@@ -941,111 +1031,19 @@ const Employees: React.FC = () => {
                         ) : null}
                       </Stack>
                     </TableCell>
-                    <TableCell align="right" sx={{ minWidth: 360, pr: 3, py: 1.5 }}>
-                      <Stack
-                        direction="row"
-                        spacing={1.5}
-                        justifyContent="flex-end"
-                        alignItems="center"
-                        flexWrap="wrap"
-                        useFlexGap
-                      >
-                        <Tooltip title="Open and approve or reject each joining document one by one.">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => setReviewEmployee(employee)}
-                            sx={{
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0,
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              borderRadius: 1.5,
-                              px: 1.5,
-                            }}
-                          >
-                            Documents
-                          </Button>
-                        </Tooltip>
-                        <Tooltip title="Review full onboarding: form summary, documents, and policies. Start review, send back, or approve.">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => setPackageEmployee(employee)}
-                            sx={{
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0,
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              borderRadius: 1.5,
-                              px: 1.5,
-                            }}
-                          >
-                            Review
-                          </Button>
-                        </Tooltip>
-                        {employee.onboardingStatus === 'Draft' || employee.onboardingStatus === 'Invited' ? (
-                          <Tooltip title="Email the candidate their first personal joining invitation link.">
-                            <span>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                disabled={inviteMutation.isPending || resendJoinMutation.isPending}
-                                onClick={() => inviteMutation.mutate(employee._id)}
-                                sx={{
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0,
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  borderRadius: 1.5,
-                                  px: 1.5,
-                                  bgcolor: tokens.gold,
-                                  color: tokens.black,
-                                  boxShadow: 'none',
-                                  '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
-                                }}
-                              >
-                                {inviteMutation.isPending && inviteMutation.variables === employee._id
-                                  ? 'Sending…'
-                                  : 'Send invitation'}
-                              </Button>
-                            </span>
-                          </Tooltip>
-                        ) : null}
-                        {employee.canResendJoinLink ? (
-                          <Tooltip title="Send a fresh join URL so they can finish incomplete details. Saved answers stay. If email was already verified, no OTP again.">
-                            <span>
-                              <Button
-                                size="small"
-                                variant={employee.invitationExpired ? 'contained' : 'outlined'}
-                                disabled={inviteMutation.isPending || resendJoinMutation.isPending}
-                                onClick={() => resendJoinMutation.mutate(employee._id)}
-                                sx={{
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0,
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  borderRadius: 1.5,
-                                  px: 1.5,
-                                  ...(employee.invitationExpired
-                                    ? {
-                                        bgcolor: tokens.gold,
-                                        color: tokens.black,
-                                        boxShadow: 'none',
-                                        '&:hover': { bgcolor: tokens.goldDark, boxShadow: 'none' },
-                                      }
-                                    : {}),
-                                }}
-                              >
-                                {resendJoinMutation.isPending &&
-                                resendJoinMutation.variables === employee._id
-                                  ? 'Sending…'
-                                  : 'Resend join link'}
-                              </Button>
-                            </span>
-                          </Tooltip>
-                        ) : null}
-                      </Stack>
+                    <TableCell align="right" sx={{ width: 72, pr: 2, py: 0.75 }}>
+                      <Tooltip title="More actions">
+                        <IconButton
+                          size="small"
+                          aria-label={`More actions for ${employee.firstName} ${employee.lastName}`}
+                          aria-controls={menuEmployee?._id === employee._id ? 'employee-row-menu' : undefined}
+                          aria-haspopup="true"
+                          aria-expanded={menuEmployee?._id === employee._id ? 'true' : undefined}
+                          onClick={(event) => openRowMenu(event, employee)}
+                        >
+                          <MoreVert fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1053,6 +1051,121 @@ const Employees: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Menu
+          id="employee-row-menu"
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor) && Boolean(menuEmployee)}
+          onClose={closeRowMenu}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{
+            paper: {
+              sx: {
+                minWidth: 240,
+                border: `1px solid ${tokens.border}`,
+                boxShadow: tokens.shadowSoft,
+              },
+            },
+          }}
+        >
+          {menuEmployee ? (
+            <>
+              <MenuItem
+                onClick={() => runMenuAction(() => setReviewEmployee(menuEmployee))}
+              >
+                <ListItemIcon>
+                  <DescriptionOutlined fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Review documents"
+                  secondary="Approve or reject each joining file"
+                />
+              </MenuItem>
+              <MenuItem
+                onClick={() => runMenuAction(() => setPackageEmployee(menuEmployee))}
+              >
+                <ListItemIcon>
+                  <RateReviewOutlined fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Review onboarding"
+                  secondary="Form summary, documents, and policies"
+                />
+              </MenuItem>
+              {menuEmployee.onboardingStatus === 'Draft' || menuEmployee.onboardingStatus === 'Invited' ? (
+                <MenuItem
+                  disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                  onClick={() =>
+                    runMenuAction(() => inviteMutation.mutate(menuEmployee._id))
+                  }
+                >
+                  <ListItemIcon>
+                    <SendOutlined fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      inviteMutation.isPending && inviteMutation.variables === menuEmployee._id
+                        ? 'Sending invitation…'
+                        : 'Send invitation'
+                    }
+                    secondary="Email the first personal joining link"
+                  />
+                </MenuItem>
+              ) : null}
+              {menuEmployee.canResendJoinLink ? (
+                <MenuItem
+                  disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                  onClick={() =>
+                    runMenuAction(() => resendJoinMutation.mutate(menuEmployee._id))
+                  }
+                >
+                  <ListItemIcon>
+                    <Replay fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      resendJoinMutation.isPending &&
+                      resendJoinMutation.variables === menuEmployee._id
+                        ? 'Sending fresh link…'
+                        : menuEmployee.invitationExpired
+                          ? 'Resend expired join link'
+                          : 'Resend join link'
+                    }
+                    secondary="Fresh URL keeps saved answers"
+                  />
+                </MenuItem>
+              ) : null}
+              {canManageRecords ? (
+                <>
+                  <Divider sx={{ my: 0.5 }} />
+                  <MenuItem onClick={() => runMenuAction(() => openEdit(menuEmployee))}>
+                    <ListItemIcon>
+                      <EditOutlined fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Edit employee"
+                      secondary="Name, contact, role, and status"
+                    />
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => runMenuAction(() => setDeleteTarget(menuEmployee))}
+                    sx={{ color: 'error.main' }}
+                  >
+                    <ListItemIcon>
+                      <DeleteOutline fontSize="small" color="error" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Delete employee"
+                      secondary="Removes record, invites, and files"
+                      primaryTypographyProps={{ color: 'error.main' }}
+                    />
+                  </MenuItem>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </Menu>
       </Paper>
 
       {sorted.length > ROWS_PER_PAGE && (
@@ -1067,11 +1180,20 @@ const Employees: React.FC = () => {
         </Box>
       )}
 
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Add employee</DialogTitle>
+      <Dialog open={createOpen} onClose={closeEditor} fullWidth maxWidth="sm">
+        <DialogTitle>{editingEmployee ? 'Edit employee' : 'Add employee'}</DialogTitle>
         <Divider />
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
+            {editingEmployee ? (
+              <TextField
+                label="Employee ID"
+                value={editingEmployee.employeeCode}
+                fullWidth
+                InputProps={{ readOnly: true }}
+                helperText=" "
+              />
+            ) : null}
             {fields.map((field) => (
               <TextField
                 key={field.key}
@@ -1085,17 +1207,51 @@ const Employees: React.FC = () => {
                 InputLabelProps={field.type === 'date' ? { shrink: true } : undefined}
               />
             ))}
+            {editingEmployee ? (
+              <FormControl fullWidth>
+                <InputLabel id="employee-employment-status">Employment status</InputLabel>
+                <Select
+                  labelId="employee-employment-status"
+                  label="Employment status"
+                  value={employmentStatus}
+                  onChange={(event) => setEmploymentStatus(event.target.value)}
+                >
+                  {EMPLOYMENT_STATUSES.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {status}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} disabled={createMutation.isPending}>
+          <Button onClick={closeEditor} disabled={editorSaving}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={submitCreate} disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Saving…' : 'Create'}
+          <Button variant="contained" onClick={submitEditor} disabled={editorSaving}>
+            {editorSaving ? 'Saving…' : editingEmployee ? 'Save changes' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete employee?"
+        description={
+          deleteTarget
+            ? `This permanently removes ${deleteTarget.firstName} ${deleteTarget.lastName} (${deleteTarget.employeeCode}), their invitations, and stored joining files.`
+            : ''
+        }
+        confirmLabel="Delete employee"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget._id);
+        }}
+      />
 
       <DocumentReviewDialog
         employee={reviewEmployee}

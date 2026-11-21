@@ -487,6 +487,18 @@ export const createEmployee = (data: CreateEmployeeInput) => {
   return http.post('/employees', data);
 };
 
+export interface UpdateEmployeeInput extends Partial<CreateEmployeeInput> {
+  employmentStatus?: string;
+}
+
+export const updateEmployee = (employeeId: string, data: UpdateEmployeeInput) => {
+  return http.patch(`/employees/${employeeId}`, data);
+};
+
+export const deleteEmployee = (employeeId: string) => {
+  return http.delete(`/employees/${employeeId}`);
+};
+
 export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
 };
