@@ -499,6 +499,42 @@ export const deleteEmployee = (employeeId: string) => {
   return http.delete(`/employees/${employeeId}`);
 };
 
+export const getEmployeeForm = async (employeeId: string): Promise<JoinFormDraft> => {
+  const response = await http.get(`/employees/${employeeId}/form`);
+  return response.data;
+};
+
+export const saveEmployeeForm = async (
+  employeeId: string,
+  data: Omit<
+    JoinFormDraft,
+    | 'firstName'
+    | 'lastName'
+    | 'personalEmail'
+    | 'personalSectionSavedAt'
+    | 'formDraftSavedAt'
+    | 'onboardingStatus'
+  >,
+): Promise<JoinFormDraft> => {
+  const response = await http.put(`/employees/${employeeId}/form`, data);
+  return response.data;
+};
+
+export const uploadEmployeeDocument = async (
+  employeeId: string,
+  documentType: string,
+  file: File,
+): Promise<JoinDocumentsChecklist> => {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await http.post(`/employees/${employeeId}/documents/${documentType}/upload`, body, {
+    headers: {
+      'Content-Type': undefined as unknown as string,
+    },
+  });
+  return response.data;
+};
+
 export const sendEmployeeInvitation = (employeeId: string) => {
   return http.post(`/employees/${employeeId}/invitation`);
 };

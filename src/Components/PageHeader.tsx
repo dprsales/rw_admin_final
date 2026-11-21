@@ -34,8 +34,29 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <Box sx={{ mb: { xs: 2, sm: 3 } }}>
       <Breadcrumbs
-        separator={<NavigateNextRoundedIcon sx={{ fontSize: 13, color: tokens.textMuted, opacity: 0.6 }} />}
-        sx={{ mb: 1.1, '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap' } }}
+        separator={
+          <NavigateNextRoundedIcon
+            sx={{ fontSize: 14, color: tokens.textMuted, opacity: 0.65, display: 'block' }}
+          />
+        }
+        sx={{
+          mb: 1.1,
+          '& .MuiBreadcrumbs-ol': {
+            flexWrap: 'nowrap',
+            alignItems: 'center',
+          },
+          '& .MuiBreadcrumbs-li': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            lineHeight: 1,
+          },
+          '& .MuiBreadcrumbs-separator': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            mx: 0.35,
+            lineHeight: 1,
+          },
+        }}
       >
         <MuiLink
           component={RouterLink}
@@ -44,14 +65,16 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           sx={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 0.5,
-            fontSize: 11.5,
+            gap: 0.45,
+            height: 18,
+            lineHeight: 1,
+            fontSize: 12,
             fontWeight: 600,
             color: tokens.textMuted,
             '&:hover': { color: tokens.goldHover },
           }}
         >
-          <HomeRoundedIcon sx={{ fontSize: 14 }} />
+          <HomeRoundedIcon sx={{ fontSize: 15, display: 'block' }} />
           Home
         </MuiLink>
         {trail.map((crumb) =>
@@ -61,12 +84,33 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               component={RouterLink}
               to={crumb.to}
               underline="none"
-              sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.textMuted, '&:hover': { color: tokens.goldHover } }}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 18,
+                lineHeight: 1,
+                fontSize: 12,
+                fontWeight: 600,
+                color: tokens.textMuted,
+                '&:hover': { color: tokens.goldHover },
+              }}
             >
               {crumb.label}
             </MuiLink>
           ) : (
-            <Typography key={crumb.label} sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.goldHover }}>
+            <Typography
+              key={crumb.label}
+              component="span"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 18,
+                lineHeight: 1,
+                fontSize: 12,
+                fontWeight: 600,
+                color: tokens.goldHover,
+              }}
+            >
               {crumb.label}
             </Typography>
           ),

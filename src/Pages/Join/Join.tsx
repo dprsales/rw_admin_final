@@ -1301,9 +1301,9 @@ const Join: React.FC = () => {
       return (
         <Stack spacing={2}>
           <Typography variant="body2" color="text.secondary">
-            Upload PDF, JPG, or PNG files up to 5 MB. Each uploaded file shows a preview so you can
-            confirm the right document before moving on. Your NDNC signature is collected on the next
-            NDNC step.
+            Upload PDF, JPG, or PNG files up to 5 MB. Include relieving letter and experience letter
+            if you have prior work experience; fresher hires can skip those. Your NDNC signature is
+            collected on the next NDNC step.
           </Typography>
           {checklist && (
             <Typography variant="body2" fontWeight={600} role="status" aria-atomic="true">

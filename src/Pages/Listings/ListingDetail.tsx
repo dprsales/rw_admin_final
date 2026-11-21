@@ -385,7 +385,10 @@ function FieldRow({ label, value }: { label: string; value?: React.ReactNode }) 
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: tokens.goldText, mb: 1 }}>
+    <Typography
+      variant="subtitle2"
+      sx={{ fontWeight: 700, color: tokens.goldText, lineHeight: 1.3, m: 0 }}
+    >
       {children}
     </Typography>
   )

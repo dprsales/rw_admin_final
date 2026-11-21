@@ -302,7 +302,58 @@ export const theme = createTheme({
       },
     },
     MuiSelect: {
+      defaultProps: {
+        // Dropdowns should not lock page scroll or drop a dim backdrop over the app.
+        MenuProps: {
+          disableScrollLock: true,
+          slotProps: {
+            backdrop: {
+              invisible: true,
+              sx: { backgroundColor: "transparent" },
+            },
+          },
+        },
+      },
       styleOverrides: { outlined: { color: text } },
+    },
+    MuiAccordion: {
+      styleOverrides: {
+        root: {
+          backgroundColor: panel,
+          backgroundImage: "none",
+          border: `1px solid ${border}`,
+          borderRadius: "12px !important",
+          boxShadow: "none",
+          "&:before": { display: "none" },
+          "&.Mui-expanded": { margin: 0 },
+        },
+      },
+    },
+    MuiAccordionSummary: {
+      styleOverrides: {
+        root: {
+          minHeight: 52,
+          paddingLeft: 16,
+          paddingRight: 16,
+          "&.Mui-expanded": { minHeight: 52 },
+        },
+        content: {
+          alignItems: "center",
+          margin: "12px 0",
+          "&.Mui-expanded": { margin: "12px 0" },
+        },
+        expandIconWrapper: { color: textMuted },
+      },
+    },
+    MuiAccordionDetails: {
+      styleOverrides: {
+        root: {
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 0,
+          paddingBottom: 16,
+        },
+      },
     },
     MuiInputLabel: {
       styleOverrides: {
@@ -444,6 +495,9 @@ export const theme = createTheme({
       styleOverrides: { root: { padding: "16px 24px 20px", gap: "8px" } },
     },
     MuiPopover: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
       styleOverrides: {
         paper: {
           backgroundColor: panelAlt,
@@ -454,6 +508,15 @@ export const theme = createTheme({
       },
     },
     MuiMenu: {
+      defaultProps: {
+        disableScrollLock: true,
+        slotProps: {
+          backdrop: {
+            invisible: true,
+            sx: { backgroundColor: "transparent" },
+          },
+        },
+      },
       styleOverrides: {
         paper: {
           backgroundColor: panelAlt,

@@ -5,21 +5,24 @@ import {
   Button,
   Chip,
   CircularProgress,
+  ClickAwayListener,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
   FormControl,
+  Grow,
   IconButton,
   InputAdornment,
   InputLabel,
   ListItemIcon,
   ListItemText,
-  Menu,
   MenuItem,
+  MenuList,
   Pagination,
   Paper,
+  Popper,
   Select,
   Stack,
   Table,
@@ -62,7 +65,6 @@ import {
   resendEmployeeJoinLink,
   sendEmployeeInvitation,
   startEmployeePackageReview,
-  updateEmployee,
   type CreateEmployeeInput,
   type EmployeePackageReview,
   type EmployeeRecord,
@@ -75,6 +77,7 @@ import EmptyState from '../../Components/EmptyState';
 import { useTableSort, SortableHeadCell, type SortAccessors } from '../../Components/TableSort';
 import { tokens } from '../../Theme/tokens';
 import { roleSatisfies } from '../../utils/roles';
+import EmployeeEditDialog from './EmployeeEditDialog';
 
 const EMPTY_FORM: CreateEmployeeInput = {
   firstName: '',
@@ -84,15 +87,6 @@ const EMPTY_FORM: CreateEmployeeInput = {
   designation: '',
   department: '',
   joiningDate: '',
-};
-
-const EMPLOYMENT_STATUSES = ['Prejoining', 'Active', 'Inactive', 'Exited'] as const;
-
-const toDateInputValue = (value?: string) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
-  return date.toISOString().slice(0, 10);
 };
 
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
@@ -722,7 +716,6 @@ const Employees: React.FC = () => {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuEmployee, setMenuEmployee] = useState<EmployeeRecord | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [employmentStatus, setEmploymentStatus] = useState<string>('Prejoining');
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [reviewEmployee, setReviewEmployee] = useState<EmployeeRecord | null>(null);
   const [packageEmployee, setPackageEmployee] = useState<EmployeeRecord | null>(null);
@@ -770,11 +763,9 @@ const Employees: React.FC = () => {
     onError: (requestError: any) => toast.error(errorMessage(requestError)),
   });
 
-  const closeEditor = () => {
+  const closeCreate = () => {
     setCreateOpen(false);
-    setEditingEmployee(null);
     setForm(EMPTY_FORM);
-    setEmploymentStatus('Prejoining');
     setFormErrors({});
   };
 
@@ -782,18 +773,7 @@ const Employees: React.FC = () => {
     mutationFn: createEmployee,
     onSuccess: () => {
       toast.success('Employee created');
-      closeEditor();
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-    },
-    onError: (requestError: any) => toast.error(errorMessage(requestError)),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: CreateEmployeeInput & { employmentStatus: string } }) =>
-      updateEmployee(id, payload),
-    onSuccess: () => {
-      toast.success('Employee updated');
-      closeEditor();
+      closeCreate();
       queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
     onError: (requestError: any) => toast.error(errorMessage(requestError)),
@@ -844,34 +824,20 @@ const Employees: React.FC = () => {
   };
 
   const openCreate = () => {
-    setEditingEmployee(null);
     setForm(EMPTY_FORM);
-    setEmploymentStatus('Prejoining');
     setFormErrors({});
     setCreateOpen(true);
   };
 
   const openEdit = (employee: EmployeeRecord) => {
     setEditingEmployee(employee);
-    setForm({
-      firstName: employee.firstName || '',
-      lastName: employee.lastName || '',
-      personalEmail: employee.personalEmail || '',
-      phone: employee.phone || '',
-      designation: employee.designation || '',
-      department: employee.department || '',
-      joiningDate: toDateInputValue(employee.joiningDate),
-    });
-    setEmploymentStatus(employee.employmentStatus || 'Prejoining');
-    setFormErrors({});
-    setCreateOpen(true);
   };
 
-  const submitEditor = () => {
+  const submitCreate = () => {
     const errors = validate(form);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    const payload = {
+    createMutation.mutate({
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       personalEmail: form.personalEmail.trim(),
@@ -879,18 +845,8 @@ const Employees: React.FC = () => {
       designation: form.designation.trim(),
       department: form.department.trim(),
       joiningDate: form.joiningDate,
-    };
-    if (editingEmployee) {
-      updateMutation.mutate({
-        id: editingEmployee._id,
-        payload: { ...payload, employmentStatus },
-      });
-      return;
-    }
-    createMutation.mutate(payload);
+    });
   };
-
-  const editorSaving = createMutation.isPending || updateMutation.isPending;
 
   if (isPending) {
     return (
@@ -958,6 +914,7 @@ const Employees: React.FC = () => {
                 setOnboardingFilter(event.target.value);
                 setCurrentPage(1);
               }}
+              MenuProps={{ disableScrollLock: true }}
             >
               <MenuItem value="all">All statuses</MenuItem>
               {onboardingOptions.map((status) => (
@@ -1039,7 +996,10 @@ const Employees: React.FC = () => {
                           aria-controls={menuEmployee?._id === employee._id ? 'employee-row-menu' : undefined}
                           aria-haspopup="true"
                           aria-expanded={menuEmployee?._id === employee._id ? 'true' : undefined}
-                          onClick={(event) => openRowMenu(event, employee)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openRowMenu(event, employee);
+                          }}
                         >
                           <MoreVert fontSize="small" />
                         </IconButton>
@@ -1052,120 +1012,170 @@ const Employees: React.FC = () => {
           </Table>
         </TableContainer>
 
-        <Menu
+        <Popper
           id="employee-row-menu"
-          anchorEl={menuAnchor}
           open={Boolean(menuAnchor) && Boolean(menuEmployee)}
-          onClose={closeRowMenu}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          slotProps={{
-            paper: {
-              sx: {
-                minWidth: 240,
-                border: `1px solid ${tokens.border}`,
-                boxShadow: tokens.shadowSoft,
-              },
-            },
-          }}
+          anchorEl={menuAnchor}
+          placement="bottom-end"
+          transition
+          disablePortal={false}
+          style={{ zIndex: 1400 }}
         >
-          {menuEmployee ? (
-            <>
-              <MenuItem
-                onClick={() => runMenuAction(() => setReviewEmployee(menuEmployee))}
+          {({ TransitionProps }) => (
+            <Grow {...TransitionProps} style={{ transformOrigin: 'right top' }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 0.5,
+                  minWidth: 268,
+                  maxWidth: 320,
+                  borderRadius: 2,
+                  bgcolor: tokens.panelAlt,
+                  border: `1px solid ${tokens.lineStrong}`,
+                  boxShadow: tokens.shadow,
+                  overflow: 'hidden',
+                }}
               >
-                <ListItemIcon>
-                  <DescriptionOutlined fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Review documents"
-                  secondary="Approve or reject each joining file"
-                />
-              </MenuItem>
-              <MenuItem
-                onClick={() => runMenuAction(() => setPackageEmployee(menuEmployee))}
-              >
-                <ListItemIcon>
-                  <RateReviewOutlined fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Review onboarding"
-                  secondary="Form summary, documents, and policies"
-                />
-              </MenuItem>
-              {menuEmployee.onboardingStatus === 'Draft' || menuEmployee.onboardingStatus === 'Invited' ? (
-                <MenuItem
-                  disabled={inviteMutation.isPending || resendJoinMutation.isPending}
-                  onClick={() =>
-                    runMenuAction(() => inviteMutation.mutate(menuEmployee._id))
-                  }
-                >
-                  <ListItemIcon>
-                    <SendOutlined fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      inviteMutation.isPending && inviteMutation.variables === menuEmployee._id
-                        ? 'Sending invitation…'
-                        : 'Send invitation'
-                    }
-                    secondary="Email the first personal joining link"
-                  />
-                </MenuItem>
-              ) : null}
-              {menuEmployee.canResendJoinLink ? (
-                <MenuItem
-                  disabled={inviteMutation.isPending || resendJoinMutation.isPending}
-                  onClick={() =>
-                    runMenuAction(() => resendJoinMutation.mutate(menuEmployee._id))
-                  }
-                >
-                  <ListItemIcon>
-                    <Replay fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      resendJoinMutation.isPending &&
-                      resendJoinMutation.variables === menuEmployee._id
-                        ? 'Sending fresh link…'
-                        : menuEmployee.invitationExpired
-                          ? 'Resend expired join link'
-                          : 'Resend join link'
-                    }
-                    secondary="Fresh URL keeps saved answers"
-                  />
-                </MenuItem>
-              ) : null}
-              {canManageRecords ? (
-                <>
-                  <Divider sx={{ my: 0.5 }} />
-                  <MenuItem onClick={() => runMenuAction(() => openEdit(menuEmployee))}>
-                    <ListItemIcon>
-                      <EditOutlined fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Edit employee"
-                      secondary="Name, contact, role, and status"
-                    />
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => runMenuAction(() => setDeleteTarget(menuEmployee))}
-                    sx={{ color: 'error.main' }}
+                <ClickAwayListener onClickAway={closeRowMenu}>
+                  <MenuList
+                    autoFocusItem={Boolean(menuEmployee)}
+                    sx={{
+                      py: 0.75,
+                      '& .MuiMenuItem-root': {
+                        alignItems: 'flex-start',
+                        gap: 0.5,
+                        minHeight: 52,
+                        px: 1.5,
+                        py: 1,
+                        borderRadius: 0,
+                        '&:hover': { bgcolor: tokens.hover },
+                      },
+                      '& .MuiListItemIcon-root': {
+                        minWidth: 34,
+                        mt: 0.25,
+                        color: tokens.textMuted,
+                      },
+                      '& .MuiListItemText-primary': {
+                        color: tokens.text,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      },
+                      '& .MuiListItemText-secondary': {
+                        color: '#C9C0B4',
+                        fontSize: 12,
+                        lineHeight: 1.35,
+                        mt: 0.25,
+                      },
+                    }}
                   >
-                    <ListItemIcon>
-                      <DeleteOutline fontSize="small" color="error" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Delete employee"
-                      secondary="Removes record, invites, and files"
-                      primaryTypographyProps={{ color: 'error.main' }}
-                    />
-                  </MenuItem>
-                </>
-              ) : null}
-            </>
-          ) : null}
-        </Menu>
+                    {menuEmployee ? (
+                      <>
+                        <MenuItem
+                          onClick={() => runMenuAction(() => setReviewEmployee(menuEmployee))}
+                        >
+                          <ListItemIcon>
+                            <DescriptionOutlined fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="Review documents"
+                            secondary="Approve or reject each joining file"
+                          />
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => runMenuAction(() => setPackageEmployee(menuEmployee))}
+                        >
+                          <ListItemIcon>
+                            <RateReviewOutlined fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="Review onboarding"
+                            secondary="Form summary, documents, and policies"
+                          />
+                        </MenuItem>
+                        {menuEmployee.onboardingStatus === 'Draft' ||
+                        menuEmployee.onboardingStatus === 'Invited' ? (
+                          <MenuItem
+                            disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                            onClick={() =>
+                              runMenuAction(() => inviteMutation.mutate(menuEmployee._id))
+                            }
+                          >
+                            <ListItemIcon>
+                              <SendOutlined fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={
+                                inviteMutation.isPending &&
+                                inviteMutation.variables === menuEmployee._id
+                                  ? 'Sending invitation…'
+                                  : 'Send invitation'
+                              }
+                              secondary="Email the first personal joining link"
+                            />
+                          </MenuItem>
+                        ) : null}
+                        {menuEmployee.canResendJoinLink ? (
+                          <MenuItem
+                            disabled={inviteMutation.isPending || resendJoinMutation.isPending}
+                            onClick={() =>
+                              runMenuAction(() => resendJoinMutation.mutate(menuEmployee._id))
+                            }
+                          >
+                            <ListItemIcon>
+                              <Replay fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={
+                                resendJoinMutation.isPending &&
+                                resendJoinMutation.variables === menuEmployee._id
+                                  ? 'Sending fresh link…'
+                                  : menuEmployee.invitationExpired
+                                    ? 'Resend expired join link'
+                                    : 'Resend join link'
+                              }
+                              secondary="Fresh URL keeps saved answers"
+                            />
+                          </MenuItem>
+                        ) : null}
+                        {canManageRecords ? (
+                          <>
+                            <Divider sx={{ my: 0.75, borderColor: tokens.border }} />
+                            <MenuItem onClick={() => runMenuAction(() => openEdit(menuEmployee))}>
+                              <ListItemIcon>
+                                <EditOutlined fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary="Edit employee"
+                                secondary="Role, joining form, and documents"
+                              />
+                            </MenuItem>
+                            <MenuItem
+                              onClick={() => runMenuAction(() => setDeleteTarget(menuEmployee))}
+                              sx={{
+                                '& .MuiListItemIcon-root': { color: tokens.dangerText },
+                                '& .MuiListItemText-primary': { color: tokens.dangerText },
+                                '& .MuiListItemText-secondary': { color: tokens.dangerText, opacity: 0.85 },
+                              }}
+                            >
+                              <ListItemIcon>
+                                <DeleteOutline fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary="Delete employee"
+                                secondary="Removes record, invites, and files"
+                              />
+                            </MenuItem>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </MenuList>
+                </ClickAwayListener>
+              </Paper>
+            </Grow>
+          )}
+        </Popper>
       </Paper>
 
       {sorted.length > ROWS_PER_PAGE && (
@@ -1180,20 +1190,11 @@ const Employees: React.FC = () => {
         </Box>
       )}
 
-      <Dialog open={createOpen} onClose={closeEditor} fullWidth maxWidth="sm">
-        <DialogTitle>{editingEmployee ? 'Edit employee' : 'Add employee'}</DialogTitle>
+      <Dialog open={createOpen} onClose={closeCreate} fullWidth maxWidth="sm">
+        <DialogTitle>Add employee</DialogTitle>
         <Divider />
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {editingEmployee ? (
-              <TextField
-                label="Employee ID"
-                value={editingEmployee.employeeCode}
-                fullWidth
-                InputProps={{ readOnly: true }}
-                helperText=" "
-              />
-            ) : null}
             {fields.map((field) => (
               <TextField
                 key={field.key}
@@ -1207,34 +1208,23 @@ const Employees: React.FC = () => {
                 InputLabelProps={field.type === 'date' ? { shrink: true } : undefined}
               />
             ))}
-            {editingEmployee ? (
-              <FormControl fullWidth>
-                <InputLabel id="employee-employment-status">Employment status</InputLabel>
-                <Select
-                  labelId="employee-employment-status"
-                  label="Employment status"
-                  value={employmentStatus}
-                  onChange={(event) => setEmploymentStatus(event.target.value)}
-                >
-                  {EMPLOYMENT_STATUSES.map((status) => (
-                    <MenuItem key={status} value={status}>
-                      {status}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={closeEditor} disabled={editorSaving}>
+          <Button onClick={closeCreate} disabled={createMutation.isPending}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={submitEditor} disabled={editorSaving}>
-            {editorSaving ? 'Saving…' : editingEmployee ? 'Save changes' : 'Create'}
+          <Button variant="contained" onClick={submitCreate} disabled={createMutation.isPending}>
+            {createMutation.isPending ? 'Saving…' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <EmployeeEditDialog
+        open={Boolean(editingEmployee)}
+        employee={editingEmployee}
+        onClose={() => setEditingEmployee(null)}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
