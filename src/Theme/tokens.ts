@@ -4,24 +4,26 @@
  * so plain CSS files can use var(--rw-*) while MUI components use these tokens.
  */
 export const tokens = Object.freeze({
-  // Surfaces
-  bg: '#0B0A09', // main workspace background
-  sidebar: '#090909',
-  topbar: '#090909',
-  panel: '#141310', // cards, panels, modals, drawers
-  panelAlt: '#181611', // secondary panels, table headers, dropdowns
-  input: '#1B1915', // inputs, textareas, selects
-  hover: '#211D16', // hover backgrounds
-  border: '#30291D', // subtle borders
+  // Surfaces: stepped charcoal so shell / cards / menus stay readable (not one flat black)
+  bg: '#0A0908', // main workspace shell
+  sidebar: '#070706',
+  topbar: '#070706',
+  panel: '#15130F', // cards, panels, modals, drawers
+  panelAlt: '#1C1914', // table headers, secondary panels
+  input: '#221E18', // inputs, textareas, selects
+  hover: '#2A241C', // hover backgrounds
+  menu: '#1F1B15', // floating menus / popovers (lighter than panel)
+  border: '#3A3226', // subtle borders
+  borderStrong: '#524536',
 
   // Brand
   gold: '#C39B53',
   goldHover: '#D6B66F',
-  goldSoft: 'rgba(195,155,83,0.12)',
+  goldSoft: 'rgba(195,155,83,0.14)',
 
   // Text
-  text: '#F5F2EC',
-  textMuted: '#A49B90',
+  text: '#F7F3EC',
+  textMuted: '#C4B9AA', // brighter secondary for dark panels
   textWhite: '#FFFFFF',
 
   // Overlays on the black shell
@@ -30,17 +32,17 @@ export const tokens = Object.freeze({
 
   // Semantic statuses
   success: '#2E7D52',
-  successSoft: 'rgba(46,125,82,0.16)',
-  successText: '#6FC39A',
+  successSoft: 'rgba(46,125,82,0.18)',
+  successText: '#7DCEA6',
   warning: '#D6A03C',
-  warningSoft: 'rgba(214,160,60,0.14)',
-  warningText: '#E7BD6E',
+  warningSoft: 'rgba(214,160,60,0.16)',
+  warningText: '#EBC47A',
   danger: '#C6452A',
-  dangerSoft: 'rgba(198,69,42,0.15)',
-  dangerText: '#E58C77',
+  dangerSoft: 'rgba(198,69,42,0.18)',
+  dangerText: '#E99986',
   info: '#4C8FC7',
-  infoSoft: 'rgba(76,143,199,0.14)',
-  infoText: '#8CBEE6',
+  infoSoft: 'rgba(76,143,199,0.18)',
+  infoText: '#9AC6E8',
 
   // Restrained elevation
   shadowSoft: '0 4px 16px rgba(0,0,0,0.32)',
@@ -48,27 +50,27 @@ export const tokens = Object.freeze({
   shadowStrong: '0 24px 56px rgba(0,0,0,0.55)',
 
   // Legacy aliases (kept so every existing import keeps compiling)
-  black: '#0B0A09',
-  ink: '#141310',
-  paper: '#0B0A09',
-  card: '#141310',
-  cream: '#F5F2EC',
+  black: '#0A0908',
+  ink: '#15130F',
+  paper: '#0A0908',
+  card: '#15130F',
+  cream: '#F7F3EC',
   goldDark: '#D6B66F',
   goldText: '#D6B66F',
   goldLight: '#D6B66F',
-  muted: '#A49B90',
-  mutedAlt: '#A49B90',
-  line: '#30291D',
-  lineStrong: '#4A3F2C',
-  surface: '#141310',
-  surfaceAlt: '#181611',
-  surfaceRaised: '#1B1915',
-  surfaceHover: '#211D16',
+  muted: '#C4B9AA',
+  mutedAlt: '#C4B9AA',
+  line: '#3A3226',
+  lineStrong: '#524536',
+  surface: '#15130F',
+  surfaceAlt: '#1C1914',
+  surfaceRaised: '#221E18',
+  surfaceHover: '#2A241C',
 
   // Retained for any floating layer; not used on tables, cards or inputs
-  glass: 'rgba(20,19,16,0.90)',
-  glassStrong: 'rgba(9,9,9,0.94)',
-  glassBorder: '#30291D',
+  glass: 'rgba(31,27,21,0.94)',
+  glassStrong: 'rgba(7,7,6,0.96)',
+  glassBorder: '#3A3226',
   glassBlur: 'blur(18px)',
 } as const);
 
@@ -107,7 +109,9 @@ export const cssVariables = {
   '--rw-panel-alt': tokens.panelAlt,
   '--rw-input': tokens.input,
   '--rw-hover': tokens.hover,
+  '--rw-menu': tokens.menu,
   '--rw-border': tokens.border,
+  '--rw-border-strong': tokens.borderStrong,
   '--rw-gold': tokens.gold,
   '--rw-gold-hover': tokens.goldHover,
   '--rw-text': tokens.text,

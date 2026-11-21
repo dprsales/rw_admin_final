@@ -144,6 +144,35 @@ const fields: { key: keyof CreateEmployeeInput; label: string; type?: string }[]
 const isImageMime = (mime: string) => mime.startsWith('image/');
 const isPdfMime = (mime: string) => mime === 'application/pdf' || mime.includes('pdf');
 
+/** Tinted icon chip so row actions read as distinct options at a glance. */
+const MenuActionIcon = ({
+  children,
+  soft,
+  color,
+}: {
+  children: React.ReactNode;
+  soft: string;
+  color: string;
+}) => (
+  <ListItemIcon sx={{ minWidth: 40, mt: 0.1 }}>
+    <Box
+      sx={{
+        width: 32,
+        height: 32,
+        borderRadius: 1.25,
+        bgcolor: soft,
+        color,
+        display: 'grid',
+        placeItems: 'center',
+        flexShrink: 0,
+        '& .MuiSvgIcon-root': { fontSize: 18 },
+      }}
+    >
+      {children}
+    </Box>
+  </ListItemIcon>
+);
+
 const statusChipColor = (status: string): 'default' | 'success' | 'warning' | 'info' | 'error' => {
   if (status === 'Approved' || status === 'Locked') return 'success';
   if (status === 'Re-upload Required') return 'warning';
@@ -885,8 +914,26 @@ const Employees: React.FC = () => {
         }
       />
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: tokens.shadowSoft }}>
-        <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Paper
+        sx={{
+          borderRadius: 3,
+          overflow: 'hidden',
+          bgcolor: tokens.panel,
+          border: `1px solid ${tokens.border}`,
+          boxShadow: tokens.shadowSoft,
+        }}
+      >
+        <Box
+          sx={{
+            p: 2,
+            display: 'flex',
+            gap: 2,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            bgcolor: tokens.panelAlt,
+            borderBottom: `1px solid ${tokens.border}`,
+          }}
+        >
           <TextField
             value={searchText}
             onChange={(event) => {
@@ -1040,11 +1087,11 @@ const Employees: React.FC = () => {
                 elevation={0}
                 sx={{
                   mt: 0.5,
-                  minWidth: 268,
-                  maxWidth: 320,
+                  minWidth: 276,
+                  maxWidth: 328,
                   borderRadius: 2,
-                  bgcolor: tokens.panelAlt,
-                  border: `1px solid ${tokens.lineStrong}`,
+                  bgcolor: tokens.menu,
+                  border: `1px solid ${tokens.borderStrong}`,
                   boxShadow: tokens.shadow,
                   overflow: 'hidden',
                 }}
@@ -1056,17 +1103,12 @@ const Employees: React.FC = () => {
                       py: 0.75,
                       '& .MuiMenuItem-root': {
                         alignItems: 'flex-start',
-                        gap: 0.5,
+                        gap: 0.75,
                         minHeight: 52,
-                        px: 1.5,
+                        px: 1.25,
                         py: 1,
                         borderRadius: 0,
                         '&:hover': { bgcolor: tokens.hover },
-                      },
-                      '& .MuiListItemIcon-root': {
-                        minWidth: 34,
-                        mt: 0.25,
-                        color: tokens.textMuted,
                       },
                       '& .MuiListItemText-primary': {
                         color: tokens.text,
@@ -1075,7 +1117,7 @@ const Employees: React.FC = () => {
                         lineHeight: 1.3,
                       },
                       '& .MuiListItemText-secondary': {
-                        color: '#C9C0B4',
+                        color: tokens.textMuted,
                         fontSize: 12,
                         lineHeight: 1.35,
                         mt: 0.25,
@@ -1087,9 +1129,9 @@ const Employees: React.FC = () => {
                         <MenuItem
                           onClick={() => runMenuAction(() => setReviewEmployee(menuEmployee))}
                         >
-                          <ListItemIcon>
-                            <DescriptionOutlined fontSize="small" />
-                          </ListItemIcon>
+                          <MenuActionIcon soft={tokens.infoSoft} color={tokens.infoText}>
+                            <DescriptionOutlined />
+                          </MenuActionIcon>
                           <ListItemText
                             primary="Review documents"
                             secondary="Approve or reject each joining file"
@@ -1098,9 +1140,9 @@ const Employees: React.FC = () => {
                         <MenuItem
                           onClick={() => runMenuAction(() => setPackageEmployee(menuEmployee))}
                         >
-                          <ListItemIcon>
-                            <RateReviewOutlined fontSize="small" />
-                          </ListItemIcon>
+                          <MenuActionIcon soft={tokens.goldSoft} color={tokens.goldHover}>
+                            <RateReviewOutlined />
+                          </MenuActionIcon>
                           <ListItemText
                             primary="Review onboarding"
                             secondary="Form summary, documents, and policies"
@@ -1114,9 +1156,9 @@ const Employees: React.FC = () => {
                               runMenuAction(() => inviteMutation.mutate(menuEmployee._id))
                             }
                           >
-                            <ListItemIcon>
-                              <SendOutlined fontSize="small" />
-                            </ListItemIcon>
+                            <MenuActionIcon soft={tokens.successSoft} color={tokens.successText}>
+                              <SendOutlined />
+                            </MenuActionIcon>
                             <ListItemText
                               primary={
                                 inviteMutation.isPending &&
@@ -1135,9 +1177,9 @@ const Employees: React.FC = () => {
                               runMenuAction(() => resendJoinMutation.mutate(menuEmployee._id))
                             }
                           >
-                            <ListItemIcon>
-                              <Replay fontSize="small" />
-                            </ListItemIcon>
+                            <MenuActionIcon soft={tokens.warningSoft} color={tokens.warningText}>
+                              <Replay />
+                            </MenuActionIcon>
                             <ListItemText
                               primary={
                                 resendJoinMutation.isPending &&
@@ -1155,9 +1197,9 @@ const Employees: React.FC = () => {
                           <>
                             <Divider sx={{ my: 0.75, borderColor: tokens.border }} />
                             <MenuItem onClick={() => runMenuAction(() => openEdit(menuEmployee))}>
-                              <ListItemIcon>
-                                <EditOutlined fontSize="small" />
-                              </ListItemIcon>
+                              <MenuActionIcon soft={tokens.overlayStrong} color={tokens.goldHover}>
+                                <EditOutlined />
+                              </MenuActionIcon>
                               <ListItemText
                                 primary="Edit employee"
                                 secondary="Role, joining form, and documents"
@@ -1166,14 +1208,16 @@ const Employees: React.FC = () => {
                             <MenuItem
                               onClick={() => runMenuAction(() => setDeleteTarget(menuEmployee))}
                               sx={{
-                                '& .MuiListItemIcon-root': { color: tokens.dangerText },
                                 '& .MuiListItemText-primary': { color: tokens.dangerText },
-                                '& .MuiListItemText-secondary': { color: tokens.dangerText, opacity: 0.85 },
+                                '& .MuiListItemText-secondary': {
+                                  color: tokens.dangerText,
+                                  opacity: 0.88,
+                                },
                               }}
                             >
-                              <ListItemIcon>
-                                <DeleteOutline fontSize="small" />
-                              </ListItemIcon>
+                              <MenuActionIcon soft={tokens.dangerSoft} color={tokens.dangerText}>
+                                <DeleteOutline />
+                              </MenuActionIcon>
                               <ListItemText
                                 primary="Delete employee"
                                 secondary="Removes record, invites, and files"

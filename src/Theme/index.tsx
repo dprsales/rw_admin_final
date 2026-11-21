@@ -392,7 +392,15 @@ export const theme = createTheme({
     },
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: "none", color: text },
+        root: {
+          backgroundImage: "none",
+          color: text,
+          backgroundColor: panel,
+        },
+        outlined: {
+          borderColor: border,
+          backgroundColor: panelAlt,
+        },
         elevation1: { boxShadow: tokens.shadow },
       },
     },
@@ -495,10 +503,10 @@ export const theme = createTheme({
       },
       styleOverrides: {
         paper: {
-          backgroundColor: panelAlt,
+          backgroundColor: tokens.menu,
           boxShadow: tokens.shadow,
           borderRadius: "12px",
-          border: `1px solid ${border}`,
+          border: `1px solid ${tokens.borderStrong}`,
         },
       },
     },
@@ -510,9 +518,9 @@ export const theme = createTheme({
       },
       styleOverrides: {
         paper: {
-          backgroundColor: panelAlt,
+          backgroundColor: tokens.menu,
           borderRadius: "12px",
-          border: `1px solid ${border}`,
+          border: `1px solid ${tokens.borderStrong}`,
           boxShadow: tokens.shadow,
         },
       },
