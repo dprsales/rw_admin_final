@@ -9,8 +9,13 @@ export type SortAccessors<T> = Record<string, (row: T) => SortValue>;
  * Client-side sorting for the admin tables. Stable accessors live at module
  * scope so the memo only recalculates when rows or the sort actually change.
  */
-export function useTableSort<T>(rows: T[], accessors: SortAccessors<T>, initialKey = '') {
-  const [order, setOrder] = useState<SortDirection>('asc');
+export function useTableSort<T>(
+  rows: T[],
+  accessors: SortAccessors<T>,
+  initialKey = '',
+  initialOrder: SortDirection = 'asc',
+) {
+  const [order, setOrder] = useState<SortDirection>(initialOrder);
   const [orderBy, setOrderBy] = useState(initialKey);
 
   const sorted = useMemo(() => {

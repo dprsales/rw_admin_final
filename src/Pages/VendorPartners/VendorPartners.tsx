@@ -2,7 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   Avatar,
   Box,
+  Button,
   Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -23,10 +29,12 @@ import {
 import {
   CancelOutlined,
   CheckCircleOutline,
+  Close,
   DeleteOutline,
   Replay,
   Search,
   StorefrontOutlined,
+  VisibilityOutlined,
 } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
@@ -60,6 +68,7 @@ interface VendorPartner {
   status: PartnerStatus;
   vendorId?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 const rowsPerPage = 12;
@@ -67,10 +76,10 @@ const EMPTY: VendorPartner[] = [];
 
 const PARTNER_SORT = {
   business: (row: VendorPartner) => row.companyName,
-  contact: (row: VendorPartner) => row.contactName,
+  name: (row: VendorPartner) => row.contactName,
   industry: (row: VendorPartner) => row.industry,
   status: (row: VendorPartner) => row.status,
-  applied: (row: VendorPartner) => row.createdAt,
+  updated: (row: VendorPartner) => row.updatedAt || row.createdAt,
 };
 
 const STATUS_COLORS: Record<PartnerStatus, 'info' | 'success' | 'error' | 'warning'> = {
@@ -113,11 +122,25 @@ const hrefFor = (value?: string) => {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 };
 
+const formatDate = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 const VendorPartners: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | PartnerStatus>('all');
   const [page, setPage] = useState(1);
+  const [viewing, setViewing] = useState<VendorPartner | null>(null);
   const [pending, setPending] = useState<VendorPartner | null>(null);
   const [pendingDecision, setPendingDecision] = useState<{ row: VendorPartner; decision: typeof DECISIONS[number] } | null>(null);
 
@@ -128,12 +151,13 @@ const VendorPartners: React.FC = () => {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Decision }) => updateVendorPartner(id, { status }),
-    onSuccess: (_result, { status }) => {
+    onSuccess: (_result, { id, status }) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-partners'] });
       if (status === 'approved') queryClient.invalidateQueries({ queryKey: ['vendors'] });
       const decision = DECISIONS.find((item) => item.status === status);
       toast.success(decision?.toast || 'Updated');
       setPendingDecision(null);
+      setViewing((current) => (current && current._id === id ? { ...current, status } : current));
     },
     onError: () => toast.error('Could not update this application'),
   });
@@ -143,6 +167,7 @@ const VendorPartners: React.FC = () => {
     onSuccess: (_result, id) => {
       queryClient.setQueryData<VendorPartner[]>(['vendor-partners'], (current) => (current || []).filter((item) => item._id !== id));
       setPending(null);
+      if (viewing?._id === id) setViewing(null);
       toast.success('Application removed');
     },
     onError: () => toast.error('Could not remove this application'),
@@ -159,9 +184,13 @@ const VendorPartners: React.FC = () => {
     });
   }, [rows, searchText, statusFilter]);
 
-  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filtered, PARTNER_SORT);
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filtered, PARTNER_SORT, 'updated', 'desc');
   const totalPages = Math.max(1, Math.ceil(sorted.length / rowsPerPage));
   const visible = sorted.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
+  const openDecision = (row: VendorPartner, decision: typeof DECISIONS[number]) => {
+    setPendingDecision({ row, decision });
+  };
 
   if (isPending) {
     return (
@@ -182,7 +211,7 @@ const VendorPartners: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <PageHeader
         title="Listed Vendors"
-        description="People who listed themselves on rajivwilliams.com/vendorpartner. Approve moves them to the vendor list."
+        description="People who listed themselves on rajivwilliams.com/vendorpartner. Open View to read the full brief, then approve, ask to resubmit, or reject."
         crumbs={[{ label: 'Listed Vendors' }]}
       />
 
@@ -222,11 +251,12 @@ const VendorPartners: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <SortableHeadCell label="Business" sortKey="business" order={order} activeKey={orderBy} onSort={toggleSort} />
-                  <SortableHeadCell label="Contact" sortKey="contact" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Name" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} />
                   <SortableHeadCell label="Industry" sortKey="industry" order={order} activeKey={orderBy} onSort={toggleSort} />
                   <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Updated" sortKey="updated" order={order} activeKey={orderBy} onSort={toggleSort} />
                   <TableCell>Links</TableCell>
-                  <TableCell align="right">Decide</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -236,7 +266,24 @@ const VendorPartners: React.FC = () => {
                       <Stack direction="row" spacing={1.5} alignItems="flex-start">
                         <Avatar src={row.profileImageUrl} alt="" sx={{ width: 44, height: 44 }} />
                         <Box>
-                          <Typography sx={{ fontWeight: 600 }}>{row.companyName}</Typography>
+                          <Typography
+                            component="button"
+                            type="button"
+                            onClick={() => setViewing(row)}
+                            sx={{
+                              fontWeight: 600,
+                              border: 0,
+                              background: 'transparent',
+                              p: 0,
+                              m: 0,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              color: tokens.goldText,
+                              '&:hover': { textDecoration: 'underline' },
+                            }}
+                          >
+                            {row.companyName}
+                          </Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 360 }}>
                             {row.about}
                           </Typography>
@@ -244,11 +291,9 @@ const VendorPartners: React.FC = () => {
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{row.contactName}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.contactName}</Typography>
                       <Typography variant="caption" color="text.secondary">
                         {row.phone}{row.email ? ` · ${row.email}` : ''}{row.city ? ` · ${row.city}` : ''}
-                        {row.gstNumber ? ` · GST ${row.gstNumber}` : ''}{row.yearOfIncorporation ? ` · Est. ${row.yearOfIncorporation}` : ''}
-                        {row.officeLocation ? ` · ${row.officeLocation}` : ''}
                       </Typography>
                     </TableCell>
                     <TableCell>{row.industry}</TableCell>
@@ -261,6 +306,14 @@ const VendorPartners: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>
+                      <Typography variant="body2">{formatDate(row.updatedAt || row.createdAt)}</Typography>
+                      {row.createdAt && row.updatedAt && row.createdAt !== row.updatedAt ? (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          Applied {formatDate(row.createdAt)}
+                        </Typography>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
                       <Stack spacing={0.5}>
                         {row.websiteUrl && <Link href={hrefFor(row.websiteUrl)} target="_blank" rel="noreferrer">Website</Link>}
                         {row.videoUrl && <Link href={hrefFor(row.videoUrl)} target="_blank" rel="noreferrer">Video</Link>}
@@ -270,6 +323,15 @@ const VendorPartners: React.FC = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        <Tooltip title="View full details">
+                          <IconButton
+                            size="small"
+                            aria-label={`View ${row.companyName}`}
+                            onClick={() => setViewing(row)}
+                          >
+                            <VisibilityOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Approve">
                           <span>
                             <IconButton
@@ -277,7 +339,7 @@ const VendorPartners: React.FC = () => {
                               aria-label={`Approve ${row.companyName}`}
                               color="success"
                               disabled={statusMutation.isPending || row.status === 'approved'}
-                              onClick={() => setPendingDecision({ row, decision: DECISIONS[0] })}
+                              onClick={() => openDecision(row, DECISIONS[0])}
                             >
                               <CheckCircleOutline fontSize="small" />
                             </IconButton>
@@ -289,7 +351,7 @@ const VendorPartners: React.FC = () => {
                               size="small"
                               aria-label={`Ask ${row.companyName} to resubmit`}
                               disabled={statusMutation.isPending || row.status === 'resubmit'}
-                              onClick={() => setPendingDecision({ row, decision: DECISIONS[1] })}
+                              onClick={() => openDecision(row, DECISIONS[1])}
                             >
                               <Replay fontSize="small" />
                             </IconButton>
@@ -302,7 +364,7 @@ const VendorPartners: React.FC = () => {
                               aria-label={`Reject ${row.companyName}`}
                               color="error"
                               disabled={statusMutation.isPending || row.status === 'rejected'}
-                              onClick={() => setPendingDecision({ row, decision: DECISIONS[2] })}
+                              onClick={() => openDecision(row, DECISIONS[2])}
                             >
                               <CancelOutlined fontSize="small" />
                             </IconButton>
@@ -329,6 +391,15 @@ const VendorPartners: React.FC = () => {
         </Box>
       )}
 
+      <VendorPartnerDetails
+        partner={viewing}
+        onClose={() => setViewing(null)}
+        onDecide={(decision) => viewing && openDecision(viewing, decision)}
+        onRemove={() => viewing && setPending(viewing)}
+        saving={statusMutation.isPending}
+        removing={removeMutation.isPending}
+      />
+
       <ConfirmDialog
         open={pendingDecision !== null}
         title={pendingDecision?.decision.label ?? 'Update application'}
@@ -353,5 +424,138 @@ const VendorPartners: React.FC = () => {
     </Box>
   );
 };
+
+const VendorPartnerDetails: React.FC<{
+  partner: VendorPartner | null;
+  onClose: () => void;
+  onDecide: (decision: typeof DECISIONS[number]) => void;
+  onRemove: () => void;
+  saving: boolean;
+  removing: boolean;
+}> = ({ partner, onClose, onDecide, onRemove, saving, removing }) => (
+  <Dialog open={Boolean(partner)} onClose={onClose} fullWidth maxWidth="md">
+    {partner && (
+      <>
+        <DialogTitle sx={{ pr: 6, fontWeight: 700 }}>
+          {partner.companyName}
+          <IconButton onClick={onClose} aria-label="Close" sx={{ position: 'absolute', right: 12, top: 12 }}>
+            <Close />
+          </IconButton>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {partner.industry} · Applied {formatDate(partner.createdAt)}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Status</Typography>
+              <Chip
+                size="small"
+                label={STATUS_LABELS[partner.status] || partner.status}
+                color={STATUS_COLORS[partner.status] || 'default'}
+                sx={{ fontWeight: 600 }}
+              />
+              {saving && <CircularProgress size={16} />}
+            </Box>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                startIcon={<CheckCircleOutline />}
+                disabled={saving || partner.status === 'approved'}
+                onClick={() => onDecide(DECISIONS[0])}
+              >
+                {partner.status === 'approved' ? 'Approved' : 'Approve'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Replay />}
+                disabled={saving || partner.status === 'resubmit'}
+                onClick={() => onDecide(DECISIONS[1])}
+              >
+                Ask to resubmit
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<CancelOutlined />}
+                disabled={saving || partner.status === 'rejected'}
+                onClick={() => onDecide(DECISIONS[2])}
+              >
+                Reject
+              </Button>
+            </Stack>
+          </Box>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems={{ sm: 'flex-start' }}>
+            <Avatar
+              src={partner.profileImageUrl}
+              alt=""
+              variant="rounded"
+              sx={{ width: 96, height: 96, flexShrink: 0 }}
+            />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>About</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {partner.about || '-'}
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Contact and business</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 3 }}>
+            <Detail label="Contact name" value={partner.contactName} />
+            <Detail label="Phone" value={partner.phone} link={partner.phone ? `tel:${partner.phone}` : undefined} />
+            <Detail label="Email" value={partner.email} link={partner.email ? `mailto:${partner.email}` : undefined} />
+            <Detail label="City" value={partner.city} />
+            <Detail label="Industry" value={partner.industry} />
+            <Detail label="GST number" value={partner.gstNumber} />
+            <Detail label="Year of incorporation" value={partner.yearOfIncorporation} />
+            <Detail label="Office location" value={partner.officeLocation} />
+            <Detail label="Applied" value={formatDate(partner.createdAt)} />
+            <Detail label="Updated" value={formatDate(partner.updatedAt || partner.createdAt)} />
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Links and files</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+            <Detail label="Website" value={partner.websiteUrl} link={partner.websiteUrl ? hrefFor(partner.websiteUrl) : undefined} />
+            <Detail label="Video" value={partner.videoUrl} link={partner.videoUrl ? hrefFor(partner.videoUrl) : undefined} />
+            <Detail label="Brochure" value={partner.brochureUrl ? 'Open brochure' : undefined} link={partner.brochureUrl} />
+            <Detail label="Profile photo" value={partner.profileImageUrl ? 'Open photo' : undefined} link={partner.profileImageUrl} />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+          <Button color="error" startIcon={<DeleteOutline />} onClick={onRemove} disabled={removing}>
+            {removing ? 'Removing...' : 'Remove'}
+          </Button>
+          <Button onClick={onClose} variant="outlined">Close</Button>
+        </DialogActions>
+      </>
+    )}
+  </Dialog>
+);
+
+const Detail: React.FC<{ label: string; value?: string; link?: string }> = ({ label, value, link }) => (
+  <Box>
+    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4 }}>{label}</Typography>
+    {link && value ? (
+      <Typography
+        component="a"
+        href={link}
+        target={link.startsWith('http') ? '_blank' : undefined}
+        rel="noreferrer"
+        variant="body2"
+        sx={{ color: tokens.goldText, wordBreak: 'break-word' }}
+      >
+        {value}
+      </Typography>
+    ) : (
+      <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{value || '-'}</Typography>
+    )}
+  </Box>
+);
 
 export default VendorPartners;

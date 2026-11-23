@@ -4,6 +4,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -21,7 +25,17 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Add, DeleteOutline, EditOutlined, PauseCircleOutline, PlayCircleOutline, Search, StorefrontOutlined } from '@mui/icons-material';
+import {
+  Add,
+  Close,
+  DeleteOutline,
+  EditOutlined,
+  PauseCircleOutline,
+  PlayCircleOutline,
+  Search,
+  StorefrontOutlined,
+  VisibilityOutlined,
+} from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
@@ -31,6 +45,7 @@ import PageHeader from '../../Components/PageHeader';
 import EmptyState from '../../Components/EmptyState';
 import ConfirmDialog from '../../Components/ConfirmDialog';
 import { TableSkeleton, PageSkeleton } from '../../Components/LoadingState';
+import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
 import { tokens } from '../../Theme/tokens';
 
 type VendorStatus = 'active' | 'paused';
@@ -54,7 +69,30 @@ export interface Vendor {
   brochureUrl?: string;
   status: VendorStatus;
   replacedNote?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+const VENDOR_SORT = {
+  company: (row: Vendor) => row.companyName,
+  name: (row: Vendor) => row.contactName,
+  industry: (row: Vendor) => row.industry,
+  status: (row: Vendor) => row.status,
+  updated: (row: Vendor) => row.updatedAt || row.createdAt,
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 type VendorDraft = {
   companyName: string;
@@ -174,6 +212,7 @@ const Vendors: React.FC = () => {
   const [industry, setIndustry] = useState('All');
   const [status, setStatus] = useState<'all' | VendorStatus>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewing, setViewing] = useState<Vendor | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Vendor | null>(null);
   const [confirmError, setConfirmError] = useState('');
   const queryClient = useQueryClient();
@@ -189,6 +228,7 @@ const Vendors: React.FC = () => {
       queryClient.setQueryData<Vendor[]>(['vendors'], (current) => (current || []).filter((item) => item._id !== id));
       setPendingDelete(null);
       setConfirmError('');
+      if (viewing?._id === id) setViewing(null);
       toast.success('Vendor deleted');
     },
     onError: (deleteError) => setConfirmError(apiMessage(deleteError)),
@@ -196,8 +236,9 @@ const Vendors: React.FC = () => {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, next }: { id: string; next: VendorStatus }) => updateVendor(id, { status: next }),
-    onSuccess: (_result, { next }) => {
+    onSuccess: (_result, { id, next }) => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      setViewing((current) => (current && current._id === id ? { ...current, status: next } : current));
       toast.success(next === 'paused' ? 'Vendor paused' : 'Vendor resumed');
     },
   });
@@ -232,8 +273,9 @@ const Vendors: React.FC = () => {
     });
   }, [vendors, searchText, industry, status]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const visible = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const { sorted, order, orderBy, toggle: toggleSort } = useTableSort(filtered, VENDOR_SORT, 'updated', 'desc');
+  const totalPages = Math.max(1, Math.ceil(sorted.length / rowsPerPage));
+  const visible = sorted.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   const resetPage = () => setCurrentPage(1);
 
@@ -313,7 +355,7 @@ const Vendors: React.FC = () => {
               ))}
             </Stack>
           </Box>
-          <Typography variant="caption" color="text.secondary">{filtered.length} matching companies</Typography>
+          <Typography variant="caption" color="text.secondary">{sorted.length} matching companies · newest updates first</Typography>
         </Box>
         <Divider />
 
@@ -327,17 +369,27 @@ const Vendors: React.FC = () => {
           />
         ) : (
           <TableContainer>
-            <Table sx={{ minWidth: 1080 }}>
+            <Table sx={{ minWidth: 1180 }}>
               <TableHead sx={{ bgcolor: tokens.surfaceAlt }}>
                 <TableRow>
-                  {['Company', 'Contact', 'GST / PAN', 'Industry', 'Documents', 'Status', 'Actions'].map((heading) => (
-                    <TableCell key={heading} sx={{ fontWeight: 700, color: tokens.text }}>{heading}</TableCell>
-                  ))}
+                  <SortableHeadCell label="Company" sortKey="company" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, color: tokens.text }} />
+                  <SortableHeadCell label="Name" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, color: tokens.text }} />
+                  <TableCell sx={{ fontWeight: 700, color: tokens.text }}>GST / PAN</TableCell>
+                  <SortableHeadCell label="Industry" sortKey="industry" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, color: tokens.text }} />
+                  <TableCell sx={{ fontWeight: 700, color: tokens.text }}>Documents</TableCell>
+                  <SortableHeadCell label="Status" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, color: tokens.text }} />
+                  <SortableHeadCell label="Updated" sortKey="updated" order={order} activeKey={orderBy} onSort={toggleSort} sx={{ fontWeight: 700, color: tokens.text }} />
+                  <TableCell sx={{ fontWeight: 700, color: tokens.text }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {visible.map((vendor) => (
-                  <TableRow key={vendor._id} hover>
+                  <TableRow
+                    key={vendor._id}
+                    hover
+                    onClick={() => setViewing(vendor)}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <TableCell>
                       <Typography sx={{ fontWeight: 600 }}>{vendor.companyName}</Typography>
                       {vendor.websiteUrl && (
@@ -347,6 +399,7 @@ const Vendors: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           variant="caption"
+                          onClick={(event) => event.stopPropagation()}
                           sx={{ color: tokens.goldText, display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                         >
                           Website / portfolio
@@ -357,7 +410,7 @@ const Vendors: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{vendor.contactName}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{vendor.contactName}</Typography>
                       <Typography variant="caption" color="text.secondary">{vendor.phone}{vendor.email ? ` · ${vendor.email}` : ''}</Typography>
                     </TableCell>
                     <TableCell>
@@ -376,7 +429,7 @@ const Vendors: React.FC = () => {
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(event) => event.stopPropagation()}>
                       <DocumentLinks vendor={vendor} />
                     </TableCell>
                     <TableCell>
@@ -388,7 +441,18 @@ const Vendors: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell>
+                      <Typography variant="body2">{formatDateTime(vendor.updatedAt || vendor.createdAt)}</Typography>
+                      {vendor.createdAt && vendor.updatedAt && vendor.createdAt !== vendor.updatedAt ? (
+                        <Typography variant="caption" color="text.secondary">Added {formatDateTime(vendor.createdAt)}</Typography>
+                      ) : null}
+                    </TableCell>
+                    <TableCell onClick={(event) => event.stopPropagation()}>
                       <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="View details">
+                          <IconButton size="small" onClick={() => setViewing(vendor)}>
+                            <VisibilityOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Edit">
                           <IconButton size="small" onClick={() => navigate(`/vendors/${vendor._id}`)}>
                             <EditOutlined fontSize="small" />
@@ -432,7 +496,7 @@ const Vendors: React.FC = () => {
         )}
       </Paper>
 
-      {filtered.length > rowsPerPage && (
+      {sorted.length > rowsPerPage && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
           <Pagination
             count={totalPages}
@@ -443,6 +507,31 @@ const Vendors: React.FC = () => {
           />
         </Box>
       )}
+
+      <VendorDetails
+        vendor={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={() => {
+          if (!viewing) return;
+          const id = viewing._id;
+          setViewing(null);
+          navigate(`/vendors/${id}`);
+        }}
+        onDelete={() => {
+          if (!viewing) return;
+          setConfirmError('');
+          setPendingDelete(viewing);
+        }}
+        onToggleStatus={() => {
+          if (!viewing) return;
+          statusMutation.mutate({
+            id: viewing._id,
+            next: viewing.status === 'active' ? 'paused' : 'active',
+          });
+        }}
+        deleting={deleteMutation.isPending}
+        statusBusy={statusMutation.isPending}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}
@@ -460,6 +549,148 @@ const Vendors: React.FC = () => {
     </Box>
   );
 };
+
+const hrefFor = (value?: string) => {
+  if (!value) return '';
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+};
+
+const VendorDetails: React.FC<{
+  vendor: Vendor | null;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleStatus: () => void;
+  deleting: boolean;
+  statusBusy: boolean;
+}> = ({ vendor, onClose, onEdit, onDelete, onToggleStatus, deleting, statusBusy }) => (
+  <Dialog open={Boolean(vendor)} onClose={onClose} fullWidth maxWidth="md">
+    {vendor && (
+      <>
+        <DialogTitle sx={{ pr: 2, pb: 1.5 }}>
+          <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+            <Box sx={{ minWidth: 0, pr: 1 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.3 }}>
+                {vendor.companyName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {vendor.contactName} · {vendor.industry}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" sx={{ flexShrink: 0 }}>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<EditOutlined />}
+                onClick={onEdit}
+              >
+                Edit
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteOutline />}
+                disabled={deleting}
+                onClick={onDelete}
+              >
+                Delete
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Close />}
+                onClick={onClose}
+              >
+                Close
+              </Button>
+            </Stack>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5, flexWrap: 'wrap' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Status</Typography>
+            <Chip
+              size="small"
+              label={vendor.status}
+              color={vendor.status === 'active' ? 'success' : 'default'}
+              sx={{ textTransform: 'capitalize', fontWeight: 600 }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={vendor.status === 'active' ? <PauseCircleOutline /> : <PlayCircleOutline />}
+              disabled={statusBusy}
+              onClick={onToggleStatus}
+            >
+              {vendor.status === 'active' ? 'Pause' : 'Resume'}
+            </Button>
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Contact</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 3 }}>
+            <Detail label="Name" value={vendor.contactName} />
+            <Detail label="Phone" value={vendor.phone} link={vendor.phone ? `tel:${vendor.phone}` : undefined} />
+            <Detail label="Email" value={vendor.email} link={vendor.email ? `mailto:${vendor.email}` : undefined} />
+            <Detail label="City" value={vendor.city} />
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Business</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 3 }}>
+            <Detail label="Company" value={vendor.companyName} />
+            <Detail label="Industry" value={vendor.industry} />
+            <Detail label="GST" value={vendor.gstNumber} />
+            <Detail label="PAN" value={vendor.panNumber} />
+            <Detail label="Year of incorporation" value={vendor.yearOfIncorporation} />
+            <Detail label="Website" value={vendor.websiteUrl} link={vendor.websiteUrl ? hrefFor(vendor.websiteUrl) : undefined} />
+            <Detail label="Office location" value={vendor.officeLocation} />
+            <Detail label="Updated" value={formatDateTime(vendor.updatedAt || vendor.createdAt)} />
+            <Detail label="Added" value={formatDateTime(vendor.createdAt)} />
+          </Box>
+
+          {(vendor.note || vendor.feedback || vendor.replacedNote) && (
+            <>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Notes</Typography>
+              <Box sx={{ display: 'grid', gap: 2, mb: 3 }}>
+                {vendor.note ? <Detail label="What they supply" value={vendor.note} /> : null}
+                {vendor.feedback ? <Detail label="Feedback" value={vendor.feedback} /> : null}
+                {vendor.replacedNote ? <Detail label="Replacement note" value={vendor.replacedNote} /> : null}
+              </Box>
+            </>
+          )}
+
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Documents</Typography>
+          <DocumentLinks vendor={vendor} />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end' }}>
+          <Button onClick={onClose} variant="outlined" startIcon={<Close />}>
+            Close
+          </Button>
+        </DialogActions>
+      </>
+    )}
+  </Dialog>
+);
+
+const Detail: React.FC<{ label: string; value?: string; link?: string }> = ({ label, value, link }) => (
+  <Box>
+    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.4 }}>{label}</Typography>
+    {link && value ? (
+      <Typography
+        component="a"
+        href={link}
+        target={link.startsWith('http') ? '_blank' : undefined}
+        rel="noreferrer"
+        variant="body2"
+        sx={{ color: tokens.goldText, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}
+      >
+        {value}
+      </Typography>
+    ) : (
+      <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{value || '-'}</Typography>
+    )}
+  </Box>
+);
 
 const documentLinks = (vendor: Vendor) => [
   vendor.cancelledChequeUrl ? { label: 'Cheque', url: vendor.cancelledChequeUrl } : null,
