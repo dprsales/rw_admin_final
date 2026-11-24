@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import {
   CRM_ROLE_LABELS,
+  crmHomeRoute,
   isCrmRole,
   stubCrmRoleFromUserType,
 } from './crmRoles';
@@ -19,6 +20,7 @@ function currentCrmRole() {
 }
 
 const SECTION_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard',
   leads: 'Leads',
   pipeline: 'Pipeline',
   team: 'Team',
@@ -33,10 +35,13 @@ const CrmStubPage: React.FC<Props> = ({ title, blurb }) => {
   const section = pathname.split('/').filter(Boolean)[1] ?? '';
   const sectionLabel = SECTION_LABELS[section] ?? title;
 
+  const home = crmHomeRoute(crmRole);
+  const homeLabel = home.includes('dashboard') ? 'Dashboard' : 'My Day';
+
   return (
     <div className="crm-page crm-page--narrow">
       <nav className="crm-crumbs" aria-label="Breadcrumb">
-        <Link to="/crm">My Day</Link>
+        <Link to={home}>{homeLabel}</Link>
         <span className="crm-crumbs__sep" aria-hidden="true">/</span>
         <span className="crm-crumbs__current">{sectionLabel}</span>
       </nav>
@@ -49,8 +54,8 @@ const CrmStubPage: React.FC<Props> = ({ title, blurb }) => {
           <h1 className="crm-title">{title}</h1>
           <p className="crm-sub">{blurb}</p>
         </div>
-        <Link to="/crm" className="crm-btn">
-          Back to My Day
+        <Link to={home} className="crm-btn">
+          Back to {homeLabel}
         </Link>
       </div>
 

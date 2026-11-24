@@ -6,13 +6,97 @@ import {
   crmHomeBlurb,
   isCrmRole,
   stubCrmRoleFromUserType,
+  type CrmRole,
 } from './crmRoles';
 
-const STUB_CARDS = [
-  { title: 'Overdue', hint: 'Missed follow-ups' },
-  { title: 'Due today', hint: 'Next actions for today' },
-  { title: 'Hot', hint: 'Hot leads needing a move' },
-  { title: 'New / unworked', hint: 'New Lead and Attempted' },
+function isLeadership(role: CrmRole) {
+  return role === 'sales_manager' || role === 'sales_team_lead' || role === 'crm_admin';
+}
+
+type Temp = 'hot' | 'warm' | 'cold';
+
+type SampleRow = {
+  id: string;
+  name: string;
+  project: string;
+  stage: string;
+  temperature: Temp;
+  nextAction: string;
+  when: string;
+  phone: string;
+};
+
+/** Layout-only sample rows for Day 17. Real API wiring is Day 24+. */
+const SAMPLE_OVERDUE: SampleRow[] = [
+  {
+    id: 's1',
+    name: 'Ananya Reddy',
+    project: 'Skyline Residences',
+    stage: 'Site Visit Done',
+    temperature: 'hot',
+    nextAction: 'Call · send cost sheet',
+    when: 'Yesterday 4:00 pm',
+    phone: '9876543210',
+  },
+  {
+    id: 's2',
+    name: 'Vikram Shah',
+    project: 'Lakeview Towers',
+    stage: 'Proposal Sent',
+    temperature: 'warm',
+    nextAction: 'Follow up WhatsApp',
+    when: 'Mon 11:00 am',
+    phone: '9876501234',
+  },
+];
+
+const SAMPLE_TODAY: SampleRow[] = [
+  {
+    id: 's3',
+    name: 'Meera Iyer',
+    project: 'Skyline Residences',
+    stage: 'Qualified',
+    temperature: 'warm',
+    nextAction: 'Site visit confirm',
+    when: 'Today 2:30 pm',
+    phone: '9988776655',
+  },
+  {
+    id: 's4',
+    name: 'Rohit Nair',
+    project: 'Parkside Avenue',
+    stage: 'New Lead',
+    temperature: 'cold',
+    nextAction: 'First call',
+    when: 'Today 5:00 pm',
+    phone: '9123456780',
+  },
+];
+
+const SAMPLE_HOT: SampleRow[] = [
+  {
+    id: 's5',
+    name: 'Sana Khan',
+    project: 'Lakeview Towers',
+    stage: 'Negotiation',
+    temperature: 'hot',
+    nextAction: 'Call · close ask',
+    when: 'Needs a move',
+    phone: '9012345678',
+  },
+];
+
+const SAMPLE_NEW: SampleRow[] = [
+  {
+    id: 's6',
+    name: 'Arjun Patel',
+    project: 'Parkside Avenue',
+    stage: 'New Lead',
+    temperature: 'warm',
+    nextAction: 'Not contacted',
+    when: 'Arrived today',
+    phone: '9090909090',
+  },
 ];
 
 function currentCrmRole() {
@@ -21,12 +105,101 @@ function currentCrmRole() {
   return stubCrmRoleFromUserType(Cookies.get('user_type'));
 }
 
+function waLink(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const withCountry = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${withCountry}`;
+}
+
+function TempPill({ temperature }: { temperature: Temp }) {
+  return (
+    <span className={`crm-temp crm-temp--${temperature}`}>
+      {temperature}
+    </span>
+  );
+}
+
+function DayRow({ row }: { row: SampleRow }) {
+  return (
+    <article className="crm-day-row">
+      <div className="crm-day-row__main">
+        <Link to="/crm/leads" className="crm-day-row__name">
+          {row.name}
+        </Link>
+        <p className="crm-day-row__meta">
+          {row.project}
+          <span aria-hidden="true"> · </span>
+          {row.stage}
+          <span aria-hidden="true"> · </span>
+          <TempPill temperature={row.temperature} />
+        </p>
+        <p className="crm-day-row__action">
+          {row.nextAction}
+          <span className="crm-day-row__when"> · {row.when}</span>
+        </p>
+      </div>
+      <div className="crm-day-row__actions">
+        <a className="crm-btn crm-btn--ghost" href={`tel:+91${row.phone.replace(/\D/g, '').slice(-10)}`}>
+          Call
+        </a>
+        <a
+          className="crm-btn crm-btn--ghost"
+          href={waLink(row.phone)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          WhatsApp
+        </a>
+        <Link to="/crm/leads" className="crm-btn crm-btn--soft">
+          Open
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function DayPanel({
+  title,
+  count,
+  rows,
+  tone,
+}: {
+  title: string;
+  count: number;
+  rows: SampleRow[];
+  tone?: 'danger' | 'hot' | 'neutral';
+}) {
+  return (
+    <section className={`crm-panel crm-panel--day${tone ? ` crm-panel--${tone}` : ''}`}>
+      <div className="crm-panel__head crm-panel__head--split">
+        <span>{title}</span>
+        <span className="crm-panel__count">{count} sample</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="crm-panel__empty">Nothing in this bucket yet.</div>
+      ) : (
+        <div className="crm-day-list">
+          {rows.map((row) => (
+            <DayRow key={row.id} row={row} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
- * Day 14–15 home: My Day layout stub, role-aware copy.
+ * Day 17: My Day layout with today / overdue / hot / new cards.
+ * Sample rows only. Live API wiring comes later.
  */
 const CrmHome: React.FC = () => {
   const crmRole = currentCrmRole();
   const name = (Cookies.get('user_name') || 'Team').trim();
+
+  const overdue = SAMPLE_OVERDUE.length;
+  const today = SAMPLE_TODAY.length;
+  const hot = SAMPLE_HOT.length;
+  const fresh = SAMPLE_NEW.length;
 
   return (
     <div className="crm-page">
@@ -39,41 +212,81 @@ const CrmHome: React.FC = () => {
       <div className="crm-hero">
         <div>
           <p className="crm-kicker">My Day · {CRM_ROLE_LABELS[crmRole]}</p>
-          <h1 className="crm-title">Today’s desk</h1>
+          <h1 className="crm-title">Today's desk</h1>
           <p className="crm-sub">
-            Hi {name}. {crmHomeBlurb(crmRole)}
+            Hi {name}. {crmHomeBlurb(crmRole)} Sample rows below show the layout only.
           </p>
         </div>
-        <Link to="/crm/leads" className="crm-btn">
-          Open leads
-        </Link>
+        <div className="crm-hero__actions">
+          {isLeadership(crmRole) && (
+            <Link to="/crm/dashboard" className="crm-btn">
+              Dashboard
+            </Link>
+          )}
+          <Link to="/crm/leads" className={isLeadership(crmRole) ? 'crm-btn crm-btn--ghost' : 'crm-btn'}>
+            Open leads
+          </Link>
+          <Link to="/crm/pipeline" className="crm-btn crm-btn--soft">
+            Pipeline
+          </Link>
+        </div>
       </div>
 
-      {crmRole === 'sales_manager' ? (
+      <p className="crm-banner" role="note">
+        Layout sample. Counts and names are not live data yet.
+      </p>
+
+      {(crmRole === 'sales_manager' || crmRole === 'sales_team_lead') && (
         <div className="crm-panel" style={{ marginBottom: 16 }}>
-          <div className="crm-panel__head">Manager strip · stub</div>
-          <div className="crm-panel__empty">
-            Your people’s overdue and fresh queue counts land here. Open{' '}
-            <Link to="/crm/team">Team</Link> for the line.
+          <div className="crm-panel__head">Team strip · stub</div>
+          <div className="crm-strip">
+            <div className="crm-strip__cell">
+              <strong>—</strong>
+              <span>People overdue</span>
+            </div>
+            <div className="crm-strip__cell">
+              <strong>—</strong>
+              <span>Fresh uncalled</span>
+            </div>
+            <div className="crm-strip__cell">
+              <strong>—</strong>
+              <span>Visits today</span>
+            </div>
+            <div className="crm-strip__cell crm-strip__cell--link">
+              <Link to="/crm/team">Open Team →</Link>
+            </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       <div className="crm-stats">
-        {STUB_CARDS.map((card) => (
-          <div key={card.title} className="crm-stat">
-            <strong>—</strong>
-            <span>{card.title}</span>
-            <em>{card.hint}</em>
-          </div>
-        ))}
+        <div className="crm-stat crm-stat--danger">
+          <strong>{overdue}</strong>
+          <span>Overdue</span>
+          <em>Missed follow-ups</em>
+        </div>
+        <div className="crm-stat">
+          <strong>{today}</strong>
+          <span>Due today</span>
+          <em>Next actions for today</em>
+        </div>
+        <div className="crm-stat crm-stat--hot">
+          <strong>{hot}</strong>
+          <span>Hot</span>
+          <em>Need a move</em>
+        </div>
+        <div className="crm-stat">
+          <strong>{fresh}</strong>
+          <span>New / unworked</span>
+          <em>New Lead and Attempted</em>
+        </div>
       </div>
 
-      <div className="crm-panel">
-        <div className="crm-panel__head">Due today · stub</div>
-        <div className="crm-panel__empty">
-          Follow-ups will load here from the API. Shell first, then wire.
-        </div>
+      <div className="crm-day-grid">
+        <DayPanel title="Overdue follow-ups" count={overdue} rows={SAMPLE_OVERDUE} tone="danger" />
+        <DayPanel title="Due today" count={today} rows={SAMPLE_TODAY} />
+        <DayPanel title="Hot leads" count={hot} rows={SAMPLE_HOT} tone="hot" />
+        <DayPanel title="New / not contacted" count={fresh} rows={SAMPLE_NEW} />
       </div>
     </div>
   );

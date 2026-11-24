@@ -37,11 +37,9 @@ export function crmHomeRoute(crmRole: unknown): string {
   const role = isCrmRole(crmRole) ? crmRole : 'salesperson';
   switch (role) {
     case 'sales_manager':
-      return '/crm';
     case 'sales_team_lead':
-      return '/crm/team';
     case 'crm_admin':
-      return '/crm/settings';
+      return '/crm/dashboard';
     case 'salesperson':
     default:
       return '/crm';
@@ -52,13 +50,39 @@ export function crmHomeBlurb(crmRole: unknown): string {
   const role = isCrmRole(crmRole) ? crmRole : 'salesperson';
   switch (role) {
     case 'sales_manager':
-      return 'Manager stub home. Your My Day is here; Team opens your line of people.';
+      return 'Manager desk. Dashboard shows your lines; My Day is your own follow-ups.';
     case 'sales_team_lead':
-      return 'Team lead stub home. Org clarity and project access land on Team and Projects.';
+      return 'Team lead desk. Dashboard shows the team pulse; Team and Projects dig deeper.';
     case 'crm_admin':
-      return 'CRM Admin stub home. Roles, access, and templates live under Settings, not ops Users.';
+      return 'CRM Admin desk. Dashboard is the whole-desk view; Settings holds roles and templates.';
     case 'salesperson':
     default:
       return 'Your My Day. Call and WhatsApp use your phone. No Outpero on this desk.';
+  }
+}
+
+/** Day 16: which nav items each seat sees. No HR / payments on this desk. */
+export type CrmNavKey =
+  | 'dashboard'
+  | 'my_day'
+  | 'leads'
+  | 'pipeline'
+  | 'team'
+  | 'projects'
+  | 'settings';
+
+export function crmNavKeysForRole(crmRole: unknown): CrmNavKey[] {
+  const role = isCrmRole(crmRole) ? crmRole : 'salesperson';
+  switch (role) {
+    case 'salesperson':
+      return ['my_day', 'leads', 'pipeline'];
+    case 'sales_manager':
+      return ['dashboard', 'my_day', 'leads', 'pipeline', 'team', 'projects'];
+    case 'sales_team_lead':
+      return ['dashboard', 'my_day', 'leads', 'pipeline', 'team', 'projects'];
+    case 'crm_admin':
+      return ['dashboard', 'my_day', 'leads', 'pipeline', 'team', 'projects', 'settings'];
+    default:
+      return ['my_day', 'leads', 'pipeline'];
   }
 }

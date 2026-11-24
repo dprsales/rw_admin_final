@@ -15,7 +15,7 @@ import {
 import './crm.css';
 
 /**
- * Day 15: cream / dark / gold sales desk login.
+ * Day 15: slate / blue / emerald sales desk login.
  * Same API auth as ops login; redirects into /crm by CRM seat.
  */
 const CrmLogin: React.FC = () => {

@@ -23,7 +23,7 @@ import Blogs from "../Pages/Blogs/Blogs";
 import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
-import { CrmHome, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
+import { CrmDashboard, CrmHome, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
 import ServiceGate from "../Pages/ServiceGate/ServiceGate";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
@@ -116,12 +116,13 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <CrmHome /> },
+      { path: "dashboard", element: <CrmDashboard /> },
       {
         path: "leads",
         element: (
           <CrmStubPage
             title="Leads"
-            blurb="My leads list lands here when the list API is wired into this desk."
+            blurb="Day 18 will shape this list. Live columns and filters come when the API is wired."
           />
         ),
       },
@@ -130,7 +131,7 @@ const router = createBrowserRouter([
         element: (
           <CrmStubPage
             title="Pipeline"
-            blurb="Stage columns from New Lead to Booked come after the desk shell."
+            blurb="Stage columns from New Lead to Booked. Shell route is live; board layout comes later."
           />
         ),
       },
@@ -139,7 +140,7 @@ const router = createBrowserRouter([
         element: (
           <CrmStubPage
             title="Team"
-            blurb="Managers and team leads open people here. Hierarchy APIs come later."
+            blurb="Managers and team leads open people here. Day 20 stub; hierarchy APIs come later."
           />
         ),
       },
@@ -148,7 +149,7 @@ const router = createBrowserRouter([
         element: (
           <CrmStubPage
             title="Projects"
-            blurb="Mandate project hub for leadership. Stub for Day 14 scaffold."
+            blurb="Mandate project hub for leadership. Day 20 stub screen."
           />
         ),
       },
