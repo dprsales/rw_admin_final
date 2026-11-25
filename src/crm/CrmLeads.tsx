@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import CallRoundedIcon from '@mui/icons-material/CallRounded';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   CRM_ROLE_LABELS,
   crmHomeRoute,
@@ -154,6 +157,17 @@ function ageLabel(days: number) {
   if (days <= 0) return 'Today';
   if (days === 1) return '1 day';
   return `${days} days`;
+}
+
+function telLink(phone: string) {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  return `tel:+91${digits}`;
+}
+
+function waLink(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const withCountry = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${withCountry}`;
 }
 
 function TempPill({ temperature }: { temperature: Temp }) {
@@ -312,7 +326,8 @@ const CrmLeads: React.FC = () => {
                       <span className="crm-leads__age">{ageLabel(row.ageDays)}</span>
                     </td>
                     <td>
-                      <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft">
+                      <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft crm-btn--open">
+                        <OpenInNewRoundedIcon fontSize="small" aria-hidden="true" />
                         Open
                       </Link>
                     </td>
@@ -352,7 +367,21 @@ const CrmLeads: React.FC = () => {
                   Age {ageLabel(row.ageDays)}
                 </p>
                 <div className="crm-leads-card__actions">
-                  <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft">
+                  <a className="crm-btn crm-btn--ghost crm-btn--call" href={telLink(row.phone)}>
+                    <CallRoundedIcon fontSize="small" aria-hidden="true" />
+                    Call
+                  </a>
+                  <a
+                    className="crm-btn crm-btn--ghost crm-btn--wa"
+                    href={waLink(row.phone)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <WhatsAppIcon fontSize="small" aria-hidden="true" />
+                    WhatsApp
+                  </a>
+                  <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft crm-btn--open">
+                    <OpenInNewRoundedIcon fontSize="small" aria-hidden="true" />
                     Open
                   </Link>
                 </div>

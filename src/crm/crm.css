@@ -1354,6 +1354,11 @@ body.crm-nav-lock {
   box-shadow: none;
 }
 
+.crm-btn .MuiSvgIcon-root {
+  font-size: 16px !important;
+  flex-shrink: 0;
+}
+
 .crm-btn:hover {
   background: var(--crm-primary-hover);
 }
@@ -1381,6 +1386,31 @@ body.crm-nav-lock {
 .crm-btn--soft:hover {
   background: var(--crm-primary-soft);
   border-color: rgba(197, 164, 109, 0.65);
+}
+
+/* Action icons: colour by meaning so sales spots Call / WA / Open fast */
+.crm-btn--call .MuiSvgIcon-root,
+a.crm-btn[href^="tel:"] .MuiSvgIcon-root {
+  color: var(--crm-ok);
+}
+
+.crm-btn--wa .MuiSvgIcon-root,
+a.crm-btn[href*="wa.me"] .MuiSvgIcon-root {
+  color: #25d366;
+}
+
+.crm-btn--open .MuiSvgIcon-root,
+.crm-btn--soft .MuiSvgIcon-root {
+  color: var(--crm-primary);
+}
+
+.crm-btn--blocked .MuiSvgIcon-root,
+.crm-btn--ghost:disabled .MuiSvgIcon-root {
+  color: var(--crm-hot);
+}
+
+.crm-btn:not(.crm-btn--ghost):not(.crm-btn--soft) .MuiSvgIcon-root {
+  color: inherit;
 }
 
 .crm-stats {
@@ -2355,7 +2385,10 @@ body.crm-nav-lock {
 }
 
 .crm-leads-card__actions {
-  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 @media (min-width: 768px) {

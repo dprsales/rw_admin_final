@@ -401,7 +401,7 @@ const CrmLeadDetail: React.FC = () => {
           {lead.dnd ? (
             <button
               type="button"
-              className="crm-btn crm-btn--ghost"
+              className="crm-btn crm-btn--ghost crm-btn--blocked"
               disabled
               title="Do-not-call is set on this lead"
             >
@@ -409,13 +409,13 @@ const CrmLeadDetail: React.FC = () => {
               Call blocked
             </button>
           ) : (
-            <a className="crm-btn" href={telLink(lead.phone)}>
+            <a className="crm-btn crm-btn--call" href={telLink(lead.phone)}>
               <CallRoundedIcon fontSize="small" aria-hidden="true" />
               Call
             </a>
           )}
           <a
-            className="crm-btn crm-btn--soft"
+            className="crm-btn crm-btn--soft crm-btn--wa"
             href={waLink(lead.phone)}
             target="_blank"
             rel="noreferrer"

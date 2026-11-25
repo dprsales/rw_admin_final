@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Cookies from 'js-cookie';
+import CallRoundedIcon from '@mui/icons-material/CallRounded';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import {
   CRM_ROLE_LABELS,
   crmHomeBlurb,
@@ -139,18 +142,24 @@ function DayRow({ row }: { row: SampleRow }) {
         </p>
       </div>
       <div className="crm-day-row__actions">
-        <a className="crm-btn crm-btn--ghost" href={`tel:+91${row.phone.replace(/\D/g, '').slice(-10)}`}>
+        <a
+          className="crm-btn crm-btn--ghost crm-btn--call"
+          href={`tel:+91${row.phone.replace(/\D/g, '').slice(-10)}`}
+        >
+          <CallRoundedIcon fontSize="small" aria-hidden="true" />
           Call
         </a>
         <a
-          className="crm-btn crm-btn--ghost"
+          className="crm-btn crm-btn--ghost crm-btn--wa"
           href={waLink(row.phone)}
           target="_blank"
           rel="noreferrer"
         >
+          <WhatsAppIcon fontSize="small" aria-hidden="true" />
           WhatsApp
         </a>
-        <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft">
+        <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft crm-btn--open">
+          <OpenInNewRoundedIcon fontSize="small" aria-hidden="true" />
           Open
         </Link>
       </div>

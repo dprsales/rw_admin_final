@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import {
   Area,
   AreaChart,
@@ -448,7 +449,8 @@ const CrmDashboard: React.FC = () => {
                     {row.project} · {row.when}
                   </em>
                 </div>
-                <Link to="/crm/leads" className="crm-btn crm-btn--soft">
+                <Link to="/crm/leads" className="crm-btn crm-btn--soft crm-btn--open">
+                  <ArrowForwardRoundedIcon fontSize="small" aria-hidden="true" />
                   Review
                 </Link>
               </li>
