@@ -16,12 +16,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
-import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
-import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
-import PhoneInTalkRoundedIcon from '@mui/icons-material/PhoneInTalkRounded';
-import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 import {
   CRM_ROLE_LABELS,
   isCrmRole,
@@ -31,12 +25,12 @@ import {
 
 /** Sample-only figures for leadership UI. Live APIs wire later. */
 const KPI = [
-  { key: 'open', label: 'Open leads', value: '186', hint: 'Across your desk', tone: 'default' as const, Icon: GroupsRoundedIcon },
-  { key: 'overdue', label: 'Overdue follow-ups', value: '23', hint: 'Need a call today', tone: 'danger' as const, Icon: WarningAmberRoundedIcon },
-  { key: 'connected', label: 'Connected today', value: '41', hint: 'Talked / WhatsApp replied', tone: 'ok' as const, Icon: PhoneInTalkRoundedIcon },
-  { key: 'visits', label: 'Site visits (week)', value: '12', hint: 'Booked or done', tone: 'default' as const, Icon: EventAvailableRoundedIcon },
-  { key: 'booked', label: 'Booked (month)', value: '7', hint: 'Closed this month', tone: 'ok' as const, Icon: HandshakeRoundedIcon },
-  { key: 'conv', label: 'Lead → visit', value: '18%', hint: 'Last 30 days', tone: 'default' as const, Icon: TrendingUpRoundedIcon },
+  { key: 'open', label: 'Open leads', value: '186', hint: 'Across your desk', tone: 'default' as const },
+  { key: 'overdue', label: 'Overdue follow-ups', value: '23', hint: 'Need a call today', tone: 'danger' as const },
+  { key: 'connected', label: 'Connected today', value: '41', hint: 'Talked / WhatsApp replied', tone: 'ok' as const },
+  { key: 'visits', label: 'Site visits (week)', value: '12', hint: 'Booked or done', tone: 'default' as const },
+  { key: 'booked', label: 'Booked (month)', value: '7', hint: 'Closed this month', tone: 'ok' as const },
+  { key: 'conv', label: 'Lead → visit', value: '18%', hint: 'Last 30 days', tone: 'default' as const },
 ];
 
 const ACTIVITY = [
@@ -75,9 +69,9 @@ const TEAM_BARS = [
 ];
 
 const TEMP_MIX = [
-  { name: 'Hot', value: 28, color: '#ef4444' },
-  { name: 'Warm', value: 74, color: '#f59e0b' },
-  { name: 'Cold', value: 84, color: '#0ea5e9' },
+  { name: 'Hot', value: 28, color: '#f04438' },
+  { name: 'Warm', value: 74, color: '#f5a524' },
+  { name: 'Cold', value: 84, color: '#3b82f6' },
 ];
 
 const PROJECT_BARS = [
@@ -114,15 +108,15 @@ const FEED = [
   { t: '28 min ago', text: 'Arjun logged Connected · Lakeview · Vikram Shah' },
   { t: '1 hr ago', text: 'Priya booked a visit for tomorrow 11:00 · Parkside' },
   { t: '2 hr ago', text: 'Karan moved 2 leads to Attempted · Orchid' },
-  { t: 'Today 9:40', text: '12 new Meta leads landed on Skyline (sample)' },
+  { t: 'Today 9:40', text: '12 new Meta leads landed on Skyline' },
 ];
 
 const CHART_TIP = {
-  background: '#0f172a',
-  border: '1px solid #334155',
-  borderRadius: 10,
+  background: '#14181f',
+  border: '1px solid #262b33',
+  borderRadius: 6,
   fontSize: 12,
-  color: '#f8fafc',
+  color: '#eceef2',
 };
 
 function currentCrmRole(): CrmRole {
@@ -148,9 +142,9 @@ const CrmDashboard: React.FC = () => {
   const name = (Cookies.get('user_name') || 'Team').trim();
 
   const roleLine = useMemo(() => {
-    if (crmRole === 'crm_admin') return 'Whole desk · sample overview';
-    if (crmRole === 'sales_manager') return 'Your lines · sample overview';
-    return 'Your team · sample overview';
+    if (crmRole === 'crm_admin') return 'Whole desk overview';
+    if (crmRole === 'sales_manager') return 'Your lines overview';
+    return 'Your team overview';
   }, [crmRole]);
 
   if (!isLeadership(crmRole)) {
@@ -170,15 +164,15 @@ const CrmDashboard: React.FC = () => {
           <p className="crm-kicker">Dashboard · {CRM_ROLE_LABELS[crmRole]}</p>
           <h1 className="crm-title">What is moving today</h1>
           <p className="crm-sub">
-            Hi {name}. {roleLine}. Numbers and charts are layout samples so you can see the desk without chasing the team. Live data comes when APIs are wired.
+            Hi {name}. {roleLine}. Spot overdue heat, connects, and visits before you chase the floor.
           </p>
         </div>
         <div className="crm-hero__actions">
-          <div className="crm-seg" role="group" aria-label="Range (sample)">
+          <div className="crm-seg" role="group" aria-label="Range">
             <button type="button" className="crm-seg__btn is-on">
               This week
             </button>
-            <button type="button" className="crm-seg__btn" disabled title="Wires with live data later">
+            <button type="button" className="crm-seg__btn" disabled title="Month view wires with live data">
               Month
             </button>
           </div>
@@ -191,26 +185,14 @@ const CrmDashboard: React.FC = () => {
         </div>
       </div>
 
-      <p className="crm-banner" role="note">
-        Sample dashboard. Counts, charts, and names are not live yet. Structure matches what managers and admins will use every morning.
-      </p>
-
       <div className="crm-kpi-grid">
-        {KPI.map((item) => {
-          const Icon = item.Icon;
-          return (
-            <article key={item.key} className={`crm-kpi crm-kpi--${item.tone}`}>
-              <div className="crm-kpi__ico" aria-hidden="true">
-                <Icon fontSize="small" />
-              </div>
-              <div>
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-                <em>{item.hint}</em>
-              </div>
-            </article>
-          );
-        })}
+        {KPI.map((item) => (
+          <article key={item.key} className={`crm-kpi crm-kpi--${item.tone}`}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <em>{item.hint}</em>
+          </article>
+        ))}
       </div>
 
       <div className="crm-dash-grid">
@@ -226,24 +208,24 @@ const CrmDashboard: React.FC = () => {
               <AreaChart data={ACTIVITY} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="crmCalls" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#c5a46d" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#c5a46d" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="crmConnects" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+                <CartesianGrid stroke="#303640" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fill: '#a4acb8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#a4acb8', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
                 <Tooltip contentStyle={CHART_TIP} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#a4acb8' }} />
                 <Area
                   type="monotone"
                   dataKey="calls"
                   name="Calls"
-                  stroke="#3b82f6"
+                  stroke="#c5a46d"
                   strokeWidth={2}
                   fill="url(#crmCalls)"
                 />
@@ -251,7 +233,7 @@ const CrmDashboard: React.FC = () => {
                   type="monotone"
                   dataKey="connects"
                   name="Connects"
-                  stroke="#10b981"
+                  stroke="#22c55e"
                   strokeWidth={2}
                   fill="url(#crmConnects)"
                 />
@@ -259,7 +241,7 @@ const CrmDashboard: React.FC = () => {
                   type="monotone"
                   dataKey="followUps"
                   name="Follow-ups"
-                  stroke="#f59e0b"
+                  stroke="#f5a524"
                   strokeWidth={2}
                   fill="transparent"
                   strokeDasharray="4 4"
@@ -315,20 +297,20 @@ const CrmDashboard: React.FC = () => {
                 layout="vertical"
                 margin={{ top: 4, right: 12, left: 8, bottom: 4 }}
               >
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <CartesianGrid stroke="#303640" strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#a4acb8', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis
                   type="category"
                   dataKey="name"
                   width={52}
-                  tick={{ fill: '#0f172a', fontSize: 12, fontWeight: 600 }}
+                  tick={{ fill: '#f1f2f4', fontSize: 12, fontWeight: 600 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <Tooltip contentStyle={CHART_TIP} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="worked" name="Worked" fill="#3b82f6" radius={[0, 6, 6, 0]} barSize={10} />
-                <Bar dataKey="connects" name="Connects" fill="#10b981" radius={[0, 6, 6, 0]} barSize={10} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#a4acb8' }} />
+                <Bar dataKey="worked" name="Worked" fill="#c5a46d" radius={[0, 6, 6, 0]} barSize={10} />
+                <Bar dataKey="connects" name="Connects" fill="#22c55e" radius={[0, 6, 6, 0]} barSize={10} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -360,7 +342,7 @@ const CrmDashboard: React.FC = () => {
                     innerRadius={48}
                     outerRadius={72}
                     paddingAngle={3}
-                    stroke="#fff"
+                    stroke="#1c2027"
                     strokeWidth={2}
                   >
                     {TEMP_MIX.map((slice) => (
@@ -402,14 +384,14 @@ const CrmDashboard: React.FC = () => {
           <div className="crm-chart-card__body">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={PROJECT_BARS} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <CartesianGrid stroke="#303640" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: '#a4acb8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#a4acb8', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip contentStyle={CHART_TIP} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="leads" name="Open leads" fill="#60a5fa" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="visits" name="Visits" fill="#34d399" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="booked" name="Booked" fill="#fbbf24" radius={[6, 6, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#a4acb8' }} />
+                <Bar dataKey="leads" name="Open leads" fill="#c5a46d" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="visits" name="Visits" fill="#22c55e" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="booked" name="Booked" fill="#f5a524" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

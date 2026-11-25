@@ -29,7 +29,7 @@ type SampleRow = {
 /** Layout-only sample rows for Day 17. Real API wiring is Day 24+. */
 const SAMPLE_OVERDUE: SampleRow[] = [
   {
-    id: 's1',
+    id: 'l1',
     name: 'Ananya Reddy',
     project: 'Skyline Residences',
     stage: 'Site Visit Done',
@@ -39,7 +39,7 @@ const SAMPLE_OVERDUE: SampleRow[] = [
     phone: '9876543210',
   },
   {
-    id: 's2',
+    id: 'l2',
     name: 'Vikram Shah',
     project: 'Lakeview Towers',
     stage: 'Proposal Sent',
@@ -52,7 +52,7 @@ const SAMPLE_OVERDUE: SampleRow[] = [
 
 const SAMPLE_TODAY: SampleRow[] = [
   {
-    id: 's3',
+    id: 'l3',
     name: 'Meera Iyer',
     project: 'Skyline Residences',
     stage: 'Qualified',
@@ -62,7 +62,7 @@ const SAMPLE_TODAY: SampleRow[] = [
     phone: '9988776655',
   },
   {
-    id: 's4',
+    id: 'l4',
     name: 'Rohit Nair',
     project: 'Parkside Avenue',
     stage: 'New Lead',
@@ -75,7 +75,7 @@ const SAMPLE_TODAY: SampleRow[] = [
 
 const SAMPLE_HOT: SampleRow[] = [
   {
-    id: 's5',
+    id: 'l5',
     name: 'Sana Khan',
     project: 'Lakeview Towers',
     stage: 'Negotiation',
@@ -88,10 +88,10 @@ const SAMPLE_HOT: SampleRow[] = [
 
 const SAMPLE_NEW: SampleRow[] = [
   {
-    id: 's6',
+    id: 'l6',
     name: 'Arjun Patel',
     project: 'Parkside Avenue',
-    stage: 'New Lead',
+    stage: 'Attempted',
     temperature: 'warm',
     nextAction: 'Not contacted',
     when: 'Arrived today',
@@ -123,7 +123,7 @@ function DayRow({ row }: { row: SampleRow }) {
   return (
     <article className="crm-day-row">
       <div className="crm-day-row__main">
-        <Link to="/crm/leads" className="crm-day-row__name">
+        <Link to={`/crm/leads/${row.id}`} className="crm-day-row__name">
           {row.name}
         </Link>
         <p className="crm-day-row__meta">
@@ -150,7 +150,7 @@ function DayRow({ row }: { row: SampleRow }) {
         >
           WhatsApp
         </a>
-        <Link to="/crm/leads" className="crm-btn crm-btn--soft">
+        <Link to={`/crm/leads/${row.id}`} className="crm-btn crm-btn--soft">
           Open
         </Link>
       </div>
@@ -261,23 +261,23 @@ const CrmHome: React.FC = () => {
 
       <div className="crm-stats">
         <div className="crm-stat crm-stat--danger">
-          <strong>{overdue}</strong>
           <span>Overdue</span>
+          <strong>{overdue}</strong>
           <em>Missed follow-ups</em>
         </div>
         <div className="crm-stat">
-          <strong>{today}</strong>
           <span>Due today</span>
+          <strong>{today}</strong>
           <em>Next actions for today</em>
         </div>
         <div className="crm-stat crm-stat--hot">
-          <strong>{hot}</strong>
           <span>Hot</span>
+          <strong>{hot}</strong>
           <em>Need a move</em>
         </div>
         <div className="crm-stat">
-          <strong>{fresh}</strong>
           <span>New / unworked</span>
+          <strong>{fresh}</strong>
           <em>New Lead and Attempted</em>
         </div>
       </div>

@@ -23,7 +23,7 @@ import Blogs from "../Pages/Blogs/Blogs";
 import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
-import { CrmDashboard, CrmHome, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
+import { CrmDashboard, CrmHome, CrmLeadDetail, CrmLeads, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
 import ServiceGate from "../Pages/ServiceGate/ServiceGate";
 import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
 
@@ -117,15 +117,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <CrmHome /> },
       { path: "dashboard", element: <CrmDashboard /> },
-      {
-        path: "leads",
-        element: (
-          <CrmStubPage
-            title="Leads"
-            blurb="Day 18 will shape this list. Live columns and filters come when the API is wired."
-          />
-        ),
-      },
+      { path: "leads", element: <CrmLeads /> },
+      { path: "leads/:leadId", element: <CrmLeadDetail /> },
       {
         path: "pipeline",
         element: (

@@ -98,8 +98,9 @@ function currentCrmRole() {
 }
 
 /**
- * SaaS desk shell: dark chrome header + sidebar, light work area.
+ * Sales desk shell (UI locked). Graphite + champagne gold.
  * Phone dock, iPad/laptop sidebar, desktop app frame.
+ * See documents/crm/RW-CRM-UI-LOCK.md
  */
 const CrmShell: React.FC = () => {
   const location = useLocation();

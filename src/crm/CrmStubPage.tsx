@@ -59,7 +59,10 @@ const CrmStubPage: React.FC<Props> = ({ title, blurb }) => {
         </Link>
       </div>
 
-      <div className="crm-stub-box">Screen stub · filled in later calendar days</div>
+      <div className="crm-stub-box">
+        <strong>Coming on the calendar</strong>
+        Screen stub. Layout matches the locked desk. Live build fills this on later days.
+      </div>
     </div>
   );
 };
