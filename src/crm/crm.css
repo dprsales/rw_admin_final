@@ -1389,27 +1389,24 @@ body.crm-nav-lock {
 }
 
 /* Action icons: colour by meaning so sales spots Call / WA / Open fast */
-.crm-btn--call .MuiSvgIcon-root,
-a.crm-btn[href^="tel:"] .MuiSvgIcon-root {
+.crm-btn--ghost.crm-btn--call .MuiSvgIcon-root {
   color: var(--crm-ok);
 }
 
-.crm-btn--wa .MuiSvgIcon-root,
-a.crm-btn[href*="wa.me"] .MuiSvgIcon-root {
+.crm-btn--wa .MuiSvgIcon-root {
   color: #25d366;
 }
 
-.crm-btn--open .MuiSvgIcon-root,
-.crm-btn--soft .MuiSvgIcon-root {
+.crm-btn--open .MuiSvgIcon-root {
   color: var(--crm-primary);
 }
 
-.crm-btn--blocked .MuiSvgIcon-root,
-.crm-btn--ghost:disabled .MuiSvgIcon-root {
+.crm-btn--blocked .MuiSvgIcon-root {
   color: var(--crm-hot);
 }
 
-.crm-btn:not(.crm-btn--ghost):not(.crm-btn--soft) .MuiSvgIcon-root {
+/* Filled gold Call: icon stays dark on gold */
+.crm-btn--call:not(.crm-btn--ghost):not(.crm-btn--soft) .MuiSvgIcon-root {
   color: inherit;
 }
 
