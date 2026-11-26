@@ -93,7 +93,10 @@ export type GetLeadsParams = {
   phone?: string;
 };
 
-/** Day 11 — paged list; optional owner / project / stage / phone filters. */
+/**
+ * Day 11 — paged list; optional owner / project / stage / phone filters.
+ * Pass ownerId `unassigned` for the open pool (managers).
+ */
 export const getLeads = async (params: GetLeadsParams = {}) => {
   const response = await http.get('/leads', {
     params: {

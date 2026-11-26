@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Autocomplete,
   Box, TextField, InputAdornment, Paper, Table,
@@ -10,14 +10,32 @@ import {
 import { Search as SearchIcon, ArrowDropDown as ArrowDropDownIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Cookies from 'js-cookie';
 
 import LeadModal from './LeadModal'; // Adjust path
 import AddLeadDialog from './AddLeadDialog';
-import { deleteLead, getLeads, releaseLeadCall, sendLeadCall } from '../../api/services';
+import {
+  deleteLead,
+  getAssignableLeadOwners,
+  getLeads,
+  releaseLeadCall,
+  sendLeadCall,
+  type AssignableOwner,
+} from '../../api/services';
 import PageHeader from '../../Components/PageHeader';
 import EmptyState from '../../Components/EmptyState';
 import { TableSkeleton } from '../../Components/LoadingState';
 import { tokens } from '../../Theme/tokens';
+
+type OwnerFilterOption = {
+  value: string;
+  label: string;
+};
+
+function isLeadManagerSeat(): boolean {
+  const role = String(Cookies.get('user_type') || '').toLowerCase();
+  return role === 'admin' || role === 'super_admin';
+}
 
 // ----------------------
 // Type Declarations
@@ -74,6 +92,7 @@ export interface Lead {
   saleLeadId?: string;
   formSubmittedAt?: string;
   createdAt: string;
+  updatedAt?: string;
   lastCallId?: string;
   lastCallStatus?: string;
   lastCallOutcome?: string;
@@ -324,6 +343,43 @@ const KRISAH_CHIP: Record<Exclude<KrisahStatus, 'none'>, { label: string; bg: st
   not_started: { label: 'Not started', bg: tokens.warningSoft, color: tokens.warning },
 };
 
+function formatLeadDate(value?: string): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** Date in: form submit if present, else created. */
+function leadDateIn(lead: Pick<Lead, 'formSubmittedAt' | 'createdAt'>): string {
+  return formatLeadDate(lead.formSubmittedAt || lead.createdAt);
+}
+
+/**
+ * Date out: only when the lead is closed (won / lost).
+ * Uses updatedAt until a dedicated closedAt field exists.
+ */
+function leadDateOut(
+  lead: Pick<Lead, 'stage' | 'status' | 'updatedAt'>,
+): string {
+  const closed =
+    lead.stage === 'won_booked' ||
+    lead.stage === 'lost' ||
+    lead.status === 'won' ||
+    lead.status === 'lost';
+  if (!closed) return '-';
+  return formatLeadDate(lead.updatedAt);
+}
+
+function leadCampaignLabel(lead: Pick<Lead, 'pageSource'>): string {
+  const value = String(lead.pageSource || '').trim();
+  return value || '-';
+}
+
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
   const key = krisahStatusKey(lead);
   if (key === 'none') {
@@ -416,16 +472,46 @@ const AllLeads: React.FC = () => {
   const [callError, setCallError] = useState('');
   const [callInfo, setCallInfo] = useState('');
   const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState('');
+  const canFilterOwners = isLeadManagerSeat();
 
-  // Day 11 — ask the server for one page (stage + phone filters).
+  const ownersQuery = useQuery({
+    queryKey: ['assignable-lead-owners'],
+    queryFn: getAssignableLeadOwners,
+    enabled: canFilterOwners,
+  });
+  const owners: AssignableOwner[] = ownersQuery.data || [];
+
+  const ownerFilterOptions = useMemo<OwnerFilterOption[]>(() => {
+    const people = owners.map((owner) => ({
+      value: owner._id,
+      label: owner.name || owner.email || owner._id,
+    }));
+    return [
+      { value: '', label: 'All owners' },
+      { value: 'unassigned', label: 'Unassigned pool' },
+      ...people,
+    ];
+  }, [owners]);
+
+  const ownerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    owners.forEach((owner) => {
+      map.set(owner._id, owner.name || owner.email || owner._id);
+    });
+    return map;
+  }, [owners]);
+
+  // Day 11 — ask the server for one page (stage + phone + owner filters).
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
-    queryKey: ['leads', currentPage, rowsPerPage, stageFilter, phoneFilter],
+    queryKey: ['leads', currentPage, rowsPerPage, stageFilter, phoneFilter, ownerFilter],
     queryFn: () =>
       getLeads({
         page: currentPage,
         limit: rowsPerPage,
         ...(stageFilter ? { stage: stageFilter } : {}),
         ...(phoneFilter ? { phone: phoneFilter } : {}),
+        ...(canFilterOwners && ownerFilter ? { ownerId: ownerFilter } : {}),
       }),
     placeholderData: (prev) => prev,
   });
@@ -698,6 +784,29 @@ const AllLeads: React.FC = () => {
             }}
           />
 
+          {canFilterOwners && (
+            <Autocomplete
+              size="small"
+              options={ownerFilterOptions}
+              value={
+                ownerFilterOptions.find((o) => o.value === ownerFilter) ||
+                ownerFilterOptions[0]
+              }
+              onChange={(_e, next) => {
+                setOwnerFilter(next?.value || '');
+                setCurrentPage(1);
+              }}
+              getOptionLabel={(option) => option.label}
+              isOptionEqualToValue={(a, b) => a.value === b.value}
+              disableClearable
+              blurOnSelect
+              renderInput={(params) => (
+                <TextField {...params} label="Owner" placeholder="Search owner" />
+              )}
+              sx={{ ...filterFieldSx, minWidth: 180 }}
+            />
+          )}
+
           {sourceOptions.length > 0 && (
             <Autocomplete
               multiple
@@ -861,19 +970,31 @@ const AllLeads: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Leads Table: horizontal scroll when the panel is narrow */}
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Scroll the table sideways to see campaign, stage, heat, dates, and more.
+      </Typography>
+
+      {/* Wide interim columns: horizontal + vertical scroll */}
       <TableContainer
         component={Paper}
         sx={{
           borderRadius: '10px',
           width: '100%',
           maxWidth: '100%',
+          maxHeight: { xs: '70vh', md: '72vh' },
           overflowX: 'auto',
+          overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
+          border: `1px solid ${tokens.border}`,
+          '&::-webkit-scrollbar': { height: 10, width: 10 },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: tokens.borderStrong,
+            borderRadius: 8,
+          },
         }}
       >
         {(callError || callInfo) && (
-          <Box sx={{ mb: 1.5 }}>
+          <Box sx={{ px: 1.5, pt: 1.5 }}>
             {callError && (
               <Typography variant="body2" color="error" sx={{ mb: callInfo ? 0.5 : 0 }}>
                 {callError}
@@ -887,10 +1008,13 @@ const AllLeads: React.FC = () => {
           </Box>
         )}
 
-        <Table sx={{ minWidth: 1040 }} stickyHeader={false}>
-          <TableHead sx={{ backgroundColor: tokens.panelAlt }}>
+        <Table stickyHeader sx={{ minWidth: 1680 }}>
+          <TableHead>
             <TableRow>
-              <TableCell padding="checkbox" sx={{ padding: '6px 8px' }}>
+              <TableCell
+                padding="checkbox"
+                sx={{ padding: '6px 8px', bgcolor: tokens.panelAlt, zIndex: 3 }}
+              >
                 <Checkbox
                   size="small"
                   checked={allPageSelected}
@@ -899,9 +1023,36 @@ const AllLeads: React.FC = () => {
                   inputProps={{ 'aria-label': 'Select leads on this page' }}
                 />
               </TableCell>
-              {['S.No', 'Name', 'Contact', 'Type / Track', 'Source', 'Service', 'KRISAH', 'Call', 'Date'].map((text) => (
-                <TableCell key={text} align="left" sx={{ padding: '8px 12px' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{text}</Typography>
+              {[
+                'S.No',
+                'Name',
+                'Phone',
+                'Email',
+                'Source',
+                'Campaign',
+                'Stage',
+                'Heat',
+                'Owner',
+                'Project',
+                'Date in',
+                'Date out',
+                'Next follow-up',
+                'Type',
+                'KRISAH',
+                'Call',
+              ].map((text) => (
+                <TableCell
+                  key={text}
+                  align="left"
+                  sx={{
+                    padding: '8px 12px',
+                    bgcolor: tokens.panelAlt,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                    {text}
+                  </Typography>
                 </TableCell>
               ))}
             </TableRow>
@@ -909,12 +1060,19 @@ const AllLeads: React.FC = () => {
           <TableBody>
             {paginatedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10}>
+                <TableCell colSpan={17}>
                   <EmptyState
                     title="No leads found"
-                    description={searchText.trim() || stageFilter || selectedSources.length || selectedServices.length || krisahFilter
-                      ? 'Try changing or clearing the filters.'
-                      : 'New website enquiries will appear here.'}
+                    description={
+                      searchText.trim() ||
+                      stageFilter ||
+                      ownerFilter ||
+                      selectedSources.length ||
+                      selectedServices.length ||
+                      krisahFilter
+                        ? 'Try changing or clearing the filters.'
+                        : 'New website enquiries will appear here.'
+                    }
                   />
                 </TableCell>
               </TableRow>
@@ -926,7 +1084,11 @@ const AllLeads: React.FC = () => {
                 onClick={() => handleRowClick(lead)}
                 sx={{ cursor: 'pointer' }}
               >
-                <TableCell padding="checkbox" sx={{ padding: '6px 8px' }} onClick={(event) => event.stopPropagation()}>
+                <TableCell
+                  padding="checkbox"
+                  sx={{ padding: '6px 8px' }}
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <Checkbox
                     size="small"
                     checked={selectedIds.includes(lead._id)}
@@ -934,58 +1096,101 @@ const AllLeads: React.FC = () => {
                     inputProps={{ 'aria-label': `Select ${lead.name || 'lead'}` }}
                   />
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                   <Typography variant="caption">
                     {(currentPage - 1) * rowsPerPage + index + 1}
                   </Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
+                <TableCell sx={{ padding: '8px 12px', minWidth: 140 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
-                    {lead.name}
+                    {lead.name || '-'}
                   </Typography>
                   {lead.company && (
                     <Typography variant="caption" color="text.secondary" display="block">
                       {lead.company}
                     </Typography>
                   )}
-                  {lead.projectName && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {lead.projectName}
-                    </Typography>
-                  )}
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
-                  <Typography variant="caption" display="block">{lead.email}</Typography>
-                  <Typography variant="caption" color="text.secondary">{lead.phoneNumber}</Typography>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption">{lead.phoneNumber || '-'}</Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
-                  <Chip
-                    size="small"
-                    label={lead.formTrack
-                      ? (FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack)
-                      : lead.type}
-                    sx={{ height: 22, fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}
-                  />
-                  {lead.intent && lead.intent !== 'enquiry' && (
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                      {INTENT_LABEL[lead.intent] || lead.intent}
-                    </Typography>
-                  )}
+                <TableCell sx={{ padding: '8px 12px', minWidth: 160 }}>
+                  <Typography variant="caption">{lead.email || '-'}</Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
-                  <Typography variant="caption">{leadSourceLabel(lead)}</Typography>
+                <TableCell sx={{ padding: '8px 12px', minWidth: 120 }}>
+                  <Typography variant="caption" display="block">
+                    {lead.crmSource
+                      ? CRM_SOURCE_LABEL[lead.crmSource] || lead.crmSource
+                      : leadSourceLabel(lead)}
+                  </Typography>
                   {lead.enquiries && lead.enquiries > 1 && (
                     <Typography variant="caption" color="text.secondary" display="block">
                       {lead.enquiries} touches
                     </Typography>
                   )}
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
-                  <Typography variant="caption">
-                    {lead.recommendedService
-                      ? (SERVICE_LABEL[lead.recommendedService] || lead.recommendedService)
-                      : '-'}
+                <TableCell sx={{ padding: '8px 12px', minWidth: 160 }}>
+                  <Typography variant="caption">{leadCampaignLabel(lead)}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                    {lead.stage ? STAGE_LABEL[lead.stage] || lead.stage : '-'}
                   </Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  {lead.temperature ? (
+                    <Chip
+                      size="small"
+                      label={TEMPERATURE_LABEL[lead.temperature] || lead.temperature}
+                      sx={{ height: 22, fontSize: 11, textTransform: 'capitalize' }}
+                    />
+                  ) : (
+                    <Typography variant="caption">-</Typography>
+                  )}
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', minWidth: 120 }}>
+                  {lead.ownerId ? (
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      {ownerNameById.get(String(lead.ownerId)) || 'Assigned'}
+                    </Typography>
+                  ) : (
+                    <Chip
+                      size="small"
+                      label="Unassigned"
+                      variant="outlined"
+                      sx={{ height: 22, fontSize: 11 }}
+                    />
+                  )}
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', minWidth: 140 }}>
+                  <Typography variant="caption">{lead.projectName || '-'}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption">{leadDateIn(lead)}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption">{leadDateOut(lead)}</Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption">
+                    {formatLeadDate(lead.nextFollowUpAt)}
+                  </Typography>
+                </TableCell>
+                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                  <Chip
+                    size="small"
+                    label={
+                      lead.formTrack
+                        ? FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack
+                        : lead.type
+                    }
+                    sx={{
+                      height: 22,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                    }}
+                  />
                 </TableCell>
                 <TableCell sx={{ padding: '8px 12px' }}>
                   <KrisahStatusChip lead={lead} />
@@ -1010,7 +1215,12 @@ const AllLeads: React.FC = () => {
                             : 'Call'}
                       </Button>
                       {lead.lastCallStatus && !isLeadCallInFlight(lead) && (
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mt: 0.5 }}
+                        >
                           {leadCallStatusLabel(lead)}
                           {lead.lastCallOutcome &&
                           lead.lastCallStatus !== 'queued' &&
@@ -1020,19 +1230,21 @@ const AllLeads: React.FC = () => {
                         </Typography>
                       )}
                       {isLeadCallInFlight(lead) && (
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mt: 0.5 }}
+                        >
                           {CALL_STATUS_LABEL[lead.lastCallStatus || ''] || 'Calling'}
                         </Typography>
                       )}
                     </Box>
                   ) : (
-                    <Typography variant="caption" color="text.secondary">-</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      -
+                    </Typography>
                   )}
-                </TableCell>
-                <TableCell sx={{ padding: '8px 12px' }}>
-                  <Typography variant="caption">
-                    {new Date(lead.createdAt).toLocaleDateString()}
-                  </Typography>
                 </TableCell>
               </TableRow>
             ))}
