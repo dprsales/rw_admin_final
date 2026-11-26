@@ -25,7 +25,12 @@ import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
 import { CrmDashboard, CrmHome, CrmLeadDetail, CrmLeads, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
 import ServiceGate from "../Pages/ServiceGate/ServiceGate";
-import { canEnterApp, canOpenRoute, homeRoute } from "../utils/roles";
+import {
+  canEnterApp,
+  canOpenRoute,
+  homeRoute,
+  menuAccessFromCookie,
+} from "../utils/roles";
 
 // Charts live only on the dashboard — keep them out of the initial bundle.
 const Dashboard = lazy(() => import("../Pages/Dashboard/Dashboard"));
@@ -38,6 +43,9 @@ const clearSession = () => {
   Cookies.remove("user_name");
   Cookies.remove("crm_role");
   Cookies.remove("rw_service");
+  Cookies.remove("menu_access");
+  Cookies.remove("desk_access");
+  Cookies.remove("user_department");
   localStorage.clear();
 };
 
@@ -53,18 +61,19 @@ const deskHome = () => {
 const ProtectedRoute = ({ component, componentType, allow }: any) => {
   const isAuth = isAuthenticated();
   const role = Cookies.get("user_type");
-  const admitted = canEnterApp(role);
+  const menus = menuAccessFromCookie(Cookies.get("menu_access"));
+  const admitted = canEnterApp(role, menus);
   if (isAuth) {
     if (componentType === "login" && admitted) {
       const preferred = Cookies.get("rw_service");
-      if (preferred === "crm" && canOpenRoute(role, "/crm")) {
+      if (preferred === "crm" && canOpenRoute(role, "/crm", menus)) {
         return <Navigate to={deskHome()} replace />;
       }
-      return <Navigate to={homeRoute(role)} replace />;
+      return <Navigate to={homeRoute(role, menus)} replace />;
     }
     if (admitted) {
-      if (allow && !canOpenRoute(role, allow)) {
-        return <Navigate to={homeRoute(role)} replace />;
+      if (allow && !canOpenRoute(role, allow, menus)) {
+        return <Navigate to={homeRoute(role, menus)} replace />;
       }
       return component;
     }

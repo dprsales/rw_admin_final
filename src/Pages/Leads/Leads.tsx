@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import {
+  Autocomplete,
   Box, TextField, InputAdornment, Paper, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Pagination, Typography, Select, MenuItem, ListSubheader, Checkbox, FormControl,
-  Button, Menu, Dialog, DialogTitle, DialogContent, DialogActions, Chip
+  Pagination, Typography, Checkbox,
+  Button, ClickAwayListener, Popper, MenuList, MenuItem,
+  Dialog, DialogTitle, DialogContent, DialogActions, Chip
 } from '@mui/material';
 import { Search as SearchIcon, ArrowDropDown as ArrowDropDownIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import LeadModal from './LeadModal'; // Adjust path
+import AddLeadDialog from './AddLeadDialog';
 import { deleteLead, getLeads, releaseLeadCall, sendLeadCall } from '../../api/services';
 import PageHeader from '../../Components/PageHeader';
 import EmptyState from '../../Components/EmptyState';
@@ -350,6 +353,50 @@ interface LeadsApiResponse {
 // ----------------------
 const rowsPerPage = 25;
 
+/** Shared Autocomplete / search field chrome (Popper lists, not Menu modals). */
+const FILTER_H = 40;
+const filterFieldSx = {
+  minWidth: 168,
+  flex: '0 1 180px',
+  '& .MuiOutlinedInput-root': {
+    minHeight: FILTER_H,
+    bgcolor: tokens.input,
+    borderRadius: '8px',
+    fontSize: 13,
+    color: tokens.text,
+    py: 0,
+    '& fieldset': { borderColor: tokens.border },
+    '&:hover fieldset': { borderColor: tokens.borderStrong },
+    '&.Mui-focused fieldset': { borderColor: tokens.gold },
+  },
+  '& .MuiInputLabel-root': {
+    fontSize: 13,
+    color: tokens.textMuted,
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: tokens.goldHover,
+  },
+  '& .MuiChip-root': {
+    height: 22,
+    fontSize: 11,
+  },
+} as const;
+
+type StageOption = { value: string; label: string };
+type KrisahOption = { value: KrisahStatus | ''; label: string };
+
+const STAGE_FILTER_OPTIONS: StageOption[] = [
+  { value: '', label: 'All stages' },
+  ...STAGE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+];
+
+const KRISAH_FILTER_OPTIONS: KrisahOption[] = [
+  { value: '', label: 'All' },
+  { value: 'not_started', label: 'Not started' },
+  { value: 'invite_sent', label: 'Invite sent' },
+  { value: 'completed', label: 'Completed' },
+];
+
 const AllLeads: React.FC = () => {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -360,7 +407,6 @@ const AllLeads: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [openModal, setOpenModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [type, setType] = useState<string>('');
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [actionsAnchor, setActionsAnchor] = useState<null | HTMLElement>(null);
@@ -369,6 +415,7 @@ const AllLeads: React.FC = () => {
   const [callBusyId, setCallBusyId] = useState<string | null>(null);
   const [callError, setCallError] = useState('');
   const [callInfo, setCallInfo] = useState('');
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   // Day 11 — ask the server for one page (stage + phone filters).
   const { data, isPending, error } = useQuery<LeadsApiResponse, Error>({
@@ -531,17 +578,7 @@ const AllLeads: React.FC = () => {
     setCurrentPage(newPage);
   };
 
-  const handleTypeChange = (event: any) => {
-    setType(event.target.value);
-  };
-
-  const handleSourceChange = (event: any) => {
-    const value = event.target.value;
-    setSelectedSources(typeof value === 'string' ? value.split(',') : value);
-    setCurrentPage(1);
-  };
-
-  // Page-local filters (type / source / service / KRISAH / name) on the server page.
+  // Page-local filters (source / service / KRISAH / name) on the server page.
   const filteredLeads = LeadsData.filter((lead) => {
     const q = searchText.trim().toLowerCase();
     const digits = searchText.replace(/\D/g, '');
@@ -553,12 +590,11 @@ const AllLeads: React.FC = () => {
       lead.email.toLowerCase().includes(q) ||
       lead.phoneNumber.includes(searchText);
 
-    const matchesType = !type || lead.type.toLowerCase() === type.toLowerCase();
     const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source || '');
     const matchesService = selectedServices.length === 0 || selectedServices.includes(lead.recommendedService || '');
     const matchesKrisah = !krisahFilter || krisahStatusKey(lead) === krisahFilter;
 
-    return matchesSearch && matchesType && matchesSource && matchesService && matchesKrisah;
+    return matchesSearch && matchesSource && matchesService && matchesKrisah;
   });
 
   const totalPages = Math.max(1, data?.totalPages || Math.ceil((data?.totalCount || 0) / rowsPerPage) || 1);
@@ -601,284 +637,229 @@ const AllLeads: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <PageHeader
         title="Leads"
-        description="Every enquiry from the website, sorted by source and service."
+        description="Website enquiries plus hand-entered leads. Add, assign, stage, and notes."
         crumbs={[{ label: 'Leads' }]}
-        actions={<Chip label={`${filteredLeads.length} leads`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />}
+        actions={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip label={`${filteredLeads.length} leads`} sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }} />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => setAddLeadOpen(true)}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Add Lead
+            </Button>
+          </Box>
+        }
       />
-      {/* Search & Filters */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <AddLeadDialog open={addLeadOpen} onClose={() => setAddLeadOpen(false)} />
+
+      {/* Filter toolbar — Autocomplete (Popper) so lists are searchable + no scroll lock */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 2,
+          p: 1.25,
+          borderRadius: '10px',
+          border: `1px solid ${tokens.border}`,
+          bgcolor: tokens.panel,
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 1.25,
+            flexWrap: 'wrap',
+          }}
+        >
           <TextField
-            placeholder="Search name, email, or phone..."
+            placeholder="Search name, email, or phone"
             variant="outlined"
             size="small"
             onChange={handleSearch}
             InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <SearchIcon />
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18, color: tokens.textMuted }} />
                 </InputAdornment>
               ),
             }}
-            sx={{ 
-              width: { xs: '100%', sm: '350px' },
-              backgroundColor: tokens.input,
-              boxShadow: '0px 10px 25px rgba(0, 0, 0, 0.35)',
-              height: '36px',
-              borderRadius: '8px', // Added border radius as per the design
-              '& .MuiOutlinedInput-notchedOutline': {
-                border: 'none',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                border: 'none',
-              },
+            sx={{
+              flex: '1 1 220px',
+              minWidth: { xs: '100%', sm: 220 },
+              maxWidth: { sm: 320 },
+              ...filterFieldSx,
               '& .MuiOutlinedInput-input': {
-                padding: '7px',
-                marginLeft: '7px',
+                py: '8.5px',
+                fontSize: 13,
               },
-              '& .MuiInputLabel-outlined': {
-                transform: 'translate(14px, 12px) scale(0.5)',
-              },
-              '& .MuiInputLabel-shrink': {
-                transform: 'translate(14px, -6px) scale(0.75)',
-              },
-              '& .MuiInputAdornment-positionEnd': {
-                marginRight: '10px',
-              },
-              '& .MuiSvgIcon-root': {
-                color: tokens.goldText,
-              },
-              '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                border: 'none',
-              },          
             }}
           />
 
-          {/* <FormControl sx={{ minWidth: 'auto',mr: 1 }}>
-            <Select
-              value={type}
-              onChange={handleTypeChange}
-              displayEmpty
-              sx={{
-                width: '100%',
-                height: "40px",
-                border: `1px solid ${tokens.border}`,
-                borderRadius: "20px",
-                opacity: 1,
-                boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
-                fontSize: "12px",
-                color: tokens.text,
-                textAlign: 'left',
-              }}
-            >
-              <MenuItem value="">
-                <Typography variant='caption' sx={{ color: tokens.text, opacity: 0.6, fontWeight: 450 }}>
-                  Type
-                </Typography>
-              </MenuItem>
-              <MenuItem value="project">
-                <Typography variant='caption' sx={{  color: tokens.text , fontWeight: 450 }}>
-                  Project
-                </Typography>
-              </MenuItem>
-              <MenuItem value="individual">
-                <Typography variant='caption' sx={{ color: tokens.text , fontWeight: 450 }}>
-                  Contact 
-                </Typography>
-              </MenuItem>
-            </Select>
-          </FormControl> */}
-
           {sourceOptions.length > 0 && (
-            <FormControl sx={{ minWidth: 120 }}>
-              <Select
-                multiple
-                value={selectedSources}
-                onChange={handleSourceChange}
-                IconComponent={ArrowDropDownIcon}
-                displayEmpty
-                renderValue={(selected) => (
-                  <Box display="flex" alignItems="center">
-                    {selected.length > 0 ? (
-                      <>
-                        <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Sources</Typography>
-                        <Box
-                           component="span"
-                          borderRadius="50%"
-                          fontSize="10px"
-                          marginLeft="5px"
-                          width="15px"
-                          height="15px"
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="center"
-
-                          sx={{
-                            backgroundColor: tokens.gold,
-                            color: tokens.black,
-                          }}
-                        >
-                          {selected.length}
-                        </Box>
-                      </>
-                    ) : (
-                      <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: 0.6 }}>Select Sources</Typography>
-                    )}
-                  </Box>
-                )}
-                sx={{
-                  width: '100%',
-                  height: "40px",
-                  border: `1px solid ${tokens.border}`,
-                  borderRadius: "20px",
-                  opacity: 1,
-                  boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)",
-                  fontSize: "12px",
-                  color: tokens.text,
-                  textAlign: 'left',
-                }}
-              >
-                <ListSubheader sx={{ background: 'transparent' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>
-                    Sources
-                  </Typography>
-                </ListSubheader>
-                {sourceOptions.map((source) => (
-                  <MenuItem key={source} value={source}>
-                    <Checkbox checked={selectedSources.indexOf(source) > -1} size="small"   sx={{ color: tokens.text, fontSize: "10px" }}/>
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{source}</Typography>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              multiple
+              size="small"
+              options={sourceOptions}
+              value={selectedSources}
+              onChange={(_e, next) => {
+                setSelectedSources(next);
+                setCurrentPage(1);
+              }}
+              getOptionLabel={(option) => SOURCE_LABEL[option] || option}
+              limitTags={1}
+              blurOnSelect
+              renderInput={(params) => (
+                <TextField {...params} label="Source" placeholder="Search sources" />
+              )}
+              sx={filterFieldSx}
+            />
           )}
 
-          <FormControl sx={{ minWidth: 150 }}>
-            <Select
-              value={stageFilter}
-              onChange={(event) => {
-                setStageFilter(String(event.target.value || ''));
-                setCurrentPage(1);
-              }}
-              displayEmpty
-              sx={{
-                height: '40px',
-                border: `1px solid ${tokens.border}`,
-                borderRadius: '20px',
-                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
-                fontSize: '12px',
-                color: tokens.text,
-              }}
-            >
-              <MenuItem value="">
-                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>CRM stage</Typography>
-              </MenuItem>
-              {STAGE_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  <Typography variant="caption">{opt.label}</Typography>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            options={STAGE_FILTER_OPTIONS}
+            value={
+              STAGE_FILTER_OPTIONS.find((o) => o.value === stageFilter) ||
+              STAGE_FILTER_OPTIONS[0]
+            }
+            onChange={(_e, next) => {
+              setStageFilter(next?.value || '');
+              setCurrentPage(1);
+            }}
+            getOptionLabel={(option) => option.label}
+            isOptionEqualToValue={(a, b) => a.value === b.value}
+            disableClearable
+            blurOnSelect
+            renderInput={(params) => (
+              <TextField {...params} label="Stage" placeholder="Search stage" />
+            )}
+            sx={{ ...filterFieldSx, minWidth: 176 }}
+          />
 
-          <FormControl sx={{ minWidth: 140 }}>
-            <Select
-              value={krisahFilter}
-              onChange={(event) => {
-                setKrisahFilter(event.target.value as KrisahStatus | '');
-                setCurrentPage(1);
-              }}
-              displayEmpty
-              sx={{
-                height: '40px',
-                border: `1px solid ${tokens.border}`,
-                borderRadius: '20px',
-                boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
-                fontSize: '12px',
-                color: tokens.text,
-              }}
-            >
-              <MenuItem value="">
-                <Typography variant="caption" sx={{ color: tokens.text, opacity: 0.6 }}>KRISAH status</Typography>
-              </MenuItem>
-              <MenuItem value="not_started">
-                <Typography variant="caption">Not started</Typography>
-              </MenuItem>
-              <MenuItem value="invite_sent">
-                <Typography variant="caption">Invite sent</Typography>
-              </MenuItem>
-              <MenuItem value="completed">
-                <Typography variant="caption">Completed</Typography>
-              </MenuItem>
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            options={KRISAH_FILTER_OPTIONS}
+            value={
+              KRISAH_FILTER_OPTIONS.find((o) => o.value === krisahFilter) ||
+              KRISAH_FILTER_OPTIONS[0]
+            }
+            onChange={(_e, next) => {
+              setKrisahFilter((next?.value || '') as KrisahStatus | '');
+              setCurrentPage(1);
+            }}
+            getOptionLabel={(option) => option.label}
+            isOptionEqualToValue={(a, b) => a.value === b.value}
+            disableClearable
+            blurOnSelect
+            renderInput={(params) => (
+              <TextField {...params} label="KRISAH" placeholder="Search" />
+            )}
+            sx={{ ...filterFieldSx, minWidth: 150 }}
+          />
 
           {serviceOptions.length > 0 && (
-            <FormControl sx={{ minWidth: 150 }}>
-              <Select
-                multiple
-                value={selectedServices}
-                onChange={(event: any) => { const v = event.target.value; setSelectedServices(typeof v === 'string' ? v.split(',') : v); setCurrentPage(1); }}
-                IconComponent={ArrowDropDownIcon}
-                displayEmpty
-                renderValue={(selected) => (
-                  <Typography variant='caption' sx={{ fontSize: '10px', color: tokens.text, opacity: selected.length ? 1 : 0.6 }}>
-                    {selected.length ? `Recommended (${selected.length})` : 'Recommended service'}
-                  </Typography>
-                )}
-                sx={{ height: "40px", border: `1px solid ${tokens.border}`, borderRadius: "20px", boxShadow: "0px 6px 14px rgba(0, 0, 0, 0.35)", fontSize: "12px", color: tokens.text }}
-              >
-                {serviceOptions.map((key) => (
-                  <MenuItem key={key} value={key}>
-                    <Checkbox checked={selectedServices.indexOf(key) > -1} size="small" sx={{ color: tokens.text }} />
-                    <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text }}>{SERVICE_LABEL[key] || key}</Typography>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              multiple
+              size="small"
+              options={serviceOptions}
+              value={selectedServices}
+              onChange={(_e, next) => {
+                setSelectedServices(next);
+                setCurrentPage(1);
+              }}
+              getOptionLabel={(option) => SERVICE_LABEL[option] || option}
+              limitTags={1}
+              blurOnSelect
+              renderInput={(params) => (
+                <TextField {...params} label="Service" placeholder="Search services" />
+              )}
+              sx={{ ...filterFieldSx, minWidth: 176 }}
+            />
           )}
+
+          <Box sx={{ flex: '1 1 auto', minWidth: 8 }} />
+
+          <ClickAwayListener onClickAway={() => setActionsAnchor(null)}>
+            <Box sx={{ position: 'relative' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                endIcon={<ArrowDropDownIcon />}
+                onClick={(event) => {
+                  setActionsAnchor((prev) => (prev ? null : event.currentTarget));
+                }}
+                sx={{
+                  height: FILTER_H,
+                  minWidth: 112,
+                  borderRadius: '8px',
+                  borderColor: tokens.border,
+                  color: tokens.text,
+                  textTransform: 'none',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  px: 1.75,
+                  bgcolor: tokens.input,
+                  '&:hover': {
+                    borderColor: tokens.borderStrong,
+                    bgcolor: tokens.hover,
+                  },
+                }}
+              >
+                Actions{selectedCount ? ` (${selectedCount})` : ''}
+              </Button>
+
+              <Popper
+                open={Boolean(actionsAnchor)}
+                anchorEl={actionsAnchor}
+                placement="bottom-end"
+                style={{ zIndex: theme.zIndex.modal }}
+              >
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mt: 0.75,
+                    minWidth: 168,
+                    borderRadius: '10px',
+                    border: `1px solid ${tokens.borderStrong}`,
+                    bgcolor: tokens.menu,
+                    boxShadow: tokens.shadow,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <MenuList dense autoFocusItem={false} sx={{ py: 0.5 }}>
+                    <MenuItem disabled>
+                      <Typography variant="body2" sx={{ color: tokens.textMuted }}>
+                        Export CSV
+                      </Typography>
+                    </MenuItem>
+                    <MenuItem
+                      disabled={!selectedCount || deleteMutation.isPending}
+                      onClick={() => {
+                        setActionsAnchor(null);
+                        setDeleteError('');
+                        setConfirmDelete(true);
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: selectedCount ? tokens.dangerText : tokens.text,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Delete{selectedCount ? ` (${selectedCount})` : ''}
+                      </Typography>
+                    </MenuItem>
+                  </MenuList>
+                </Paper>
+              </Popper>
+            </Box>
+          </ClickAwayListener>
         </Box>
-        <Button
-          variant="outlined"
-          endIcon={<ArrowDropDownIcon />}
-          onClick={(event) => setActionsAnchor(event.currentTarget)}
-          sx={{
-            height: '40px',
-            borderRadius: '20px',
-            borderColor: tokens.border,
-            boxShadow: '0px 6px 14px rgba(0, 0, 0, 0.35)',
-            fontSize: '12px',
-            color: tokens.text,
-            textTransform: 'none',
-            px: 2,
-          }}
-        >
-          Actions{selectedCount ? ` (${selectedCount})` : ''}
-        </Button>
-        <Menu
-          anchorEl={actionsAnchor}
-          open={Boolean(actionsAnchor)}
-          onClose={() => setActionsAnchor(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          <MenuItem disabled>
-            <Typography variant="caption" sx={{ fontWeight: 500, color: tokens.text, opacity: 0.5 }}>Export CSV</Typography>
-          </MenuItem>
-          <MenuItem
-            disabled={!selectedCount || deleteMutation.isPending}
-            onClick={() => {
-              setActionsAnchor(null);
-              setDeleteError('');
-              setConfirmDelete(true);
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 500, color: selectedCount ? tokens.danger : tokens.text }}>
-              Delete{selectedCount ? ` (${selectedCount})` : ''}
-            </Typography>
-          </MenuItem>
-        </Menu>
-      </Box>
+      </Paper>
 
       {/* Leads Table: horizontal scroll when the panel is narrow */}
       <TableContainer

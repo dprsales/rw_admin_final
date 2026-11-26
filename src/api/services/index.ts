@@ -116,6 +116,39 @@ export const addLead = (data: any) => {
   return http.post("/leads", data);
 };
 
+/** Interim desk hand-create (auth). Prefer this over public addLead. */
+export type StaffLeadPayload = {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  type?: 'project' | 'contact' | 'coaching';
+  projectName?: string;
+  projectId?: string;
+  message?: string;
+  pageSource?: string;
+  crmSource?: string;
+  stage?: string;
+  temperature?: string;
+  ownerId?: string;
+};
+
+export const addStaffLead = async (data: StaffLeadPayload) => {
+  const response = await http.post('/leads/staff', data);
+  return response.data; // { message, leadId, lead }
+};
+
+export type AssignableOwner = {
+  _id: string;
+  name: string;
+  email: string;
+  usertype: string;
+};
+
+export const getAssignableLeadOwners = async (): Promise<AssignableOwner[]> => {
+  const response = await http.get('/leads/meta/assignable-owners');
+  return response.data?.owners || [];
+};
+
 export const updateLead = (leadId: string, data: any) => {
   return http.patch(`/leads/${leadId}`, data);
 };
@@ -299,6 +332,20 @@ export const setUserAccess = (userId: string, enabled: boolean) => {
   return http.patch(`/users/${userId}/access`, { enabled });
 };
 
+/** Super admin: department + custom staff menu allowlist. */
+export const updateUserAccessProfile = (
+  userId: string,
+  data: {
+    department?: string;
+    deskAccess?: string[];
+    menuAccess?: string[];
+    useRoleDefaults?: boolean;
+    usertype?: string;
+  },
+) => {
+  return http.patch(`/users/${userId}/access-profile`, data);
+};
+
 export const resetUserPassword = (userId: string, password: string) => {
   return http.patch(`/users/${userId}/password`, { password });
 };
@@ -444,6 +491,7 @@ export const createUser = (data: {
   phone: string;
   password: string;
   usertype: string;
+  department?: string;
   userimage?: string;
 }) => {
   return http.post('/users', data);

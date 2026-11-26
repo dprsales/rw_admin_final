@@ -87,6 +87,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 /**
  * Screens each seat is allowed to open. Admin keeps the whole office except
  * user management, which stays with super admin. One person, one seat.
+ * Super admin may override per person via `menuAccess` (cookie / login profile).
  */
 const WORKSPACES: Partial<Record<UserRole, string[]>> = {
   hr: ['/applications', '/employees', '/vendors', '/vendor-partners'],
@@ -96,7 +97,7 @@ const WORKSPACES: Partial<Record<UserRole, string[]>> = {
   marketing: ['/blogs', '/gallery', '/leads', '/crm'],
 };
 
-const ADMIN_ROUTES = [
+export const ADMIN_ROUTES = [
   '/dashboard',
   '/projects',
   '/leads',
@@ -104,6 +105,7 @@ const ADMIN_ROUTES = [
   '/applications',
   '/channel-partners',
   '/vendors',
+  '/vendor-partners',
   '/listings',
   '/employees',
   '/payments',
@@ -112,29 +114,124 @@ const ADMIN_ROUTES = [
   '/gallery',
 ];
 
-/** `null` means every route, including user management. */
-export function allowedRoutes(role: unknown): string[] | null {
+/** Admin-panel screens only (not the Sales CRM desk). */
+export const ADMIN_MENU_ROUTES = [
+  '/dashboard',
+  '/projects',
+  '/leads',
+  '/applications',
+  '/channel-partners',
+  '/vendors',
+  '/vendor-partners',
+  '/listings',
+  '/users',
+  '/employees',
+  '/payments',
+  '/integrations',
+  '/blogs',
+  '/gallery',
+] as const;
+
+/** CRM desk entry. Inner CRM nav still follows CRM seat until per-screen CRM menus ship. */
+export const CRM_MENU_ROUTES = ['/crm'] as const;
+
+/** Full catalog a super admin can tick in People and access (includes Users). */
+export const STAFF_MENU_ROUTES = [
+  ...ADMIN_MENU_ROUTES,
+  ...CRM_MENU_ROUTES,
+] as const;
+
+export const STAFF_MENU_LABELS: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/projects': 'Projects',
+  '/leads': 'Leads (admin)',
+  '/crm': 'Sales CRM desk',
+  '/applications': 'Applications',
+  '/channel-partners': 'Channel partners',
+  '/vendors': 'Vendor list',
+  '/vendor-partners': 'Listed vendors',
+  '/listings': 'Listings',
+  '/users': 'People and access',
+  '/employees': 'Employees',
+  '/payments': 'Payments',
+  '/integrations': 'Integrations',
+  '/blogs': 'Blogs',
+  '/gallery': 'Gallery',
+};
+
+export const USER_DEPARTMENTS = [
+  'sales',
+  'marketing',
+  'hr',
+  'accounts',
+  'operations',
+  'leadership',
+  'other',
+] as const;
+
+export type UserDepartment = (typeof USER_DEPARTMENTS)[number];
+
+export const DEPARTMENT_LABELS: Record<UserDepartment, string> = {
+  sales: 'Sales',
+  marketing: 'Marketing',
+  hr: 'Human resources',
+  accounts: 'Accounts / Finance',
+  operations: 'Operations',
+  leadership: 'Leadership',
+  other: 'Other',
+};
+
+export function defaultDepartmentForRole(role: unknown): UserDepartment | '' {
+  if (role === 'sales') return 'sales';
+  if (role === 'marketing') return 'marketing';
+  if (role === 'hr') return 'hr';
+  if (role === 'account' || role === 'finance') return 'accounts';
+  if (role === 'admin' || role === 'super_admin') return 'leadership';
+  if (role === 'employee') return 'operations';
+  return '';
+}
+
+/** Role-default workspace. `null` = every route (super admin). */
+export function roleDefaultRoutes(role: unknown): string[] | null {
   if (roleSatisfies(role, 'super_admin')) {
     return null;
   }
   if (roleSatisfies(role, 'admin')) {
-    return ADMIN_ROUTES;
+    return [...ADMIN_ROUTES];
   }
   if (typeof role === 'string' && WORKSPACES[role as UserRole]) {
-    return WORKSPACES[role as UserRole] as string[];
+    return [...(WORKSPACES[role as UserRole] as string[])];
   }
   return [];
 }
 
+/**
+ * Effective nav allowlist.
+ * - Super admin: always all (`null`)
+ * - Custom `menuAccess` array: that list
+ * - Else: role defaults
+ */
+export function allowedRoutes(
+  role: unknown,
+  menuAccess?: string[] | null,
+): string[] | null {
+  if (roleSatisfies(role, 'super_admin')) {
+    return null;
+  }
+  if (Array.isArray(menuAccess)) {
+    return menuAccess;
+  }
+  return roleDefaultRoutes(role);
+}
+
 /** True for anyone who has a seat in this app. */
-export const canEnterApp = (role: unknown): boolean => {
-  const routes = allowedRoutes(role);
+export const canEnterApp = (role: unknown, menuAccess?: string[] | null): boolean => {
+  const routes = allowedRoutes(role, menuAccess);
   return routes === null || routes.length > 0;
 };
 
-export function homeRoute(role: unknown): string {
-  const routes = allowedRoutes(role);
-  // Sales land on the CRM desk (Day 15). Ops admin keeps the classic dashboard.
+export function homeRoute(role: unknown, menuAccess?: string[] | null): string {
+  const routes = allowedRoutes(role, menuAccess);
   if (typeof role === 'string' && role === 'sales' && routes?.includes('/crm')) {
     return '/crm';
   }
@@ -147,10 +244,68 @@ export function homeRoute(role: unknown): string {
   return routes[0] ?? '/login';
 }
 
-export function canOpenRoute(role: unknown, path: string): boolean {
-  const routes = allowedRoutes(role);
+export function canOpenRoute(
+  role: unknown,
+  path: string,
+  menuAccess?: string[] | null,
+): boolean {
+  const routes = allowedRoutes(role, menuAccess);
   if (routes === null) {
     return true;
   }
   return routes.some((route) => path === route || path.startsWith(`${route}/`));
+}
+
+/** Read custom menu cookie set at login (JSON array or empty = role defaults). */
+export function menuAccessFromCookie(raw: string | undefined | null): string[] | null {
+  if (!raw || raw === 'null' || raw === '') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+export const DESK_ACCESS = ['admin', 'crm'] as const;
+export type DeskAccess = (typeof DESK_ACCESS)[number];
+
+export function defaultDeskAccessForRole(role: unknown): DeskAccess[] {
+  if (role === 'super_admin' || role === 'admin') return ['admin', 'crm'];
+  if (role === 'sales' || role === 'marketing') return ['admin', 'crm'];
+  if (role === 'hr' || role === 'account' || role === 'finance' || role === 'employee') {
+    return ['admin'];
+  }
+  return [];
+}
+
+export function deskAccessFromCookie(raw: string | undefined | null): DeskAccess[] | null {
+  if (!raw || raw === 'null' || raw === '') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((v): v is DeskAccess => v === 'admin' || v === 'crm');
+  } catch {
+    return null;
+  }
+}
+
+/** Effective desks: custom cookie/list, else role defaults. */
+export function effectiveDeskAccess(
+  role: unknown,
+  deskAccess?: string[] | null,
+): DeskAccess[] {
+  if (roleSatisfies(role, 'super_admin')) return ['admin', 'crm'];
+  if (Array.isArray(deskAccess) && deskAccess.length) {
+    return deskAccess.filter((v): v is DeskAccess => v === 'admin' || v === 'crm');
+  }
+  return defaultDeskAccessForRole(role);
+}
+
+export function canOpenDesk(
+  role: unknown,
+  desk: DeskAccess,
+  deskAccess?: string[] | null,
+): boolean {
+  return effectiveDeskAccess(role, deskAccess).includes(desk);
 }

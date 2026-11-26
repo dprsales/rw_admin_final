@@ -198,6 +198,13 @@
   display: inline-flex;
 }
 
+.rw-auth__hint {
+  margin: 4px 0 16px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(232, 236, 243, 0.62);
+}
+
 .rw-auth__row {
   display: flex;
   justify-content: flex-end;

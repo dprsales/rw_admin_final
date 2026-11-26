@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Drawer, Box, Typography, Button, Chip, Divider, Stack, Link, IconButton,
   FormControl, InputLabel, Select, MenuItem, TextField, Alert, Grid, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, Tooltip,
@@ -40,14 +41,22 @@ import {
 } from './Leads';
 import {
   addLeadNote,
+  assignLeadOwner,
   deleteLeadNote,
+  getAssignableLeadOwners,
   getLeadActivities,
   getWhatsappTemplates,
   sendLeadWhatsapp,
   updateLead,
   updateLeadNote,
+  type AssignableOwner,
 } from '../../api/services';
 import { tokens } from '../../Theme/tokens';
+
+function isManagerSeat(): boolean {
+  const role = String(Cookies.get('user_type') || '').toLowerCase();
+  return role === 'admin' || role === 'super_admin';
+}
 
 /** Flip to true after Meta approves the first templates and Live API campaigns exist. */
 const WHATSAPP_MANUAL_SEND_READY = false;
@@ -257,6 +266,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
   const [nextAction, setNextAction] = useState(lead.nextAction || '');
   const [nextFollowUpAt, setNextFollowUpAt] = useState(toLocalInput(lead.nextFollowUpAt));
   const [error, setError] = useState('');
+  const canAssign = isManagerSeat();
+  const [ownerId, setOwnerId] = useState(lead.ownerId ? String(lead.ownerId) : '');
+  const [assignError, setAssignError] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -265,8 +277,42 @@ const LeadModal: React.FC<LeadModalProps> = ({
     setLostReason(lead.lostReason || '');
     setNextAction(lead.nextAction || '');
     setNextFollowUpAt(toLocalInput(lead.nextFollowUpAt));
+    setOwnerId(lead.ownerId ? String(lead.ownerId) : '');
     setError('');
+    setAssignError('');
   }, [open, lead]);
+
+  const ownersQuery = useQuery({
+    queryKey: ['assignable-lead-owners'],
+    queryFn: getAssignableLeadOwners,
+    enabled: open && canAssign,
+  });
+  const owners: AssignableOwner[] = ownersQuery.data || [];
+  const ownerLabel = (id: string) => {
+    const row = owners.find((o) => o._id === id);
+    if (!row) return id || 'Unassigned';
+    return row.name || row.email || id;
+  };
+
+  const assignMutation = useMutation({
+    mutationFn: (nextOwnerId: string | null) => assignLeadOwner(lead._id, nextOwnerId),
+    onSuccess: (_data, nextOwnerId) => {
+      setOwnerId(nextOwnerId || '');
+      setAssignError('');
+      toast.success(nextOwnerId ? 'Lead assigned' : 'Owner cleared');
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', lead._id] });
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : null) ||
+        'Could not assign owner.';
+      setAssignError(typeof msg === 'string' ? msg : 'Could not assign owner.');
+    },
+  });
 
   const activitiesQuery = useQuery({
     queryKey: ['lead-activities', lead._id],
@@ -597,6 +643,8 @@ const LeadModal: React.FC<LeadModalProps> = ({
       anchor="right"
       open={open}
       onClose={handleClose}
+      // Admin AppBar sits at drawer+1; keep this lead panel above the top bar.
+      sx={{ zIndex: (theme) => theme.zIndex.modal }}
       PaperProps={{
         sx: {
           width: { xs: '100%', sm: 520, md: 600 },
@@ -750,6 +798,51 @@ const LeadModal: React.FC<LeadModalProps> = ({
           <Section title="CRM">
             <Box sx={{ py: 1.5 }}>
               <Grid container spacing={2}>
+                {canAssign && (
+                  <Grid item xs={12}>
+                    <Autocomplete
+                      size="small"
+                      options={owners}
+                      value={owners.find((o) => o._id === ownerId) || null}
+                      loading={ownersQuery.isLoading}
+                      disabled={assignMutation.isPending || ownersQuery.isLoading}
+                      onChange={(_e, next) => {
+                        const nextId = next?._id || null;
+                        assignMutation.mutate(nextId);
+                      }}
+                      getOptionLabel={(owner) =>
+                        (owner.name || owner.email || owner._id) +
+                        (owner.usertype ? ` (${owner.usertype})` : '')
+                      }
+                      isOptionEqualToValue={(a, b) => a._id === b._id}
+                      blurOnSelect
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Assign to"
+                          placeholder="Search person"
+                          helperText={
+                            ownerId && !owners.some((o) => o._id === ownerId)
+                              ? `Current: ${ownerLabel(ownerId)}`
+                              : undefined
+                          }
+                        />
+                      )}
+                    />
+                    {assignError && (
+                      <Alert severity="error" sx={{ mt: 1, py: 0 }}>
+                        {assignError}
+                      </Alert>
+                    )}
+                  </Grid>
+                )}
+                {!canAssign && lead.ownerId && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Owner: {String(lead.ownerId)}
+                    </Typography>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth size="small">
                     <InputLabel id="lead-stage-label">Stage</InputLabel>

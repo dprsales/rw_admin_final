@@ -27,7 +27,7 @@ import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { sidebarSkyline } from '../../assets';
-import { canOpenRoute } from '../../utils/roles';
+import { canOpenRoute, menuAccessFromCookie } from '../../utils/roles';
 import { tokens } from '../../Theme/tokens';
 
 interface TabPanelProps {
@@ -87,7 +87,8 @@ const Tabs: React.FC<TabsProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const role = Cookies.get('user_type');
-  const tabs = adminTabs.filter((tab) => canOpenRoute(role, tab.route));
+  const menus = menuAccessFromCookie(Cookies.get('menu_access'));
+  const tabs = adminTabs.filter((tab) => canOpenRoute(role, tab.route, menus));
   const width = collapsed && !isMobile ? COLLAPSED : EXPANDED;
 
   const go = (route: string) => {

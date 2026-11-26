@@ -961,7 +961,15 @@ const Employees: React.FC = () => {
                 setOnboardingFilter(event.target.value);
                 setCurrentPage(1);
               }}
-              MenuProps={{ disableScrollLock: true }}
+              MenuProps={{
+                disableScrollLock: true,
+                slotProps: {
+                  backdrop: {
+                    invisible: true,
+                    sx: { backgroundColor: 'transparent', opacity: 1 },
+                  },
+                },
+              }}
             >
               <MenuItem value="all">All statuses</MenuItem>
               {onboardingOptions.map((status) => (

@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import Cookies from 'js-cookie';
 import { authLogin } from '../api/services';
-import { canEnterApp, canOpenRoute } from '../utils/roles';
+import { canEnterApp, canOpenDesk, canOpenRoute } from '../utils/roles';
 import {
   CRM_ROLE_LABELS,
   CRM_ROLES,
@@ -32,14 +32,23 @@ const CrmLogin: React.FC = () => {
       try {
         const { access_token, user_profile } = response.data;
         const userType = user_profile?.usertype;
+        const menuAccess = Array.isArray(user_profile?.menuAccess)
+          ? user_profile.menuAccess.map(String)
+          : null;
+        const deskAccess = Array.isArray(user_profile?.deskAccess)
+          ? user_profile.deskAccess.map(String)
+          : null;
 
-        if (!canEnterApp(userType)) {
+        if (!canEnterApp(userType, menuAccess)) {
           setError('This account does not have access to the staff app.');
           toast.error('This account does not have access to the staff app.');
           return;
         }
 
-        if (!canOpenRoute(userType, '/crm')) {
+        if (
+          !canOpenDesk(userType, 'crm', deskAccess) ||
+          !canOpenRoute(userType, '/crm', menuAccess)
+        ) {
           setError('This account cannot open the sales desk yet.');
           toast.error('This account cannot open the sales desk yet.');
           return;
@@ -52,6 +61,15 @@ const CrmLogin: React.FC = () => {
         Cookies.set('user_type', userType);
         Cookies.set('user_name', user_profile.name);
         Cookies.set('crm_role', crmRole);
+        Cookies.set(
+          'menu_access',
+          menuAccess ? JSON.stringify(menuAccess) : '',
+        );
+        Cookies.set(
+          'desk_access',
+          deskAccess ? JSON.stringify(deskAccess) : '',
+        );
+        Cookies.set('user_department', user_profile.department || '');
 
         toast.success('Welcome to the sales desk');
         navigate(crmHomeRoute(crmRole), { replace: true });

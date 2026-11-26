@@ -11,7 +11,12 @@ import {
   DialogTitle,
   Divider,
   FormControl,
+  IconButton,
+  InputAdornment,
   InputLabel,
+  ListItemIcon,
+  ListItemText,
+  Menu,
   MenuItem,
   Pagination,
   Paper,
@@ -24,20 +29,41 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import { GroupOutlined, LockReset, PersonAddAlt1, PersonOff, Search } from '@mui/icons-material';
+import {
+  DeleteOutline,
+  GroupOutlined,
+  LockReset,
+  MoreVert,
+  PersonAddAlt1,
+  PersonOff,
+  Search,
+  Tune,
+  Visibility,
+  VisibilityOff,
+} from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
 import { toast } from 'react-toastify';
-import { changeUserRole, createUser, deleteUser, getUsers, resetUserPassword, setUserAccess } from '../../api/services';
-import { ROLE_LABELS, USER_ROLES, roleSatisfies, type UserRole } from '../../utils/roles';
+import { createUser, deleteUser, getUsers, resetUserPassword, setUserAccess } from '../../api/services';
+import {
+  DEPARTMENT_LABELS,
+  ROLE_LABELS,
+  USER_DEPARTMENTS,
+  USER_ROLES,
+  defaultDepartmentForRole,
+  defaultDeskAccessForRole,
+  roleSatisfies,
+  type UserDepartment,
+  type UserRole,
+} from '../../utils/roles';
 import PageHeader from '../../Components/PageHeader';
 import EmptyState from '../../Components/EmptyState';
 import ConfirmDialog from '../../Components/ConfirmDialog';
 import { useTableSort, SortableHeadCell } from '../../Components/TableSort';
 import { tokens } from '../../Theme/tokens';
+import UserManageModal from './UserManageModal';
 
 export interface AdminUser {
   _id: string;
@@ -45,8 +71,19 @@ export interface AdminUser {
   email?: string;
   phone?: string;
   usertype: UserRole;
+  department?: string | null;
+  menuAccess?: string[] | null;
+  deskAccess?: string[] | null;
   accessEnabled?: boolean;
   createdAt?: string;
+}
+
+function deskChips(user: AdminUser): string[] {
+  const desks =
+    Array.isArray(user.deskAccess) && user.deskAccess.length
+      ? user.deskAccess
+      : defaultDeskAccessForRole(user.usertype);
+  return desks.map((d) => (d === 'crm' ? 'CRM' : 'Admin'));
 }
 
 const rowsPerPage = 12;
@@ -82,6 +119,7 @@ const EMPTY_FORM = {
   phone: '',
   password: '',
   usertype: 'customer' as UserRole,
+  department: '' as string,
   userimage: '',
 };
 
@@ -108,6 +146,7 @@ const USER_SORT = {
   name: (row: AdminUser) => row.name,
   email: (row: AdminUser) => row.email,
   role: (row: AdminUser) => row.usertype,
+  department: (row: AdminUser) => row.department || '',
   status: (row: AdminUser) => (hasAccess(row) ? 'Can sign in' : 'Access removed'),
 };
 
@@ -120,12 +159,17 @@ const isValidForm = (form: typeof EMPTY_FORM) =>
 const Users: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [accessFilter, setAccessFilter] = useState<'all' | 'active' | 'removed'>('all');
+  const [deptFilter, setDeptFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [selected, setSelected] = useState<string[]>([]);
   const [passwordFor, setPasswordFor] = useState<AdminUser | null>(null);
   const [nextPassword, setNextPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [manageFor, setManageFor] = useState<AdminUser | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ anchor: HTMLElement; user: AdminUser } | null>(null);
   const [confirm, setConfirm] = useState<null | { kind: 'delete' | 'remove' | 'restore'; ids: string[] }>(null);
   const queryClient = useQueryClient();
   const selfId = signedInUserId();
@@ -138,16 +182,6 @@ const Users: React.FC = () => {
   const { data, isPending, error } = useQuery<AdminUser[], Error>({
     queryKey: ['users'],
     queryFn: getUsers,
-  });
-
-  const roleMutation = useMutation({
-    mutationFn: ({ userId, usertype }: { userId: string; usertype: UserRole }) =>
-      changeUserRole(userId, usertype),
-    onSuccess: (response: any) => {
-      toast.success(response?.data?.message ?? 'Role updated');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-    onError: (error: any) => toast.error(errorMessage(error)),
   });
 
   const refreshUsers = () => {
@@ -210,6 +244,7 @@ const Users: React.FC = () => {
       phone: string;
       password: string;
       usertype: UserRole;
+      department?: string;
       userimage?: string;
     } = {
       name: form.name.trim(),
@@ -217,6 +252,7 @@ const Users: React.FC = () => {
       phone: form.phone.trim(),
       password: form.password,
       usertype: form.usertype,
+      ...(form.department ? { department: form.department } : {}),
     };
     // Omit the key entirely rather than sending an empty string. @IsOptional() only
     // skips validation for null/undefined, so a blank value would still be validated.
@@ -228,12 +264,27 @@ const Users: React.FC = () => {
   };
 
   const openCreate = () => {
-    setForm({ ...EMPTY_FORM, usertype: allowedRoles[0] ?? 'customer' });
+    const usertype = allowedRoles[0] ?? 'customer';
+    setForm({
+      ...EMPTY_FORM,
+      usertype,
+      department: defaultDepartmentForRole(usertype),
+    });
+    setShowCreatePassword(false);
     setCreateOpen(true);
   };
 
   const updateField = (field: keyof typeof EMPTY_FORM, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      if (field === 'usertype') {
+        return {
+          ...prev,
+          usertype: value as UserRole,
+          department: defaultDepartmentForRole(value) || prev.department,
+        };
+      }
+      return { ...prev, [field]: value };
+    });
 
   const nameInvalid = form.name.length > 0 && form.name.trim().length === 0;
   const emailInvalid = form.email.length > 0 && !/^\S+@\S+\.\S+$/.test(form.email.trim());
@@ -245,12 +296,29 @@ const Users: React.FC = () => {
     return users.filter((user) => {
       if (accessFilter === 'active' && !hasAccess(user)) return false;
       if (accessFilter === 'removed' && hasAccess(user)) return false;
+      if (deptFilter === 'unset' && user.department) return false;
+      if (
+        deptFilter !== 'all' &&
+        deptFilter !== 'unset' &&
+        (user.department || '') !== deptFilter
+      ) {
+        return false;
+      }
       if (!query) return true;
-      return [user.name, user.email, user.phone, user.usertype].some((value) =>
+      return [user.name, user.email, user.phone, user.usertype, user.department].some((value) =>
         value?.toLowerCase().includes(query),
       );
     });
-  }, [users, searchText, accessFilter]);
+  }, [users, searchText, accessFilter, deptFilter]);
+
+  const deptCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    users.forEach((user) => {
+      const key = user.department || 'unset';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [users]);
 
   const { sorted: sortedUsers, order, orderBy, toggle: toggleSort } = useTableSort(filteredUsers, USER_SORT);
   const totalPages = Math.max(1, Math.ceil(sortedUsers.length / rowsPerPage));
@@ -262,10 +330,6 @@ const Users: React.FC = () => {
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(event.target.value);
     setCurrentPage(1);
-  };
-
-  const handleRoleChange = (user: AdminUser, usertype: UserRole) => {
-    roleMutation.mutate({ userId: user._id, usertype });
   };
 
   const selectableIds = visibleUsers.filter((user) => user._id !== selfId).map((user) => user._id);
@@ -314,7 +378,7 @@ const Users: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <PageHeader
         title="People and access"
-        description="Give each person one seat, an email address, and a password. Removing access keeps the account and stops sign-in. Deleting removes the account."
+        description="Manage seats, departments, Admin vs CRM desk login, and screen menus. Click a person or use More for the full manage panel. Passwords cannot be viewed; set a temporary one instead."
         crumbs={[{ label: 'Users' }]}
         actions={
           <>
@@ -335,12 +399,35 @@ const Users: React.FC = () => {
           <TextField
             value={searchText}
             onChange={handleSearch}
-            placeholder="Search name, email, phone or role"
+            placeholder="Search name, email, phone, role or department"
             size="small"
             sx={{ width: { xs: '100%', sm: 380 }, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             InputProps={{ startAdornment: <Search fontSize="small" /> }}
           />
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="dept-filter-label">Department</InputLabel>
+              <Select
+                labelId="dept-filter-label"
+                label="Department"
+                value={deptFilter}
+                onChange={(event) => {
+                  setDeptFilter(String(event.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <MenuItem value="all">All departments</MenuItem>
+                {USER_DEPARTMENTS.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {DEPARTMENT_LABELS[value]}
+                    {deptCounts[value] ? ` (${deptCounts[value]})` : ''}
+                  </MenuItem>
+                ))}
+                <MenuItem value="unset">
+                  Unset{deptCounts.unset ? ` (${deptCounts.unset})` : ''}
+                </MenuItem>
+              </Select>
+            </FormControl>
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel id="access-filter-label">Access</InputLabel>
               <Select
@@ -400,21 +487,33 @@ const Users: React.FC = () => {
                       inputProps={{ 'aria-label': 'Select everyone on this page' }}
                     />
                   </TableCell>
-                  <SortableHeadCell label="Name" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} />
-                  <SortableHeadCell label="Email" sortKey="email" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Person" sortKey="name" order={order} activeKey={orderBy} onSort={toggleSort} />
                   <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
                   <SortableHeadCell label="Role" sortKey="role" order={order} activeKey={orderBy} onSort={toggleSort} />
-                  <SortableHeadCell label="Access" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
-                  <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                  <SortableHeadCell label="Department / desks" sortKey="department" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <SortableHeadCell label="Sign-in" sortKey="status" order={order} activeKey={orderBy} onSort={toggleSort} />
+                  <TableCell sx={{ fontWeight: 700 }} align="right">
+                    More
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {visibleUsers.map((user) => {
                   const isSelf = user._id === selfId;
                   const active = hasAccess(user);
+                  const desks = deskChips(user);
                   return (
-                    <TableRow key={user._id} hover selected={selected.includes(user._id)}>
-                      <TableCell padding="checkbox">
+                    <TableRow
+                      key={user._id}
+                      hover
+                      selected={selected.includes(user._id)}
+                      onClick={() => setManageFor(user)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      <TableCell
+                        padding="checkbox"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <Checkbox
                           size="small"
                           checked={selected.includes(user._id)}
@@ -424,78 +523,71 @@ const Users: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        {user.name ?? '-'}
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {user.name ?? '-'}
+                        </Typography>
                         {isSelf && (
                           <Typography variant="caption" display="block" color="text.secondary">
                             Signed in
                           </Typography>
                         )}
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {user.email ?? '-'}
+                        </Typography>
                       </TableCell>
-                      <TableCell>{user.email ?? '-'}</TableCell>
                       <TableCell>{user.phone ?? '-'}</TableCell>
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <Chip
+                          size="small"
+                          label={ROLE_LABELS[user.usertype] ?? user.usertype}
+                          color={ROLE_COLORS[user.usertype] ?? 'default'}
+                        />
+                      </TableCell>
                       <TableCell>
-                        <Stack spacing={0.5}>
-                          <Chip size="small" label={ROLE_LABELS[user.usertype] ?? user.usertype} color={ROLE_COLORS[user.usertype] ?? 'default'} />
-                          <FormControl size="small" sx={{ minWidth: 180 }}>
-                            <InputLabel id={`role-label-${user._id}`}>Role</InputLabel>
-                            <Select
-                              labelId={`role-label-${user._id}`}
-                              label="Role"
-                              value={user.usertype}
-                              disabled={roleMutation.isPending || isSelf}
-                              onChange={(event) => handleRoleChange(user, event.target.value as UserRole)}
-                              renderValue={(value) => ROLE_LABELS[value as UserRole] ?? value}
-                              sx={{ borderRadius: 2 }}
-                            >
-                              {allowedRoles.map((role) => (
-                                <MenuItem key={role} value={role}>
-                                  {ROLE_LABELS[role]}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
+                        <Typography variant="body2">
+                          {user.department
+                            ? DEPARTMENT_LABELS[user.department as UserDepartment] || user.department
+                            : '-'}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
+                          {desks.map((label) => (
+                            <Chip
+                              key={label}
+                              size="small"
+                              label={label}
+                              variant="outlined"
+                              sx={{ height: 20, fontSize: 10 }}
+                            />
+                          ))}
+                          {Array.isArray(user.menuAccess) && (
+                            <Chip
+                              size="small"
+                              label="Custom menus"
+                              sx={{ height: 20, fontSize: 10 }}
+                            />
+                          )}
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        <Chip size="small" label={active ? 'Can sign in' : 'Access removed'} color={active ? 'success' : 'default'} />
+                        <Chip
+                          size="small"
+                          label={active ? 'Can sign in' : 'Blocked'}
+                          color={active ? 'success' : 'default'}
+                        />
                         <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
                           Joined {formatDate(user.createdAt)}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                          <Tooltip title="Set a new password">
-                            <span>
-                              <Button
-                                size="small"
-                                startIcon={<LockReset />}
-                                disabled={isSelf}
-                                onClick={() => {
-                                  setPasswordFor(user);
-                                  setNextPassword('');
-                                }}
-                              >
-                                Password
-                              </Button>
-                            </span>
-                          </Tooltip>
-                          <Button
-                            size="small"
-                            startIcon={<PersonOff />}
-                            disabled={isSelf || busy}
-                            onClick={() => setConfirm({ kind: active ? 'remove' : 'restore', ids: [user._id] })}
-                          >
-                            {active ? 'Remove access' : 'Restore'}
-                          </Button>
-                          <Button
-                            size="small"
-                            color="error"
-                            disabled={isSelf || busy}
-                            onClick={() => setConfirm({ kind: 'delete', ids: [user._id] })}
-                          >
-                            Delete
-                          </Button>
-                        </Stack>
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <IconButton
+                          size="small"
+                          aria-label={`More actions for ${user.name || user.email}`}
+                          onClick={(event) =>
+                            setRowMenu({ anchor: event.currentTarget, user })
+                          }
+                        >
+                          <MoreVert fontSize="small" />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   );
@@ -553,23 +645,59 @@ const Users: React.FC = () => {
               error={form.phone.length > 0 && !PHONE_PATTERN.test(form.phone)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
-            <TextField
-              label="Temporary password"
-              type="password"
-              value={form.password}
-              onChange={(e) => updateField('password', e.target.value)}
-              required
-              fullWidth
-              size="small"
-              helperText="Minimum 6 characters. Share it with the user to be changed at first login."
-              error={form.password.length > 0 && form.password.length < 6}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-            />
+            <Box>
+              <Typography
+                component="label"
+                htmlFor="create-temp-password"
+                variant="body2"
+                sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}
+              >
+                Temporary password
+              </Typography>
+              <TextField
+                id="create-temp-password"
+                type={showCreatePassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={(e) => updateField('password', e.target.value)}
+                required
+                fullWidth
+                size="small"
+                placeholder="At least 6 characters"
+                helperText="Minimum 6 characters. Share it with the user to be changed at first login."
+                error={form.password.length > 0 && form.password.length < 6}
+                autoComplete="new-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowCreatePassword((v) => !v)}
+                      >
+                        {showCreatePassword ? (
+                          <VisibilityOff fontSize="small" />
+                        ) : (
+                          <Visibility fontSize="small" />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                  '& input': {
+                    WebkitTextFillColor: 'inherit',
+                    boxShadow: '0 0 0 1000px transparent inset',
+                  },
+                }}
+              />
+            </Box>
             <FormControl size="small" fullWidth>
-              <InputLabel id="create-role-label">Role</InputLabel>
+              <InputLabel id="create-role-label">Role (seat)</InputLabel>
               <Select
                 labelId="create-role-label"
-                label="Role"
+                label="Role (seat)"
                 value={form.usertype}
                 onChange={(e) => updateField('usertype', e.target.value)}
                 renderValue={(value) => ROLE_LABELS[value as UserRole] ?? value}
@@ -582,8 +710,24 @@ const Users: React.FC = () => {
                 ))}
               </Select>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                HR sees Applications and Employees. Accounts and Finance see Payments. Sales sees Leads.
+                Role sets API rights and default menus. Open Manage on the row to set desks and screens.
               </Typography>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="create-dept-label">Department</InputLabel>
+              <Select
+                labelId="create-dept-label"
+                label="Department"
+                value={form.department}
+                onChange={(e) => updateField('department', e.target.value)}
+                sx={{ borderRadius: 2 }}
+              >
+                {USER_DEPARTMENTS.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {DEPARTMENT_LABELS[value]}
+                  </MenuItem>
+                ))}
+              </Select>
             </FormControl>
             <TextField
               label="Profile image URL (optional)"
@@ -610,25 +754,71 @@ const Users: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(passwordFor)} onClose={() => setPasswordFor(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={Boolean(passwordFor)}
+        onClose={() => {
+          setPasswordFor(null);
+          setShowPassword(false);
+        }}
+        fullWidth
+        maxWidth="xs"
+      >
         <DialogTitle>Set password</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            This becomes the password for {passwordFor?.email}. Share it with them directly.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Current password for {passwordFor?.email} cannot be shown. Set a new one and share it with them.
+          </Typography>
+          <Typography
+            component="label"
+            htmlFor="set-new-password"
+            variant="body2"
+            sx={{ fontWeight: 600, display: 'block', mb: 0.75, mt: 1 }}
+          >
+            New password
           </Typography>
           <TextField
-            label="New password"
-            type="password"
+            id="set-new-password"
+            type={showPassword ? 'text' : 'password'}
             value={nextPassword}
             onChange={(event) => setNextPassword(event.target.value)}
             fullWidth
             size="small"
+            placeholder="At least 6 characters"
             helperText="Minimum 6 characters"
             error={nextPassword.length > 0 && nextPassword.length < 6}
+            autoComplete="new-password"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    edge="end"
+                    size="small"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': { borderRadius: 2 },
+              '& input': {
+                WebkitTextFillColor: 'inherit',
+                boxShadow: '0 0 0 1000px transparent inset',
+              },
+            }}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setPasswordFor(null)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setPasswordFor(null);
+              setShowPassword(false);
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
             disabled={nextPassword.length < 6 || passwordMutation.isPending || !passwordFor}
@@ -653,6 +843,80 @@ const Users: React.FC = () => {
         loading={busy}
         onClose={() => setConfirm(null)}
         onConfirm={runConfirm}
+      />
+
+      <Menu
+        anchorEl={rowMenu?.anchor ?? null}
+        open={Boolean(rowMenu)}
+        onClose={() => setRowMenu(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (rowMenu) setManageFor(rowMenu.user);
+            setRowMenu(null);
+          }}
+        >
+          <ListItemIcon>
+            <Tune fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Manage access</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={rowMenu?.user._id === selfId}
+          onClick={() => {
+            if (!rowMenu) return;
+            setPasswordFor(rowMenu.user);
+            setNextPassword('');
+            setShowPassword(false);
+            setRowMenu(null);
+          }}
+        >
+          <ListItemIcon>
+            <LockReset fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Set password</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={rowMenu?.user._id === selfId || busy}
+          onClick={() => {
+            if (!rowMenu) return;
+            const active = hasAccess(rowMenu.user);
+            setConfirm({ kind: active ? 'remove' : 'restore', ids: [rowMenu.user._id] });
+            setRowMenu(null);
+          }}
+        >
+          <ListItemIcon>
+            <PersonOff fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>
+            {rowMenu && hasAccess(rowMenu.user) ? 'Remove sign-in' : 'Restore sign-in'}
+          </ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={rowMenu?.user._id === selfId || busy}
+          onClick={() => {
+            if (!rowMenu) return;
+            setConfirm({ kind: 'delete', ids: [rowMenu.user._id] });
+            setRowMenu(null);
+          }}
+        >
+          <ListItemIcon>
+            <DeleteOutline fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Delete account</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      <UserManageModal
+        open={Boolean(manageFor)}
+        user={manageFor}
+        actorRole={actorRole}
+        isSelf={Boolean(manageFor && manageFor._id === selfId)}
+        onClose={() => setManageFor(null)}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+        onRequestDelete={(user) => setConfirm({ kind: 'delete', ids: [user._id] })}
       />
     </Box>
   );

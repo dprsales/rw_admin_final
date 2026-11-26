@@ -126,6 +126,9 @@ const CrmShell: React.FC = () => {
     Cookies.remove('user_name');
     Cookies.remove('crm_role');
     Cookies.remove('rw_service');
+    Cookies.remove('menu_access');
+    Cookies.remove('desk_access');
+    Cookies.remove('user_department');
     localStorage.clear();
     navigate('/', { replace: true });
   };

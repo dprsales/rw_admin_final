@@ -1,34 +1,35 @@
 /**
- * Team RW admin — single source of truth for the black / charcoal / antique-gold
- * design system. These values are mirrored as CSS custom properties in index.css
- * so plain CSS files can use var(--rw-*) while MUI components use these tokens.
+ * Team RW admin — black / charcoal + antique-gold accents.
+ * Surfaces and body text stay cool (readable). Gold is for brand / CTAs only,
+ * not for page titles, table cells, or filter labels (those looked gold-on-gold).
+ * Mirrored as CSS vars in index.css (var(--rw-*)).
  */
 export const tokens = Object.freeze({
-  // Surfaces: stepped charcoal so shell / cards / menus stay readable (not one flat black)
-  bg: '#0A0908', // main workspace shell
-  sidebar: '#070706',
-  topbar: '#070706',
-  panel: '#15130F', // cards, panels, modals, drawers
-  panelAlt: '#1C1914', // table headers, secondary panels
-  input: '#221E18', // inputs, textareas, selects
-  hover: '#2A241C', // hover backgrounds
-  menu: '#1F1B15', // floating menus / popovers (lighter than panel)
-  border: '#3A3226', // subtle borders
-  borderStrong: '#524536',
+  // Cool charcoal shell (not warm brown-black — that read as gold wash)
+  bg: '#0C0E12', // main workspace shell
+  sidebar: '#0A0C10',
+  topbar: '#0A0C10',
+  panel: '#14181F', // cards, panels, modals, drawers
+  panelAlt: '#1A1F27', // table headers, secondary panels
+  input: '#1C222B', // inputs, textareas, selects
+  hover: '#242B35', // hover backgrounds
+  menu: '#1A1F27', // floating menus / popovers
+  border: '#2E353F', // cool hairlines
+  borderStrong: '#3E4652',
 
-  // Brand
+  // Brand (accent only)
   gold: '#C39B53',
   goldHover: '#D6B66F',
-  goldSoft: 'rgba(195,155,83,0.14)',
+  goldSoft: 'rgba(195,155,83,0.12)',
 
-  // Text
-  text: '#F7F3EC',
-  textMuted: '#C4B9AA', // brighter secondary for dark panels
+  // Text — cool ink for readability on charcoal
+  text: '#ECEEF2',
+  textMuted: '#9AA1AB',
   textWhite: '#FFFFFF',
 
-  // Overlays on the black shell
-  overlay: 'rgba(245,242,236,0.06)',
-  overlayStrong: 'rgba(245,242,236,0.10)',
+  // Overlays on the cool shell
+  overlay: 'rgba(236,238,242,0.06)',
+  overlayStrong: 'rgba(236,238,242,0.10)',
 
   // Semantic statuses
   success: '#2E7D52',
@@ -50,27 +51,27 @@ export const tokens = Object.freeze({
   shadowStrong: '0 24px 56px rgba(0,0,0,0.55)',
 
   // Legacy aliases (kept so every existing import keeps compiling)
-  black: '#0A0908',
-  ink: '#15130F',
-  paper: '#0A0908',
-  card: '#15130F',
-  cream: '#F7F3EC',
+  black: '#0C0E12',
+  ink: '#14181F',
+  paper: '#0C0E12',
+  card: '#14181F',
+  cream: '#ECEEF2',
   goldDark: '#D6B66F',
-  goldText: '#D6B66F',
+  goldText: '#D6B66F', // brand accent only — prefer `text` for body / labels
   goldLight: '#D6B66F',
-  muted: '#C4B9AA',
-  mutedAlt: '#C4B9AA',
-  line: '#3A3226',
-  lineStrong: '#524536',
-  surface: '#15130F',
-  surfaceAlt: '#1C1914',
-  surfaceRaised: '#221E18',
-  surfaceHover: '#2A241C',
+  muted: '#9AA1AB',
+  mutedAlt: '#9AA1AB',
+  line: '#2E353F',
+  lineStrong: '#3E4652',
+  surface: '#14181F',
+  surfaceAlt: '#1A1F27',
+  surfaceRaised: '#1C222B',
+  surfaceHover: '#242B35',
 
   // Retained for any floating layer; not used on tables, cards or inputs
-  glass: 'rgba(31,27,21,0.94)',
-  glassStrong: 'rgba(7,7,6,0.96)',
-  glassBorder: '#3A3226',
+  glass: 'rgba(20,24,31,0.94)',
+  glassStrong: 'rgba(10,12,16,0.96)',
+  glassBorder: '#2E353F',
   glassBlur: 'blur(18px)',
 } as const);
 

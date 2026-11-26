@@ -349,7 +349,15 @@ const EmployeeEditDialog: React.FC<Props> = ({ open, employee, onClose }) => {
                     prev ? { ...prev, employmentStatus: event.target.value } : prev,
                   )
                 }
-                MenuProps={{ disableScrollLock: true }}
+                MenuProps={{
+                  disableScrollLock: true,
+                  slotProps: {
+                    backdrop: {
+                      invisible: true,
+                      sx: { backgroundColor: 'transparent', opacity: 1 },
+                    },
+                  },
+                }}
               >
                 {EMPLOYMENT_STATUSES.map((status) => (
                   <MenuItem key={status} value={status}>

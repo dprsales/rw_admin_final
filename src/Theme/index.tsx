@@ -78,7 +78,7 @@ export const theme = createTheme({
     body1: { fontSize: "15px", color: text },
     body2: { fontSize: "14px", color: textMuted },
     caption: { fontSize: "12px", color: textMuted },
-    overline: { fontSize: "10px", color: gold, letterSpacing: "0.12em" },
+    overline: { fontSize: "10px", color: textMuted, letterSpacing: "0.12em" },
   },
   shape: { borderRadius: 10 },
   components: {
@@ -167,7 +167,7 @@ export const theme = createTheme({
             color: goldHover,
           },
         },
-        outlinedPrimary: { color: gold, borderColor: border },
+        outlinedPrimary: { color: text, borderColor: border },
         outlinedError: {
           color: tokens.dangerText,
           border: `1px solid ${tokens.danger}`,
@@ -178,7 +178,7 @@ export const theme = createTheme({
           },
         },
         text: {
-          color: gold,
+          color: text,
           "&:hover": { backgroundColor: goldSoft, color: goldHover },
         },
         textError: {
@@ -199,7 +199,7 @@ export const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: { fontWeight: 600, color: text, backgroundColor: panelAlt },
-        colorPrimary: { backgroundColor: goldSoft, color: goldHover },
+        colorPrimary: { backgroundColor: panelAlt, color: text },
         colorSuccess: { backgroundColor: tokens.successSoft, color: tokens.successText },
         colorError: { backgroundColor: tokens.dangerSoft, color: tokens.dangerText },
         colorWarning: { backgroundColor: tokens.warningSoft, color: tokens.warningText },
@@ -303,13 +303,55 @@ export const theme = createTheme({
     },
     MuiSelect: {
       defaultProps: {
-        // Dropdowns should not lock page scroll or leave a click-blocking backdrop.
+        // Transparent backdrop: outside click closes, page still visible/scrollable.
+        // Never use hideBackdrop: true — that leaves the list stuck open.
         MenuProps: {
           disableScrollLock: true,
-          hideBackdrop: true,
+          slotProps: {
+            backdrop: {
+              invisible: true,
+              sx: { backgroundColor: 'transparent', opacity: 1 },
+            },
+          },
         },
       },
       styleOverrides: { outlined: { color: text } },
+    },
+    MuiAutocomplete: {
+      defaultProps: {
+        // Popper list: closes on outside click / Escape; page keeps scrolling.
+        openOnFocus: false,
+        clearOnBlur: true,
+        selectOnFocus: true,
+        handleHomeEndKeys: true,
+        autoHighlight: true,
+        slotProps: {
+          popper: {
+            placement: 'bottom-start',
+          },
+        },
+      },
+      styleOverrides: {
+        paper: {
+          backgroundColor: tokens.menu,
+          border: `1px solid ${tokens.borderStrong}`,
+          borderRadius: '10px',
+          boxShadow: tokens.shadow,
+        },
+        option: {
+          fontSize: '13px',
+          minHeight: 36,
+        },
+        listbox: {
+          padding: '4px 0',
+          maxHeight: 280,
+        },
+        tag: {
+          backgroundColor: panelAlt,
+          color: text,
+          border: `1px solid ${border}`,
+        },
+      },
     },
     MuiAccordion: {
       styleOverrides: {
@@ -497,9 +539,24 @@ export const theme = createTheme({
     MuiDialogActions: {
       styleOverrides: { root: { padding: "16px 24px 20px", gap: "8px" } },
     },
+    MuiBackdrop: {
+      styleOverrides: {
+        // Menu / Select use invisible — force fully clear (no grey wash).
+        invisible: {
+          backgroundColor: 'transparent',
+          opacity: '1 !important',
+        },
+      },
+    },
     MuiPopover: {
       defaultProps: {
         disableScrollLock: true,
+        slotProps: {
+          backdrop: {
+            invisible: true,
+            sx: { backgroundColor: 'transparent', opacity: 1 },
+          },
+        },
       },
       styleOverrides: {
         paper: {
@@ -513,8 +570,13 @@ export const theme = createTheme({
     MuiMenu: {
       defaultProps: {
         disableScrollLock: true,
-        // Avoid a full-screen modal layer that blocks clicks after the menu closes.
-        hideBackdrop: true,
+        // Transparent backdrop: outside click closes; no grey wash over the page.
+        slotProps: {
+          backdrop: {
+            invisible: true,
+            sx: { backgroundColor: 'transparent', opacity: 1 },
+          },
+        },
       },
       styleOverrides: {
         paper: {
@@ -523,6 +585,11 @@ export const theme = createTheme({
           border: `1px solid ${tokens.borderStrong}`,
           boxShadow: tokens.shadow,
         },
+      },
+    },
+    MuiModal: {
+      defaultProps: {
+        disableScrollLock: true,
       },
     },
     MuiFormLabel: {

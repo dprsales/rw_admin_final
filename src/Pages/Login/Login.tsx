@@ -6,10 +6,14 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { toast } from "react-toastify";
 import Cookies from "js-cookie";
 import gsap from "gsap";
-import ForgotPassword from "./ForgotPassword";
 import { authLogin } from "../../api/services";
 import { rwGoldLogo, staffLoginBg } from "../../assets";
-import { canEnterApp, canOpenRoute, homeRoute } from "../../utils/roles";
+import {
+  canEnterApp,
+  canOpenDesk,
+  canOpenRoute,
+  homeRoute,
+} from "../../utils/roles";
 import {
   crmHomeRoute,
   stubCrmRoleFromUserType,
@@ -26,7 +30,6 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [error, setError] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -63,8 +66,14 @@ const Login: React.FC = () => {
       try {
         const { access_token, user_profile } = response.data;
         const userType = user_profile.usertype;
+        const menuAccess = Array.isArray(user_profile.menuAccess)
+          ? user_profile.menuAccess.map(String)
+          : null;
+        const deskAccess = Array.isArray(user_profile.deskAccess)
+          ? user_profile.deskAccess.map(String)
+          : null;
 
-        if (!canEnterApp(userType)) {
+        if (!canEnterApp(userType, menuAccess)) {
           setError("This account does not have access to the staff app.");
           toast.error("This account does not have access to the staff app.");
           return;
@@ -75,15 +84,40 @@ const Login: React.FC = () => {
         Cookies.set("user_type", userType);
         Cookies.set("user_name", user_profile.name);
         Cookies.set("crm_role", crmRole);
+        Cookies.set(
+          "menu_access",
+          menuAccess ? JSON.stringify(menuAccess) : "",
+        );
+        Cookies.set(
+          "desk_access",
+          deskAccess ? JSON.stringify(deskAccess) : "",
+        );
+        Cookies.set("user_department", user_profile.department || "");
 
-        const canCrm = canOpenRoute(userType, "/crm");
-        const openCrm = userType === "sales" || (wantsCrm && canCrm);
+        const canCrmDesk = canOpenDesk(userType, "crm", deskAccess);
+        const canAdminDesk = canOpenDesk(userType, "admin", deskAccess);
+        const canCrmRoute = canOpenRoute(userType, "/crm", menuAccess);
+        const canCrm = canCrmDesk && canCrmRoute;
+        const openCrm = wantsCrm ? canCrm : userType === "sales" && canCrm && !canAdminDesk;
 
-        if (wantsCrm && !canCrm && userType !== "sales") {
+        if (wantsCrm && !canCrm) {
           setError("This account cannot open the sales CRM desk.");
           toast.error("This account cannot open the sales CRM desk.");
-          Cookies.set("rw_service", "admin", { expires: 30 });
-          navigate(homeRoute(userType));
+          if (canAdminDesk) {
+            Cookies.set("rw_service", "admin", { expires: 30 });
+            navigate(homeRoute(userType, menuAccess));
+          } else {
+            [
+              "access_token",
+              "user_type",
+              "user_name",
+              "crm_role",
+              "menu_access",
+              "desk_access",
+              "user_department",
+              "rw_service",
+            ].forEach((key) => Cookies.remove(key));
+          }
           return;
         }
 
@@ -94,9 +128,31 @@ const Login: React.FC = () => {
           return;
         }
 
+        if (!canAdminDesk) {
+          if (canCrm) {
+            Cookies.set("rw_service", "crm", { expires: 30 });
+            toast.success("Welcome to the sales desk");
+            navigate(crmHomeRoute(crmRole));
+            return;
+          }
+          [
+            "access_token",
+            "user_type",
+            "user_name",
+            "crm_role",
+            "menu_access",
+            "desk_access",
+            "user_department",
+            "rw_service",
+          ].forEach((key) => Cookies.remove(key));
+          setError("This account has no admin or CRM desk access.");
+          toast.error("This account has no admin or CRM desk access.");
+          return;
+        }
+
         Cookies.set("rw_service", "admin", { expires: 30 });
         toast.success("Login successful!");
-        const opsHome = homeRoute(userType);
+        const opsHome = homeRoute(userType, menuAccess);
         navigate(opsHome === "/crm" ? "/dashboard" : opsHome);
       } catch (err) {
         console.error(err);
@@ -124,25 +180,6 @@ const Login: React.FC = () => {
     Cookies.set("rw_service", service, { expires: 30 });
     setSearchParams({ service }, { replace: true });
   };
-
-  if (showForgotPassword) {
-    return (
-      <div className="rw-auth" ref={rootRef}>
-        <div
-          className="rw-auth__bg"
-          style={{ backgroundImage: `url(${staffLoginBg})` }}
-        />
-        <div className="rw-auth__veil" />
-        <div className="rw-auth__grid" />
-        <div className="rw-auth__stage">
-          <ForgotPassword
-            setShowForgotPassword={setShowForgotPassword}
-            setShowLogin={() => setShowForgotPassword(false)}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="rw-auth" ref={rootRef}>
@@ -234,15 +271,10 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <div className="rw-auth__row">
-              <button
-                type="button"
-                className="rw-auth__link"
-                onClick={() => setShowForgotPassword(true)}
-              >
-                Forgot password?
-              </button>
-            </div>
+            <p className="rw-auth__hint">
+              Forgot your password? Ask a super admin to set a temporary one. Staff
+              cannot reset their own login (sales and office data stay controlled).
+            </p>
 
             {error ? <p className="rw-auth__error" id="login-error" role="alert">{error}</p> : null}
 

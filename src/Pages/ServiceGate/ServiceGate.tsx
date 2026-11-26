@@ -2,7 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import gsap from 'gsap';
-import { canEnterApp, canOpenRoute, homeRoute } from '../../utils/roles';
+import {
+  canEnterApp,
+  canOpenDesk,
+  canOpenRoute,
+  deskAccessFromCookie,
+  homeRoute,
+  menuAccessFromCookie,
+} from '../../utils/roles';
 import {
   crmHomeRoute,
   isCrmRole,
@@ -46,19 +53,23 @@ const ServiceGate: React.FC = () => {
 
   if (isAuthenticated()) {
     const role = Cookies.get('user_type');
-    if (!canEnterApp(role)) {
+    const menus = menuAccessFromCookie(Cookies.get('menu_access'));
+    const desks = deskAccessFromCookie(Cookies.get('desk_access'));
+    if (!canEnterApp(role, menus)) {
       Cookies.remove('access_token');
       Cookies.remove('user_type');
       Cookies.remove('user_name');
       Cookies.remove('crm_role');
       Cookies.remove('rw_service');
+      Cookies.remove('menu_access');
+      Cookies.remove('desk_access');
+      Cookies.remove('user_department');
     } else {
       const preferred = Cookies.get('rw_service');
-      const canCrm = canOpenRoute(role, '/crm');
-      const canOps =
-        Boolean(homeRoute(role) && homeRoute(role) !== '/crm') ||
-        role === 'admin' ||
-        role === 'super_admin';
+      const canCrm =
+        canOpenDesk(role, 'crm', desks) && canOpenRoute(role, '/crm', menus);
+      const canOps = canOpenDesk(role, 'admin', desks);
+      const home = homeRoute(role, menus);
 
       if (preferred === 'crm' && canCrm) {
         const stored = Cookies.get('crm_role');
@@ -68,13 +79,17 @@ const ServiceGate: React.FC = () => {
         return <Navigate to={crmHomeRoute(crmRole)} replace />;
       }
       if (preferred === 'admin' && canOps) {
-        return <Navigate to={homeRoute(role)} replace />;
+        return <Navigate to={home === '/crm' ? '/dashboard' : home} replace />;
       }
       if (canCrm && !canOps) {
-        return <Navigate to={homeRoute(role)} replace />;
+        const stored = Cookies.get('crm_role');
+        const crmRole = isCrmRole(stored)
+          ? stored
+          : stubCrmRoleFromUserType(role);
+        return <Navigate to={crmHomeRoute(crmRole)} replace />;
       }
       if (!canCrm && canOps) {
-        return <Navigate to={homeRoute(role)} replace />;
+        return <Navigate to={home === '/crm' ? '/dashboard' : home} replace />;
       }
     }
   }

@@ -30,7 +30,12 @@ import { rwGoldLogo } from '../../assets';
 import { adminTabs } from './Tabs';
 import Cookies from 'js-cookie';
 import { useNavigate } from 'react-router-dom';
-import { canOpenRoute, ROLE_LABELS, type UserRole } from '../../utils/roles';
+import {
+  canOpenRoute,
+  menuAccessFromCookie,
+  ROLE_LABELS,
+  type UserRole,
+} from '../../utils/roles';
 import { tokens } from '../../Theme/tokens';
 
 interface HeaderProps {
@@ -61,6 +66,7 @@ const Header: React.FC<HeaderProps> = ({
   });
 
   const role = Cookies.get('user_type');
+  const menus = menuAccessFromCookie(Cookies.get('menu_access'));
   const name = (Cookies.get('user_name') || 'Team RW').trim();
   const roleLabel = role ? ROLE_LABELS[role as UserRole] || role : 'Staff';
   const initials =
@@ -94,10 +100,10 @@ const Header: React.FC<HeaderProps> = ({
     const query = search.trim().toLowerCase();
     if (!query) return [];
     return adminTabs
-      .filter((tab) => canOpenRoute(role, tab.route))
+      .filter((tab) => canOpenRoute(role, tab.route, menus))
       .filter((tab) => tab.label.toLowerCase().includes(query))
       .slice(0, 6);
-  }, [search, role]);
+  }, [search, role, menus]);
 
   const handleLogout = () => {
     Cookies.remove('access_token');
@@ -105,6 +111,9 @@ const Header: React.FC<HeaderProps> = ({
     Cookies.remove('user_name');
     Cookies.remove('crm_role');
     Cookies.remove('rw_service');
+    Cookies.remove('menu_access');
+    Cookies.remove('desk_access');
+    Cookies.remove('user_department');
     localStorage.clear();
     navigate('/login');
   };
