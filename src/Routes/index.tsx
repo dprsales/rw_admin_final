@@ -23,7 +23,21 @@ import Blogs from "../Pages/Blogs/Blogs";
 import GalleryPhotos from "../Pages/Gallery/GalleryPhotos";
 import Listings from "../Pages/Listings/Listings";
 import ListingDetail from "../Pages/Listings/ListingDetail";
-import { CrmDashboard, CrmHome, CrmLeadDetail, CrmLeads, CrmShell, CrmStubPage, crmHomeRoute, isCrmRole, stubCrmRoleFromUserType } from "../crm";
+import {
+  CrmDashboard,
+  CrmHome,
+  CrmLeadDetail,
+  CrmLeads,
+  CrmPersonDetail,
+  CrmProjectDetail,
+  CrmProjects,
+  CrmShell,
+  CrmStubPage,
+  CrmTeam,
+  crmHomeRoute,
+  isCrmRole,
+  stubCrmRoleFromUserType,
+} from "../crm";
 import ServiceGate from "../Pages/ServiceGate/ServiceGate";
 import {
   canEnterApp,
@@ -137,24 +151,10 @@ const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: "team",
-        element: (
-          <CrmStubPage
-            title="Team"
-            blurb="Managers and team leads open people here. Day 20 stub; hierarchy APIs come later."
-          />
-        ),
-      },
-      {
-        path: "projects",
-        element: (
-          <CrmStubPage
-            title="Projects"
-            blurb="Mandate project hub for leadership. Day 20 stub screen."
-          />
-        ),
-      },
+      { path: "team", element: <CrmTeam /> },
+      { path: "team/:personId", element: <CrmPersonDetail /> },
+      { path: "projects", element: <CrmProjects /> },
+      { path: "projects/:projectId", element: <CrmProjectDetail /> },
       {
         path: "settings",
         element: (

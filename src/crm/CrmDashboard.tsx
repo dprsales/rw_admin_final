@@ -62,11 +62,11 @@ const FUNNEL = [
 ];
 
 const TEAM_BARS = [
-  { name: 'Priya', worked: 42, connects: 19, overdue: 2 },
-  { name: 'Arjun', worked: 38, connects: 16, overdue: 5 },
-  { name: 'Neha', worked: 35, connects: 21, overdue: 1 },
-  { name: 'Karan', worked: 29, connects: 12, overdue: 7 },
-  { name: 'Meera', worked: 24, connects: 10, overdue: 4 },
+  { id: 'priya', name: 'Priya', worked: 42, connects: 19, overdue: 2 },
+  { id: 'arjun', name: 'Arjun', worked: 38, connects: 16, overdue: 5 },
+  { id: 'neha', name: 'Neha', worked: 35, connects: 21, overdue: 1 },
+  { id: 'karan', name: 'Karan', worked: 29, connects: 12, overdue: 7 },
+  { id: 'meera', name: 'Meera', worked: 24, connects: 10, overdue: 4 },
 ];
 
 const TEMP_MIX = [
@@ -98,10 +98,10 @@ const ATTENTION = [
 ];
 
 const PROJECT_PULSE = [
-  { name: 'Skyline Residences', open: 48, hot: 9, overdue: 6, next: 'Cost sheet chase · 2 today', health: 72 },
-  { name: 'Lakeview Towers', open: 41, hot: 7, overdue: 4, next: 'Site visit confirm · 3', health: 64 },
-  { name: 'Parkside Avenue', open: 36, hot: 5, overdue: 8, next: 'Fresh dials · 11 new', health: 48 },
-  { name: 'Orchid Heights', open: 29, hot: 4, overdue: 3, next: 'Proposal follow-ups', health: 58 },
+  { id: 'skyline', name: 'Skyline Residences', open: 48, hot: 9, overdue: 6, next: 'Cost sheet chase · 2 today', health: 72 },
+  { id: 'lakeview', name: 'Lakeview Towers', open: 41, hot: 7, overdue: 4, next: 'Site visit confirm · 3', health: 64 },
+  { id: 'parkside', name: 'Parkside Avenue', open: 36, hot: 5, overdue: 8, next: 'Fresh dials · 11 new', health: 48 },
+  { id: 'orchid', name: 'Orchid Heights', open: 29, hot: 4, overdue: 3, next: 'Proposal follow-ups', health: 58 },
 ];
 
 const FEED = [
@@ -317,8 +317,8 @@ const CrmDashboard: React.FC = () => {
           </div>
           <ul className="crm-mini-table" aria-label="Team overdue counts">
             {TEAM_BARS.map((row) => (
-              <li key={row.name}>
-                <span>{row.name}</span>
+              <li key={row.id}>
+                <Link to={`/crm/team/${row.id}`}>{row.name}</Link>
                 <span className={row.overdue >= 5 ? 'is-bad' : undefined}>{row.overdue} overdue</span>
               </li>
             ))}
@@ -467,7 +467,11 @@ const CrmDashboard: React.FC = () => {
           </header>
           <div className="crm-pulse-grid">
             {PROJECT_PULSE.map((p) => (
-              <article key={p.name} className="crm-pulse">
+              <Link
+                key={p.id}
+                to={`/crm/projects/${p.id}`}
+                className="crm-pulse crm-pulse--link"
+              >
                 <header>
                   <h3>{p.name}</h3>
                   <span className={`crm-pulse__health${p.health < 55 ? ' is-low' : p.health >= 70 ? ' is-good' : ''}`}>
@@ -489,7 +493,7 @@ const CrmDashboard: React.FC = () => {
                   </div>
                 </dl>
                 <p className="crm-pulse__next">{p.next}</p>
-              </article>
+              </Link>
             ))}
           </div>
         </section>
