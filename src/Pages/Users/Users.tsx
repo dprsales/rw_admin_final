@@ -92,6 +92,7 @@ const EMPTY_USERS: AdminUser[] = [];
 const ROLE_COLORS: Record<UserRole, 'default' | 'primary' | 'info' | 'warning' | 'success' | 'error' | 'secondary'> = {
   super_admin: 'error',
   admin: 'warning',
+  ceo: 'secondary',
   hr: 'info',
   account: 'primary',
   finance: 'secondary',

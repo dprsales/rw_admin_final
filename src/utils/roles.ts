@@ -9,6 +9,7 @@
 export const USER_ROLES = [
   'super_admin',
   'admin',
+  'ceo',
   'hr',
   'account',
   'finance',
@@ -29,6 +30,9 @@ const LADDER_RANK = {
 
 const DEPARTMENT_ROLES = ['hr', 'account', 'finance', 'sales', 'marketing'] as const;
 
+/** Leadership view seat: small menu, not full admin privilege. */
+const VIEW_ROLES = ['ceo'] as const;
+
 type LadderRole = keyof typeof LADDER_RANK;
 
 function isLadderRole(role: string): role is LadderRole {
@@ -37,6 +41,10 @@ function isLadderRole(role: string): role is LadderRole {
 
 function isDepartmentRole(role: string): boolean {
   return (DEPARTMENT_ROLES as readonly string[]).includes(role);
+}
+
+function isViewRole(role: string): boolean {
+  return (VIEW_ROLES as readonly string[]).includes(role);
 }
 
 /** True when `actualRole` holds at least the privilege of `requiredRole`. Unknown roles fail closed. */
@@ -55,11 +63,15 @@ export function roleSatisfies(actualRole: unknown, requiredRole: unknown): boole
     if (isLadderRole(requiredRole)) {
       return LADDER_RANK[actualRole] >= LADDER_RANK[requiredRole];
     }
-    return isDepartmentRole(requiredRole);
+    return isDepartmentRole(requiredRole) || isViewRole(requiredRole);
   }
 
   if (isDepartmentRole(actualRole)) {
     return isLadderRole(requiredRole) && LADDER_RANK[requiredRole] <= LADDER_RANK.employee;
+  }
+
+  if (isViewRole(actualRole)) {
+    return false;
   }
 
   if (isLadderRole(actualRole) && isLadderRole(requiredRole)) {
@@ -75,6 +87,7 @@ export const isStaff = (role: unknown): boolean => roleSatisfies(role, 'admin');
 export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super admin',
   admin: 'Admin',
+  ceo: 'CEO',
   hr: 'Human resources',
   account: 'Account',
   finance: 'Finance',
@@ -88,8 +101,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  * Screens each seat is allowed to open. Admin keeps the whole office except
  * user management, which stays with super admin. One person, one seat.
  * Super admin may override per person via `menuAccess` (cookie / login profile).
+ * CEO: command pulse only (dashboard). Not Users, Projects, Integrations, etc.
  */
 const WORKSPACES: Partial<Record<UserRole, string[]>> = {
+  ceo: ['/dashboard'],
   hr: ['/applications', '/employees', '/vendors', '/vendor-partners'],
   account: ['/payments'],
   finance: ['/payments'],
@@ -186,7 +201,7 @@ export function defaultDepartmentForRole(role: unknown): UserDepartment | '' {
   if (role === 'marketing') return 'marketing';
   if (role === 'hr') return 'hr';
   if (role === 'account' || role === 'finance') return 'accounts';
-  if (role === 'admin' || role === 'super_admin') return 'leadership';
+  if (role === 'admin' || role === 'super_admin' || role === 'ceo') return 'leadership';
   if (role === 'employee') return 'operations';
   return '';
 }
@@ -272,6 +287,7 @@ export type DeskAccess = (typeof DESK_ACCESS)[number];
 
 export function defaultDeskAccessForRole(role: unknown): DeskAccess[] {
   if (role === 'super_admin' || role === 'admin') return ['admin', 'crm'];
+  if (role === 'ceo') return ['admin'];
   if (role === 'sales' || role === 'marketing') return ['admin', 'crm'];
   if (role === 'hr' || role === 'account' || role === 'finance' || role === 'employee') {
     return ['admin'];
