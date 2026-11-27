@@ -11,10 +11,12 @@ import { Search as SearchIcon, ArrowDropDown as ArrowDropDownIcon } from '@mui/i
 import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookies from 'js-cookie';
+import { toast } from 'react-toastify';
 
 import LeadModal from './LeadModal'; // Adjust path
 import AddLeadDialog from './AddLeadDialog';
 import {
+  assignLeadOwner,
   deleteLead,
   getAssignableLeadOwners,
   getLeads,
@@ -91,6 +93,7 @@ export interface Lead {
   formAnswers?: Record<string, unknown>;
   saleLeadId?: string;
   formSubmittedAt?: string;
+  closedAt?: string;
   createdAt: string;
   updatedAt?: string;
   lastCallId?: string;
@@ -259,6 +262,32 @@ export const STAGE_LABEL: Record<string, string> = Object.fromEntries(
   STAGE_OPTIONS.map((o) => [o.value, o.label]),
 );
 
+/**
+ * Interim telecaller words on top of mandate stages (same values underneath).
+ * Heat (hot / warm / cold) stays on the temperature field.
+ */
+export const TELECALLER_STAGE_LABEL: Record<string, string> = {
+  new_lead: 'Incoming',
+  attempted_contact: 'Pending',
+  connected: 'In process',
+  qualified: 'In process',
+  site_visit_planned: 'Visit planned',
+  site_visit_done: 'Visit done',
+  negotiation: 'In process',
+  booking_token: 'Closing',
+  won_booked: 'Closed won',
+  lost: 'Closed lost',
+  nurture: 'Cold hold',
+};
+
+/** Desk label: telecaller word first, CRM stage in brackets. */
+export function stageDeskLabel(stage?: string): string {
+  if (!stage) return '-';
+  const desk = TELECALLER_STAGE_LABEL[stage];
+  const crm = STAGE_LABEL[stage] || stage;
+  return desk ? `${desk} (${crm})` : crm;
+}
+
 /** Locked temperatures — separate from stage. */
 export const TEMPERATURE_OPTIONS = [
   { value: 'hot', label: 'Hot' },
@@ -360,12 +389,13 @@ function leadDateIn(lead: Pick<Lead, 'formSubmittedAt' | 'createdAt'>): string {
 }
 
 /**
- * Date out: only when the lead is closed (won / lost).
- * Uses updatedAt until a dedicated closedAt field exists.
+ * Date out: closedAt when won / lost.
+ * Falls back to updatedAt for older closed leads created before closedAt existed.
  */
 function leadDateOut(
-  lead: Pick<Lead, 'stage' | 'status' | 'updatedAt'>,
+  lead: Pick<Lead, 'stage' | 'status' | 'closedAt' | 'updatedAt'>,
 ): string {
+  if (lead.closedAt) return formatLeadDate(lead.closedAt);
   const closed =
     lead.stage === 'won_booked' ||
     lead.stage === 'lost' ||
@@ -378,6 +408,74 @@ function leadDateOut(
 function leadCampaignLabel(lead: Pick<Lead, 'pageSource'>): string {
   const value = String(lead.pageSource || '').trim();
   return value || '-';
+}
+
+function csvEscape(value: unknown): string {
+  const text = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+  if (/[",]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+/** Build Excel-friendly CSV (BOM) for interim manager export. */
+function buildLeadsCsv(
+  rows: Lead[],
+  ownerNameById: Map<string, string>,
+): string {
+  const headers = [
+    'Name',
+    'Phone',
+    'Email',
+    'Source',
+    'Campaign',
+    'Stage',
+    'Heat',
+    'Owner',
+    'Project',
+    'Date in',
+    'Date out',
+    'Next follow-up',
+    'Type',
+  ];
+  const lines = rows.map((lead) =>
+    [
+      lead.name,
+      lead.phoneNumber,
+      lead.email,
+      lead.crmSource
+        ? CRM_SOURCE_LABEL[lead.crmSource] || lead.crmSource
+        : leadSourceLabel(lead),
+      leadCampaignLabel(lead),
+      lead.stage ? stageDeskLabel(lead.stage) : '',
+      lead.temperature
+        ? TEMPERATURE_LABEL[lead.temperature] || lead.temperature
+        : '',
+      lead.ownerId
+        ? ownerNameById.get(String(lead.ownerId)) || 'Assigned'
+        : 'Unassigned',
+      lead.projectName || '',
+      leadDateIn(lead),
+      leadDateOut(lead),
+      formatLeadDate(lead.nextFollowUpAt),
+      lead.formTrack
+        ? FORM_TRACK_LABEL[lead.formTrack] || lead.formTrack
+        : lead.type,
+    ]
+      .map(csvEscape)
+      .join(','),
+  );
+  return `\uFEFF${[headers.join(','), ...lines].join('\n')}`;
+}
+
+function downloadTextFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function KrisahStatusChip({ lead }: { lead: Pick<Lead, 'source' | 'pageSource' | 'krisahDone' | 'krisahScore' | 'krisahInviteSentAt'> }) {
@@ -442,8 +540,11 @@ type StageOption = { value: string; label: string };
 type KrisahOption = { value: KrisahStatus | ''; label: string };
 
 const STAGE_FILTER_OPTIONS: StageOption[] = [
-  { value: '', label: 'All stages' },
-  ...STAGE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+  { value: '', label: 'All statuses' },
+  ...STAGE_OPTIONS.map((o) => ({
+    value: o.value,
+    label: stageDeskLabel(o.value),
+  })),
 ];
 
 const KRISAH_FILTER_OPTIONS: KrisahOption[] = [
@@ -472,8 +573,15 @@ const AllLeads: React.FC = () => {
   const [callError, setCallError] = useState('');
   const [callInfo, setCallInfo] = useState('');
   const [addLeadOpen, setAddLeadOpen] = useState(false);
-  const [ownerFilter, setOwnerFilter] = useState('');
+  /** Managers land on the open pool first (standard CRM assign desk). */
+  const [ownerFilter, setOwnerFilter] = useState(() =>
+    isLeadManagerSeat() ? 'unassigned' : '',
+  );
+  const [assignBusyId, setAssignBusyId] = useState<string | null>(null);
+  const [exportRequestOpen, setExportRequestOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const canFilterOwners = isLeadManagerSeat();
+  const canExportLeads = canFilterOwners;
 
   const ownersQuery = useQuery({
     queryKey: ['assignable-lead-owners'],
@@ -563,6 +671,37 @@ const AllLeads: React.FC = () => {
       cancelled = true;
     };
   }, [data?.leads, queryClient]);
+
+  const assignMutation = useMutation({
+    mutationFn: ({
+      leadId,
+      ownerId,
+    }: {
+      leadId: string;
+      ownerId: string | null;
+    }) => assignLeadOwner(leadId, ownerId),
+    onMutate: ({ leadId }) => {
+      setAssignBusyId(leadId);
+    },
+    onSuccess: (_result, variables) => {
+      setAssignBusyId(null);
+      toast.success(variables.ownerId ? 'Lead assigned' : 'Owner cleared');
+      setSelectedLead((prev) =>
+        prev && prev._id === variables.leadId
+          ? { ...prev, ownerId: variables.ownerId || undefined }
+          : prev,
+      );
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: (err: any) => {
+      setAssignBusyId(null);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Could not assign owner.';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    },
+  });
 
   const callMutation = useMutation({
     mutationFn: (leadId: string) => sendLeadCall(leadId),
@@ -706,6 +845,78 @@ const AllLeads: React.FC = () => {
     ));
   };
 
+  const runManagerExport = async () => {
+    if (!canExportLeads) return;
+    setExportBusy(true);
+    setActionsAnchor(null);
+    try {
+      let rows: Lead[] = [];
+      if (selectedIds.length) {
+        const selectedSet = new Set(selectedIds);
+        rows = LeadsData.filter((lead) => selectedSet.has(lead._id));
+        if (!rows.length) {
+          toast.error('Selected leads are not on this page. Select again, then export.');
+          return;
+        }
+      } else {
+        const response = await getLeads({
+          page: 1,
+          limit: 100,
+          ...(stageFilter ? { stage: stageFilter } : {}),
+          ...(phoneFilter ? { phone: phoneFilter } : {}),
+          ...(ownerFilter ? { ownerId: ownerFilter } : {}),
+        });
+        rows = response?.leads || [];
+      }
+
+      if (!rows.length) {
+        toast.error('No leads to export for the current filters.');
+        return;
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const csv = buildLeadsCsv(rows, ownerNameById);
+      downloadTextFile(
+        `rw-leads-${stamp}.csv`,
+        csv,
+        'text/csv;charset=utf-8;',
+      );
+      toast.success(
+        selectedIds.length
+          ? `Exported ${rows.length} selected lead${rows.length === 1 ? '' : 's'}`
+          : `Exported ${rows.length} lead${rows.length === 1 ? '' : 's'} (up to 100 for current filters)`,
+      );
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message || err?.message || 'Could not export leads.';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : String(msg));
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const copyExportRequestMessage = async () => {
+    const bits = [
+      'Please export leads from admin Leads for me.',
+      stageFilter ? `Status: ${stageDeskLabel(stageFilter)}` : '',
+      ownerFilter === 'unassigned'
+        ? 'Owner: Unassigned pool'
+        : ownerFilter
+          ? `Owner: ${ownerNameById.get(ownerFilter) || ownerFilter}`
+          : '',
+      phoneFilter ? `Phone search: ${phoneFilter}` : '',
+      selectedCount ? `Selected on my screen: ${selectedCount}` : '',
+    ].filter(Boolean);
+    const text = bits.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Request text copied. Send it to your manager.');
+    } catch {
+      toast.error('Could not copy. Ask your manager to use Actions → Export CSV.');
+    }
+    setExportRequestOpen(false);
+  };
+
   // ----------------------
   // Loading / Error States
   // ---------------------- 
@@ -723,7 +934,11 @@ const AllLeads: React.FC = () => {
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <PageHeader
         title="Leads"
-        description="Website enquiries plus hand-entered leads. Add, assign, stage, and notes."
+        description={
+          canFilterOwners
+            ? 'Open pool first. Assign to sales, then they only see their own leads. Export is manager-only.'
+            : 'Your assigned leads only. Add a lead or ask a manager to assign from the open pool.'
+        }
         crumbs={[{ label: 'Leads' }]}
         actions={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -790,6 +1005,7 @@ const AllLeads: React.FC = () => {
               options={ownerFilterOptions}
               value={
                 ownerFilterOptions.find((o) => o.value === ownerFilter) ||
+                ownerFilterOptions.find((o) => o.value === 'unassigned') ||
                 ownerFilterOptions[0]
               }
               onChange={(_e, next) => {
@@ -801,9 +1017,24 @@ const AllLeads: React.FC = () => {
               disableClearable
               blurOnSelect
               renderInput={(params) => (
-                <TextField {...params} label="Owner" placeholder="Search owner" />
+                <TextField
+                  {...params}
+                  label="Owner"
+                  placeholder="Search owner"
+                  helperText="Unassigned pool = open work. Sales never see peers’ leads."
+                />
               )}
-              sx={{ ...filterFieldSx, minWidth: 180 }}
+              sx={{
+                ...filterFieldSx,
+                minWidth: 200,
+                alignSelf: 'flex-start',
+                '& .MuiFormHelperText-root': {
+                  mx: 0,
+                  mt: 0.5,
+                  fontSize: 11,
+                  color: tokens.textMuted,
+                },
+              }}
             />
           )}
 
@@ -843,7 +1074,7 @@ const AllLeads: React.FC = () => {
             disableClearable
             blurOnSelect
             renderInput={(params) => (
-              <TextField {...params} label="Stage" placeholder="Search stage" />
+              <TextField {...params} label="Status" placeholder="Search status" />
             )}
             sx={{ ...filterFieldSx, minWidth: 176 }}
           />
@@ -939,11 +1170,33 @@ const AllLeads: React.FC = () => {
                   }}
                 >
                   <MenuList dense autoFocusItem={false} sx={{ py: 0.5 }}>
-                    <MenuItem disabled>
-                      <Typography variant="body2" sx={{ color: tokens.textMuted }}>
-                        Export CSV
-                      </Typography>
-                    </MenuItem>
+                    {canExportLeads ? (
+                      <MenuItem
+                        disabled={exportBusy}
+                        onClick={() => {
+                          void runManagerExport();
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {exportBusy
+                            ? 'Exporting…'
+                            : selectedCount
+                              ? `Export CSV (${selectedCount})`
+                              : 'Export CSV'}
+                        </Typography>
+                      </MenuItem>
+                    ) : (
+                      <MenuItem
+                        onClick={() => {
+                          setActionsAnchor(null);
+                          setExportRequestOpen(true);
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Request export
+                        </Typography>
+                      </MenuItem>
+                    )}
                     <MenuItem
                       disabled={!selectedCount || deleteMutation.isPending}
                       onClick={() => {
@@ -1030,9 +1283,9 @@ const AllLeads: React.FC = () => {
                 'Email',
                 'Source',
                 'Campaign',
-                'Stage',
+                'Status',
                 'Heat',
-                'Owner',
+                canFilterOwners ? 'Assign to' : 'Owner',
                 'Project',
                 'Date in',
                 'Date out',
@@ -1132,10 +1385,21 @@ const AllLeads: React.FC = () => {
                 <TableCell sx={{ padding: '8px 12px', minWidth: 160 }}>
                   <Typography variant="caption">{leadCampaignLabel(lead)}</Typography>
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    {lead.stage ? STAGE_LABEL[lead.stage] || lead.stage : '-'}
-                  </Typography>
+                <TableCell sx={{ padding: '8px 12px', minWidth: 130 }}>
+                  {lead.stage ? (
+                    <>
+                      <Typography variant="caption" sx={{ fontWeight: 700 }} display="block">
+                        {TELECALLER_STAGE_LABEL[lead.stage] ||
+                          STAGE_LABEL[lead.stage] ||
+                          lead.stage}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {STAGE_LABEL[lead.stage] || lead.stage}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="caption">-</Typography>
+                  )}
                 </TableCell>
                 <TableCell sx={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                   {lead.temperature ? (
@@ -1148,8 +1412,57 @@ const AllLeads: React.FC = () => {
                     <Typography variant="caption">-</Typography>
                   )}
                 </TableCell>
-                <TableCell sx={{ padding: '8px 12px', minWidth: 120 }}>
-                  {lead.ownerId ? (
+                <TableCell
+                  sx={{ padding: '8px 12px', minWidth: canFilterOwners ? 220 : 120 }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {canFilterOwners ? (
+                    <Autocomplete
+                      size="small"
+                      options={owners}
+                      value={
+                        owners.find((o) => o._id === String(lead.ownerId || '')) ||
+                        null
+                      }
+                      loading={ownersQuery.isLoading}
+                      disabled={
+                        assignBusyId === lead._id ||
+                        assignMutation.isPending ||
+                        ownersQuery.isLoading
+                      }
+                      onChange={(_e, next) => {
+                        const nextId = next?._id || null;
+                        const currentId = lead.ownerId
+                          ? String(lead.ownerId)
+                          : null;
+                        if (nextId === currentId) return;
+                        assignMutation.mutate({
+                          leadId: lead._id,
+                          ownerId: nextId,
+                        });
+                      }}
+                      getOptionLabel={(owner) =>
+                        owner.name || owner.email || owner._id
+                      }
+                      isOptionEqualToValue={(a, b) => a._id === b._id}
+                      blurOnSelect
+                      clearOnBlur={false}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Assign…"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              bgcolor: tokens.input,
+                              borderRadius: '8px',
+                              fontSize: 12,
+                            },
+                          }}
+                        />
+                      )}
+                      sx={{ minWidth: 200 }}
+                    />
+                  ) : lead.ownerId ? (
                     <Typography variant="caption" sx={{ fontWeight: 600 }}>
                       {ownerNameById.get(String(lead.ownerId)) || 'Assigned'}
                     </Typography>
@@ -1328,6 +1641,38 @@ const AllLeads: React.FC = () => {
             onClick={() => deleteMutation.mutate(selectedIds)}
           >
             {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={exportRequestOpen}
+        onClose={() => setExportRequestOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Request Excel export</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Only a manager (admin) can download the leads file. Copy a short request
+            and send it to them on WhatsApp or email. They use Actions → Export CSV.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setExportRequestOpen(false)}>Close</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              void copyExportRequestMessage();
+            }}
+            sx={{
+              bgcolor: tokens.gold,
+              color: tokens.black,
+              fontWeight: 600,
+              '&:hover': { bgcolor: tokens.goldDark },
+            }}
+          >
+            Copy request text
           </Button>
         </DialogActions>
       </Dialog>

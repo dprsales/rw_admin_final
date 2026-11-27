@@ -38,6 +38,7 @@ import {
   STAGE_OPTIONS,
   TEMPERATURE_OPTIONS,
   VISITOR_LABEL,
+  stageDeskLabel,
 } from './Leads';
 import {
   addLeadNote,
@@ -845,15 +846,17 @@ const LeadModal: React.FC<LeadModalProps> = ({
                 )}
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth size="small">
-                    <InputLabel id="lead-stage-label">Stage</InputLabel>
+                    <InputLabel id="lead-stage-label">Status</InputLabel>
                     <Select
                       labelId="lead-stage-label"
-                      label="Stage"
+                      label="Status"
                       value={stage}
                       onChange={(e) => setStage(e.target.value)}
                     >
                       {STAGE_OPTIONS.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {stageDeskLabel(opt.value)}
+                        </MenuItem>
                       ))}
                     </Select>
                   </FormControl>

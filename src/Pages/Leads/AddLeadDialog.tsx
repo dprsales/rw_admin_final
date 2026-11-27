@@ -19,7 +19,12 @@ import {
   getAssignableLeadOwners,
   type AssignableOwner,
 } from '../../api/services';
-import { CRM_SOURCE_LABEL, STAGE_OPTIONS, TEMPERATURE_OPTIONS } from './Leads';
+import {
+  CRM_SOURCE_LABEL,
+  STAGE_OPTIONS,
+  TEMPERATURE_OPTIONS,
+  stageDeskLabel,
+} from './Leads';
 
 const CRM_SOURCE_OPTIONS = [
   'manual',
@@ -246,12 +251,12 @@ const AddLeadDialog: React.FC<AddLeadDialogProps> = ({ open, onClose }) => {
                 options={[...STAGE_OPTIONS]}
                 value={STAGE_OPTIONS.find((o) => o.value === stage) || STAGE_OPTIONS[0]}
                 onChange={(_e, next) => setStage(next?.value || 'new_lead')}
-                getOptionLabel={(option) => option.label}
+                getOptionLabel={(option) => stageDeskLabel(option.value)}
                 isOptionEqualToValue={(a, b) => a.value === b.value}
                 disableClearable
                 blurOnSelect
                 renderInput={(params) => (
-                  <TextField {...params} label="Stage" placeholder="Search stage" />
+                  <TextField {...params} label="Status" placeholder="Search status" />
                 )}
               />
             </Grid>
