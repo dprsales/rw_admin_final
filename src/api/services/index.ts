@@ -484,6 +484,85 @@ export const getCoachingPayments = async (): Promise<CoachingPayment[]> => {
   return response.data;
 };
 
+/** Spend / tool expenses from Gmail Sheet sync + manual entries. */
+export type MoneyEntry = {
+  _id: string;
+  date: string;
+  type: 'expense' | 'income';
+  merchant: string;
+  product?: string;
+  category?: string;
+  amountOriginal: number;
+  currency: string;
+  amountInr: number;
+  month?: string;
+  year?: string;
+  likelySubscription?: string;
+  note?: string;
+  project?: string;
+  gmailLink?: string;
+  externalId?: string;
+  source?: string;
+  status?: string;
+};
+
+export type MoneySummary = {
+  year: string;
+  expenseCount: number;
+  totalInr: number;
+  byMonth: { month: string; count: number; totalInr: number }[];
+  subscriptions: {
+    merchant: string;
+    timesSeen: number;
+    totalInr: number;
+    lastDate: string;
+    estMonthlyInr: number;
+  }[];
+};
+
+export type MoneyEntryInput = {
+  date: string;
+  type?: 'expense' | 'income';
+  merchant: string;
+  product?: string;
+  category?: string;
+  amountOriginal: number;
+  currency?: string;
+  amountInr: number;
+  likelySubscription?: string;
+  note?: string;
+  project?: string;
+};
+
+export const getMoneyEntries = async (params: {
+  month?: string;
+  year?: string;
+  type?: string;
+  limit?: number;
+} = {}): Promise<MoneyEntry[]> => {
+  const response = await http.get('/money-entries', { params });
+  return response.data;
+};
+
+export const getMoneySummary = async (year?: string): Promise<MoneySummary> => {
+  const response = await http.get('/money-entries/summary', {
+    params: year ? { year } : undefined,
+  });
+  return response.data;
+};
+
+export const createMoneyEntry = (data: MoneyEntryInput) => {
+  return http.post('/money-entries', data);
+};
+
+export const updateMoneyEntry = (id: string, data: Partial<MoneyEntryInput>) => {
+  return http.patch(`/money-entries/${id}`, data);
+};
+
+export const deleteMoneyEntry = (id: string) => {
+  return http.delete(`/money-entries/${id}`);
+};
+
 export const sendCoachingInvoice = (paymentId: string) => {
   return http.post(`/payments/admin/${paymentId}/invoice`);
 };

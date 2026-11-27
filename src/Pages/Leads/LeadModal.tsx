@@ -59,8 +59,8 @@ function isManagerSeat(): boolean {
   return role === 'admin' || role === 'super_admin';
 }
 
-/** Flip to true after Meta approves the first templates and Live API campaigns exist. */
-const WHATSAPP_MANUAL_SEND_READY = false;
+/** Manual desk send on. Picker only lists campaigns marked ready (env name set). */
+const WHATSAPP_MANUAL_SEND_READY = true;
 
 type WhatsappTemplateOption = {
   key: string;
@@ -421,7 +421,9 @@ const LeadModal: React.FC<LeadModalProps> = ({
       if (!data?.configured) {
         setWaError('WhatsApp API key is not configured on the server yet.');
       } else if (!list.length) {
-        setWaError('No WhatsApp campaigns are named in server settings yet.');
+        setWaError(
+          'No approved desk templates are ready yet. After Meta approves and you create a Live API campaign, add that key to AISENSY_DESK_KEYS.',
+        );
       }
     } catch (err: any) {
       const msg =
@@ -740,7 +742,7 @@ const LeadModal: React.FC<LeadModalProps> = ({
                 <Tooltip
                   title={
                     WHATSAPP_MANUAL_SEND_READY
-                      ? 'Send an approved WhatsApp template'
+                      ? 'Send an approved WhatsApp template (desk quick send)'
                       : 'Waiting for Meta to approve WhatsApp templates'
                   }
                 >

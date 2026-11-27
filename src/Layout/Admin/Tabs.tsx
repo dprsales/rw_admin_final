@@ -22,6 +22,7 @@ import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
 import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +40,7 @@ interface TabPanelProps {
 /** One icon per screen — no more repeated Dashboard/Leads/Users placeholders. */
 export const adminTabs: TabPanelProps[] = [
   { icon: SpaceDashboardRoundedIcon, label: 'Dashboard', route: '/dashboard' },
+  { icon: AccountBalanceWalletRoundedIcon, label: 'Spend', route: '/money' },
   { icon: FolderOpenRoundedIcon, label: 'Projects', route: '/projects' },
   { icon: PersonSearchRoundedIcon, label: 'Leads', route: '/leads' },
   { icon: DescriptionRoundedIcon, label: 'Applications', route: '/applications' },

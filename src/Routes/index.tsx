@@ -17,6 +17,7 @@ import VendorPartners from "../Pages/VendorPartners/VendorPartners";
 import Users from "../Pages/Users/Users";
 import Employees from "../Pages/Employees/Employees";
 import Payments from "../Pages/Payments/Payments";
+import MoneyPage from "../Pages/Money/MoneyPage";
 import EmployeeOnboardingDemo from "../Pages/EmployeeOnboardingDemo/EmployeeOnboardingDemo";
 import Join from "../Pages/Join/Join";
 import Blogs from "../Pages/Blogs/Blogs";
@@ -172,6 +173,10 @@ const router = createBrowserRouter([
       {
         path: "/dashboard",
         element: <ProtectedRoute allow="/dashboard" component={<Dashboard />} />,
+      },
+      {
+        path: "/money",
+        element: <ProtectedRoute allow="/money" component={<MoneyPage />} />,
       },
 
       {

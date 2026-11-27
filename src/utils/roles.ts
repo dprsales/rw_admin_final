@@ -104,7 +104,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  * CEO: command pulse only (dashboard). Not Users, Projects, Integrations, etc.
  */
 const WORKSPACES: Partial<Record<UserRole, string[]>> = {
-  ceo: ['/dashboard'],
+  ceo: ['/money'],
   hr: ['/applications', '/employees', '/vendors', '/vendor-partners'],
   account: ['/payments'],
   finance: ['/payments'],
@@ -114,6 +114,7 @@ const WORKSPACES: Partial<Record<UserRole, string[]>> = {
 
 export const ADMIN_ROUTES = [
   '/dashboard',
+  '/money',
   '/projects',
   '/leads',
   '/crm',
@@ -132,6 +133,7 @@ export const ADMIN_ROUTES = [
 /** Admin-panel screens only (not the Sales CRM desk). */
 export const ADMIN_MENU_ROUTES = [
   '/dashboard',
+  '/money',
   '/projects',
   '/leads',
   '/applications',
@@ -158,6 +160,7 @@ export const STAFF_MENU_ROUTES = [
 
 export const STAFF_MENU_LABELS: Record<string, string> = {
   '/dashboard': 'Dashboard',
+  '/money': 'Spend tracker',
   '/projects': 'Projects',
   '/leads': 'Leads (admin)',
   '/crm': 'Sales CRM desk',
@@ -247,11 +250,17 @@ export const canEnterApp = (role: unknown, menuAccess?: string[] | null): boolea
 
 export function homeRoute(role: unknown, menuAccess?: string[] | null): string {
   const routes = allowedRoutes(role, menuAccess);
+  if (typeof role === 'string' && role === 'ceo' && routes?.includes('/money')) {
+    return '/money';
+  }
   if (typeof role === 'string' && role === 'sales' && routes?.includes('/crm')) {
     return '/crm';
   }
   if (routes === null || routes.includes('/dashboard')) {
     return '/dashboard';
+  }
+  if (routes.includes('/money')) {
+    return '/money';
   }
   if (routes.includes('/crm')) {
     return '/crm';
