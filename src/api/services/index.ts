@@ -140,6 +140,39 @@ export const addStaffLead = async (data: StaffLeadPayload) => {
   return response.data; // { message, leadId, lead }
 };
 
+/** One normalized row for Privyr / desk CSV import. */
+export type StaffLeadImportRow = {
+  name: string;
+  phoneNumber: string;
+  email?: string;
+  message?: string;
+  projectName?: string;
+  pageSource?: string;
+  crmSource?: string;
+  stage?: string;
+  temperature?: string;
+  ownerId?: string;
+  ownerEmail?: string;
+  importRef?: string;
+  createdAt?: string;
+};
+
+export type StaffLeadImportResult = {
+  message: string;
+  created: number;
+  skippedDuplicate: number;
+  skippedInvalid: number;
+  errors?: { row: number; reason: string }[];
+  leadIds?: string[];
+};
+
+export const importStaffLeads = async (
+  rows: StaffLeadImportRow[],
+): Promise<StaffLeadImportResult> => {
+  const response = await http.post('/leads/staff/import', { rows });
+  return response.data;
+};
+
 export type AssignableOwner = {
   _id: string;
   name: string;

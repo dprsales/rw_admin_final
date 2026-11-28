@@ -108,7 +108,7 @@ const ServiceGate: React.FC = () => {
         <div className="rw-auth__card">
           <div className="rw-auth__brand">
             <img src={rwGoldLogo} alt="Rajiv Williams" className="rw-auth__logo" />
-            <p className="rw-auth__kicker">Team RW · Internal</p>
+            <p className="rw-auth__kicker">Internal</p>
           </div>
 
           <h1 className="rw-auth__title">Choose your workspace</h1>

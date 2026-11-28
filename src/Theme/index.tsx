@@ -526,7 +526,14 @@ export const theme = createTheme({
       },
     },
     MuiBackdrop: {
-      styleOverrides: { root: { backgroundColor: "rgba(0,0,0,0.72)" } },
+      styleOverrides: {
+        root: { backgroundColor: 'rgba(0,0,0,0.72)' },
+        // Menu / Select use invisible — force fully clear (no grey wash).
+        invisible: {
+          backgroundColor: 'transparent',
+          opacity: '1 !important',
+        },
+      },
     },
     MuiDialogTitle: {
       styleOverrides: {
@@ -538,15 +545,6 @@ export const theme = createTheme({
     },
     MuiDialogActions: {
       styleOverrides: { root: { padding: "16px 24px 20px", gap: "8px" } },
-    },
-    MuiBackdrop: {
-      styleOverrides: {
-        // Menu / Select use invisible — force fully clear (no grey wash).
-        invisible: {
-          backgroundColor: 'transparent',
-          opacity: '1 !important',
-        },
-      },
     },
     MuiPopover: {
       defaultProps: {
@@ -629,11 +627,6 @@ export const theme = createTheme({
           boxShadow: tokens.shadow,
         },
         arrow: { color: panelAlt },
-      },
-    },
-    MuiAutocomplete: {
-      styleOverrides: {
-        option: { fontSize: "14px" },
       },
     },
     MuiTypography: {

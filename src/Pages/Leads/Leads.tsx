@@ -15,6 +15,7 @@ import { toast } from 'react-toastify';
 
 import LeadModal from './LeadModal'; // Adjust path
 import AddLeadDialog from './AddLeadDialog';
+import ImportLeadsDialog from './ImportLeadsDialog';
 import {
   assignLeadOwner,
   deleteLead,
@@ -580,8 +581,10 @@ const AllLeads: React.FC = () => {
   const [assignBusyId, setAssignBusyId] = useState<string | null>(null);
   const [exportRequestOpen, setExportRequestOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const canFilterOwners = isLeadManagerSeat();
   const canExportLeads = canFilterOwners;
+  const canImportLeads = canFilterOwners;
 
   const ownersQuery = useQuery({
     queryKey: ['assignable-lead-owners'],
@@ -955,6 +958,7 @@ const AllLeads: React.FC = () => {
         }
       />
       <AddLeadDialog open={addLeadOpen} onClose={() => setAddLeadOpen(false)} />
+      <ImportLeadsDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
       {/* Filter toolbar — Autocomplete (Popper) so lists are searchable + no scroll lock */}
       <Paper
@@ -1170,6 +1174,18 @@ const AllLeads: React.FC = () => {
                   }}
                 >
                   <MenuList dense autoFocusItem={false} sx={{ py: 0.5 }}>
+                    {canImportLeads ? (
+                      <MenuItem
+                        onClick={() => {
+                          setActionsAnchor(null);
+                          setImportOpen(true);
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Import CSV
+                        </Typography>
+                      </MenuItem>
+                    ) : null}
                     {canExportLeads ? (
                       <MenuItem
                         disabled={exportBusy}
