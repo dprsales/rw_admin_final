@@ -7,5 +7,6 @@ export { default as CrmTeam } from './CrmTeam';
 export { default as CrmPersonDetail } from './CrmPersonDetail';
 export { default as CrmProjects } from './CrmProjects';
 export { default as CrmProjectDetail } from './CrmProjectDetail';
+export { default as CrmSettings } from './CrmSettings';
 export { default as CrmStubPage } from './CrmStubPage';
 export * from './crmRoles';

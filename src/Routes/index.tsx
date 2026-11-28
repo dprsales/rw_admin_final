@@ -32,6 +32,7 @@ import {
   CrmPersonDetail,
   CrmProjectDetail,
   CrmProjects,
+  CrmSettings,
   CrmShell,
   CrmStubPage,
   CrmTeam,
@@ -156,15 +157,7 @@ const router = createBrowserRouter([
       { path: "team/:personId", element: <CrmPersonDetail /> },
       { path: "projects", element: <CrmProjects /> },
       { path: "projects/:projectId", element: <CrmProjectDetail /> },
-      {
-        path: "settings",
-        element: (
-          <CrmStubPage
-            title="Settings"
-            blurb="CRM Admin settings (roles, access, templates). Not the ops Users screen."
-          />
-        ),
-      },
+      { path: "settings", element: <CrmSettings /> },
     ],
   },
   {
