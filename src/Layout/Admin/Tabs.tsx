@@ -25,6 +25,7 @@ import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
 import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded';
+import HubRoundedIcon from '@mui/icons-material/HubRounded';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { sidebarSkyline } from '../../assets';
@@ -51,6 +52,7 @@ export const adminTabs: TabPanelProps[] = [
   { icon: GroupRoundedIcon, label: 'Users', route: '/users' },
   { icon: BadgeRoundedIcon, label: 'Employees', route: '/employees' },
   { icon: PaymentsRoundedIcon, label: 'Payments', route: '/payments' },
+  { icon: HubRoundedIcon, label: 'Integrations', route: '/integrations' },
   { icon: ArticleRoundedIcon, label: 'Blogs', route: '/blogs' },
   { icon: PhotoLibraryRoundedIcon, label: 'Gallery', route: '/gallery' },
 ];

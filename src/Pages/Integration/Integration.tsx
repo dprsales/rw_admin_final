@@ -1,154 +1,192 @@
 import React from 'react';
 import {
-    Box,
-    Card,
-    CardActions,
-    CardContent,
-    Button,
-    Typography,
-    Grid,
-    Chip,
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  Switch,
+  Typography,
 } from '@mui/material';
-import { useState } from 'react';
-import axios from 'axios';
+import Cookies from 'js-cookie';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import PageHeader from '../../Components/PageHeader';
-import { CardGridSkeleton } from '../../Components/LoadingState';
+import { getWhatsappAgentStatus, setWhatsappControls } from '../../api/services';
 import { tokens } from '../../Theme/tokens';
 
-interface Integration {
-    name: string;
-    description: string;
-    isConnected: boolean;
+function isSuperAdmin(): boolean {
+  return String(Cookies.get('user_type') || '').toLowerCase() === 'super_admin';
 }
 
-const integrations: Integration[] = [
-    {
-        name: 'Facebook',
-        description: 'Connect to Facebook to sync your posts and ads.',
-        isConnected: false,
-    },
-    {
-        name: 'Google',
-        description: 'Integrate with Google for analytics and ads.',
-        isConnected: false,
-    },
-    {
-        name: 'Twitter',
-        description: 'Connect with Twitter for post scheduling.',
-        isConnected: false,
-    },
-];
-
 const IntegrationPage: React.FC = () => {
-    const [integrationStatus, setIntegrationStatus] = useState(integrations);
-    const [checking, setChecking] = useState(false);
+  const queryClient = useQueryClient();
+  const superAdmin = isSuperAdmin();
 
-    const handleConnect = async (name: string) => {
-        if (name === 'Facebook') {
-            // Redirect user to the backend for Facebook OAuth flow
-            window.location.href = `${process.env.REACT_APP_BACKEND_URL}/auth/connect`;
-            return;
-        }
+  const agentQuery = useQuery({
+    queryKey: ['whatsapp-agent'],
+    queryFn: getWhatsappAgentStatus,
+  });
 
-        setIntegrationStatus((prevState) =>
-            prevState.map((integration) =>
-                integration.name === name
-                    ? { ...integration, isConnected: !integration.isConnected }
-                    : integration
-            )
-        );
-    };
+  const toggleMutation = useMutation({
+    mutationFn: (patch: { agentEnabled?: boolean; autoTemplatesEnabled?: boolean }) =>
+      setWhatsappControls(patch),
+    onSuccess: (data) => {
+      toast.success(data.message || 'Saved');
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-agent'] });
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message;
+      toast.error(
+        Array.isArray(message)
+          ? message.join(' ')
+          : message || 'Could not update WhatsApp controls.',
+      );
+    },
+  });
 
-    const checkFacebookConnection = async () => {
-        setChecking(true);
-        try {
-            const response = await axios.get(
-                `${process.env.REACT_APP_BACKEND_URL}/auth/status`
-            );
-            if (response.data.isConnected) {
-                setIntegrationStatus((prevState) =>
-                    prevState.map((integration) =>
-                        integration.name === 'Facebook'
-                            ? { ...integration, isConnected: true }
-                            : integration
-                    )
-                );
-            }
-        } catch (error) {
-            console.error('Error checking Facebook connection status:', error);
-        } finally {
-            setChecking(false);
-        }
-    };
+  const status = agentQuery.data;
+  const agentOn = Boolean(status?.agentEnabled ?? status?.enabled);
+  const autoOn = Boolean(status?.autoTemplatesEnabled);
 
-    React.useEffect(() => {
-        // Check Facebook connection status on component mount
-        checkFacebookConnection();
-    }, []);
+  return (
+    <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 720, mx: 'auto' }}>
+      <PageHeader
+        title="Integrations"
+        description="WhatsApp on/off lives here. No env push for day-to-day switches."
+        crumbs={[{ label: 'Integrations' }]}
+      />
 
-    return (
-        <Box sx={{ p: { xs: 1, sm: 2 } }}>
-            <PageHeader
-                title="Integrations"
-                description="Manage your integrations below."
-                crumbs={[{ label: 'Integrations' }]}
-                actions={
-                    <Chip
-                        label={`${integrationStatus.length} integrations`}
-                        sx={{ bgcolor: tokens.goldSoft, color: tokens.goldText, fontWeight: 600 }}
-                    />
-                }
-            />
-            {checking ? (
-                <CardGridSkeleton cards={integrationStatus.length} />
-            ) : (
-            <Grid container spacing={4}>
-                {integrationStatus.map((integration) => (
-                    <Grid item xs={12} sm={6} md={4} key={integration.name}>
-                        <Card variant="outlined" sx={{ minHeight: 200 }}>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    {integration.name}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {integration.description}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{ mt: 2, fontWeight: 'bold' }}
-                                    color={
-                                        integration.isConnected
-                                            ? 'success.main'
-                                            : 'error.main'
-                                    }
-                                >
-                                    {integration.isConnected
-                                        ? 'Connected'
-                                        : 'Not Connected'}
-                                </Typography>
-                            </CardContent>
-                            <CardActions>
-                                <Button
-                                    variant="contained"
-                                    color={
-                                        integration.isConnected
-                                            ? 'secondary'
-                                            : 'primary'
-                                    }
-                                    onClick={() => handleConnect(integration.name)}
-                                >
-                                    {integration.isConnected
-                                        ? 'Disconnect'
-                                        : 'Connect'}
-                                </Button>
-                            </CardActions>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
-            )}
-        </Box>
-    );
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          border: `1px solid ${tokens.border}`,
+          borderRadius: 2,
+          bgcolor: tokens.panel,
+        }}
+      >
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              WhatsApp (AiSensy)
+            </Typography>
+            <Typography variant="body2" sx={{ color: tokens.textMuted, mt: 0.5 }}>
+              Super admin controls. API key and campaign names stay on the server. These toggles
+              save to the database instantly.
+            </Typography>
+          </Box>
+
+          {agentQuery.isPending ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={26} />
+            </Box>
+          ) : agentQuery.isError ? (
+            <Alert severity="warning">Could not load status. Is the API running with latest code?</Alert>
+          ) : (
+            <>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                gap={2}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    AI agent (night / inbound replies)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: tokens.textMuted }}>
+                    When someone messages the Cloud API number. Never quotes price. Keep published
+                    in AiSensy when this is on.
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  label={agentOn ? 'ON' : 'OFF'}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: agentOn ? tokens.successSoft : tokens.dangerSoft,
+                    color: agentOn ? tokens.successText : tokens.dangerText,
+                  }}
+                />
+                <Switch
+                  checked={agentOn}
+                  disabled={!superAdmin || toggleMutation.isPending}
+                  onChange={(_e, checked) =>
+                    toggleMutation.mutate({ agentEnabled: checked })
+                  }
+                  color="primary"
+                />
+              </Stack>
+
+              <Divider sx={{ borderColor: tokens.border }} />
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                gap={2}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Auto template campaigns
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: tokens.textMuted }}>
+                    Form ack / nurture timers from our API. Desk manual Send WhatsApp still works
+                    when this is off.
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  label={autoOn ? 'ON' : 'OFF'}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: autoOn ? tokens.successSoft : tokens.dangerSoft,
+                    color: autoOn ? tokens.successText : tokens.dangerText,
+                  }}
+                />
+                <Switch
+                  checked={autoOn}
+                  disabled={!superAdmin || toggleMutation.isPending}
+                  onChange={(_e, checked) =>
+                    toggleMutation.mutate({ autoTemplatesEnabled: checked })
+                  }
+                  color="primary"
+                />
+              </Stack>
+
+              {!superAdmin ? (
+                <Alert severity="info">Only super admin can flip these switches.</Alert>
+              ) : null}
+
+              <Alert severity="info">
+                <Typography variant="body2">{status?.note}</Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: tokens.textMuted, display: 'block', mt: 0.5 }}
+                >
+                  API key: {status?.configured ? 'configured' : 'missing on server'}
+                </Typography>
+              </Alert>
+
+              <Button
+                variant="outlined"
+                href="https://www.app.aisensy.com/"
+                target="_blank"
+                rel="noreferrer"
+                sx={{ textTransform: 'none', alignSelf: 'flex-start', fontWeight: 600 }}
+              >
+                Open AiSensy
+              </Button>
+            </>
+          )}
+        </Stack>
+      </Paper>
+    </Box>
+  );
 };
 
 export default IntegrationPage;

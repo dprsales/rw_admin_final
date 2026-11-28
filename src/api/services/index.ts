@@ -173,6 +173,28 @@ export const importStaffLeads = async (
   return response.data;
 };
 
+export type WhatsappAgentStatus = {
+  enabled: boolean;
+  agentEnabled: boolean;
+  autoTemplatesEnabled: boolean;
+  configured: boolean;
+  note?: string;
+  message?: string;
+};
+
+export const getWhatsappAgentStatus = async (): Promise<WhatsappAgentStatus> => {
+  const response = await http.get('/whatsapp/agent');
+  return response.data;
+};
+
+export const setWhatsappControls = async (patch: {
+  agentEnabled?: boolean;
+  autoTemplatesEnabled?: boolean;
+}): Promise<WhatsappAgentStatus> => {
+  const response = await http.patch('/whatsapp/agent', patch);
+  return response.data;
+};
+
 export type AssignableOwner = {
   _id: string;
   name: string;
